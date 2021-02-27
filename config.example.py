@@ -47,3 +47,14 @@ genres = {
     "Trance": "trance/7",
     "Trap / Future Bass": "trap-future-bass/87"
 }
+
+# Charts on Beatport ("Arbitrary name": "URL path for genre, without chart ID")
+charts = {
+    "Kalambo Bontan": "kalambo",
+    "Weekend Picks %U": "weekend-picks-%U"
+}
+
+# Labels on Beatport ("Arbitrary name": "URL path for genre, with chart ID")
+labels = {
+    "8 Bit Releases": "8bit/3248"
+}

@@ -15,12 +15,26 @@ If a playlist already exists for a given genre being synced, any new tracks from
 * Create / register an app on the [Spotify Developer](https://developer.spotify.com) site
     * Add the `redirect_uri` value to the _Redirect URIs_ within the app dashboard.  The value added to the dashboard must match the variable exactly. 
 
+## Dev in progress
+
+* Adding chart and label scrapping
+* Store history of track_id / playlist_id to avoid re-adding tracks that already have been added, see config.example.py for examples
+
 ### Python 3 Packages
 
 * spotipy
+* datetime
+* BeautifulSoup
+* pandas
+* re
+* openpyxl (temp)
 
 ```
 pip install spotipy
+pip install datetime
+pip install BeautifulSoup
+pip install pandas
+pip install openpyxl
 ```
 
 ## Configuration

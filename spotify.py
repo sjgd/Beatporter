@@ -265,8 +265,9 @@ def add_new_tracks_to_playlist(genre, tracks_dict):
         track_count += 1
     print("\n[+] Adding {} new tracks to the playlist: \"{}\"".format(len(persistent_top_100_track_ids), persistent_top_100_playlist_name))
     add_tracks_to_playlist(playlists[0]["id"], persistent_top_100_track_ids)
-    print("\n[+] Adding {} new tracks to the playlist: \"{}\"".format(len(daily_top_n_track_ids), daily_top_n_playlist_name))
-    add_tracks_to_playlist(playlists[1]["id"], daily_top_n_track_ids)
+    if daily_mode:
+        print("\n[+] Adding {} new tracks to the playlist: \"{}\"".format(len(daily_top_n_track_ids), daily_top_n_playlist_name))
+        add_tracks_to_playlist(playlists[1]["id"], daily_top_n_track_ids)
 
 
 def parse_tracks_spotify(tracks_json):

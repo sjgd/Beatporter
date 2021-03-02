@@ -7,10 +7,9 @@ from pandas import to_datetime
 
 import pandas as pd
 
-from config import genres
-from config import charts
-from config import labels
-from spotify import find_playlist_chart_label
+from config import genres, charts, labels, spotify_bkp
+from config import overwrite_label
+from spotify import find_playlist_chart_label, update_hist_pl_tracks
 
 
 def get_top_100_playables(genre):
@@ -77,7 +76,7 @@ def get_chart(url):
 def parse_chart_url_datetime(str):
     return datetime.today().strftime(str)
 
-def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite = False):
+def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite = overwrite_label):
     """
     :param label: label name
     :param label_bp_url_code: label url code
@@ -95,12 +94,18 @@ def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite = Fa
 
     playlist = find_playlist_chart_label(label)
     if playlist["id"]:
-        last_update = to_datetime(max(df_hist_pl_tracks.loc[df_hist_pl_tracks.playlist_id == playlist["id"], "datetime_added"])).tz_localize(None)
-        print("Label {} has {} pages. Last update found : ".format(label, max_page_number, last_update))
-    if not 'last_update' in locals():
+        df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
+        df_loc_hist = df_hist_pl_tracks.loc[df_hist_pl_tracks.playlist_id == playlist["id"]]
+        if len(df_loc_hist.index) > 0:
+            last_update = max(df_loc_hist.loc[:, "datetime_added"]).tz_localize(None)
+            print("Label {} has {} pages. Last playlist update found {}(UTC): ".format(label, max_page_number,
+                                                                                       last_update))
+        else:
+            last_update = datetime.min
+            print("Label {} has {} pages".format(label, max_page_number))
+    else:
         last_update = datetime.min
         print("Label {} has {} pages".format(label, max_page_number))
-
 
     for i in range(1, int(max_page_number) + 1):
         print("\t[+] Getting label {}, page {}".format(label_bp_url_code, i))
@@ -119,6 +124,7 @@ def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite = Fa
             print("\t[+] Reached last updated date, stopping")
             break
 
-    return label_tracks
+    label_tracks.reverse()
 
+    return label_tracks
 

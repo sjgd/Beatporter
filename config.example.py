@@ -11,10 +11,46 @@ client_id = "CHANGE_ME"
 client_secret = "CHANGE_ME"
 redirect_uri = "http://localhost:65000"
 
+# Daily mode
+# TODO
+daily_mode = True
+daily_n_track = 15
+
+# Shuffle playlists
+# TODO
+shuffle_playlist = False
+
+# Digging mode
+# Allows to avoid adding tracks that have been previously added, (listened to) and deleted.
+# Match is done on artist - track name, not on spotify track ID
+#   "" to do not skip tracks with similar artist - track name in playlists
+#   "playlist" to skip tracks that have been already added to this playlist only
+#   "all" to skip tracks that have been added to any user's playlists
+digging_mode = "playlist"
+
+# Overwrite labels
+# If set to false will stop once reached the date of the last corresponding playlist update
+overwrite_label = True
+
+# Silent search
+# If set to true will avoid displaying search information
+silent_search = True
+
+# Parse track
+# If set to true will remove feat artist2 and orgininal mix to improve the search
+parse_track = True
+
+# Playlist prefix
+playlist_prefix = "Beatport: "
+
+# Playlist description
+playlist_description = "Created using github.com/sjeangirard/Beatporter"
+
 # Genres on Beatport ("Arbitrary name": "URL path for genre")
 genres = {
     "All Genres": "",
     "Afro House": "afro-house/89",
+    "Bass/Club": "bass-club/85",
     "Bass House": "bass-house/91",
     "Big Room": "big-room/79",
     "Breaks": "breaks/9",
@@ -38,9 +74,10 @@ genres = {
     "Melodic House & Techno": "melodic-house-and-techno/90",
     "Minimal / Deep Tech": "minimal-deep-tech/14",
     "Nu Disco / Disco": "nu-disco-disco/50",
+    "Organic House / Downtempo": "organic-house-downtempo/93",
     "Progressive House": "progressive-house/15",
     "Psy Trance": "psy-trance/13",
-    "Reggae / Dancehall / Dub": "reggae-dancehall-dub/41",
+    # "Reggae / Dancehall / Dub": "reggae-dancehall-dub/41", # Removed by Beatport
     "Tech House": "tech-house/11",
     "Techno (Peak Time / Driving / Hard)": "techno-peak-time-driving-hard/6",
     "Techno (Raw / Deep / Hypnotic)": "techno-raw-deep-hypnotic/92",
@@ -57,4 +94,9 @@ charts = {
 # Labels on Beatport ("Arbitrary name": "URL path for genre, with chart ID")
 labels = {
     "8 Bit Releases": "8bit/3248"
+}
+
+# Spotify backup, save some spotify playlist to a new name, use same logic for digging mode
+spotify_bkp = {
+    # "BKP Discover Weekly": "ORIGINAL_PLAYLIST_ID",
 }

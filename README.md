@@ -19,6 +19,7 @@ If a playlist already exists for a given genre being synced, any new tracks from
 
 * Adding chart and label scrapping
 * Store history of track_id / playlist_id to avoid re-adding tracks that already have been added, see config.example.py for examples
+* Add additional feature to backup spotify playlists
 
 ### Python 3 Packages
 

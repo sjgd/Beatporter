@@ -527,10 +527,10 @@ def add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks):
         playlists = [{"name": persistent_top_100_playlist_name, "id": get_playlist_id(persistent_top_100_playlist_name)}]
 
     for playlist in playlists:
-        df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
         if not playlist["id"]:
             print("\t[!] Playlist \"{}\" does not exist, creating it.".format(playlist["name"]))
             playlist["id"] = create_playlist(playlist["name"])
+        df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
 
     # Create local hist for top 100 playlist
     if digging_mode == "playlist":

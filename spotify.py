@@ -452,6 +452,7 @@ def add_new_tracks_to_playlist_chart_label(title, tracks_dict, df_hist_pl_tracks
 
     df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
     playlist_track_ids = df_hist_pl_tracks.loc[df_hist_pl_tracks["playlist_id"] == playlist["id"], "track_id"]
+    update_playlist_description_with_date(playlist["id"])
 
     return df_hist_pl_tracks
 
@@ -521,9 +522,7 @@ def add_new_tracks_to_playlist_id(playlist_name, track_ids, df_hist_pl_tracks):
                                                                       persistent_playlist_name))
     add_tracks_to_playlist(playlist["id"], persistent_track_ids)
 
-    # TODO extract description first
-    spotify_ins.playlist_change_details(playlist_id=playlist["id"],
-                                        description="Updated on " + datetime.today().strftime('%Y-%m-%d'))
+    update_playlist_description_with_date(playlist["id"])
     df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
 
     return df_hist_pl_tracks

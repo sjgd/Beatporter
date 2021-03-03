@@ -70,7 +70,7 @@ genres = {
     "House": "house/5",
     "Indie Dance / Nu Disco": "indie-dance-nu-disco/37",
     "Leftfield Bass": "leftfield-bass/85",
-    "Leftfield House & Techno": "leftfield-house-and-techno/80",
+    # "Leftfield House & Techno": "leftfield-house-and-techno/80", # Removed by Beatport
     "Melodic House & Techno": "melodic-house-and-techno/90",
     "Minimal / Deep Tech": "minimal-deep-tech/14",
     "Nu Disco / Disco": "nu-disco-disco/50",
@@ -82,7 +82,7 @@ genres = {
     "Techno (Peak Time / Driving / Hard)": "techno-peak-time-driving-hard/6",
     "Techno (Raw / Deep / Hypnotic)": "techno-raw-deep-hypnotic/92",
     "Trance": "trance/7",
-    "Trap / Future Bass": "trap-future-bass/87",
+    # "Trap / Future Bass": "trap-future-bass/87",  # Removed by Beatport
     "Trap / Hip-Hop / R&B": "trap-hip-hop-rb/38",
     "UK Garage / Bassline:": "uk-garage-bassline/86"
 }
@@ -90,15 +90,15 @@ genres = {
 # Charts on Beatport ("Arbitrary name": "URL path for genre, without chart ID")
 charts = {
     "Kalambo Bontan": "kalambo",
-    "Weekend Picks %U": "weekend-picks-%U"
+    "Weekend Picks %U (%Y)": "weekend-picks-%U"
 }
 
 # Labels on Beatport ("Arbitrary name": "URL path for genre, with chart ID")
 labels = {
-    "8 Bit Releases": "8bit/3248"
+    "8Bit Releases": "8bit/3248"
 }
 
-# Spotify backup, save some spotify playlist to a new name, use same logic for digging mode
+# Spotify backup, save some spotify playlist to a new name, using same logic for digging mode
 spotify_bkp = {
-    # "BKP Discover Weekly": "ORIGINAL_PLAYLIST_ID",
+    "BKP Discover Weekly": "ORIGINAL_PLAYLIST_ID",
 }

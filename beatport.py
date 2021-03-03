@@ -82,7 +82,7 @@ def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite = ov
     :param label_bp_url_code: label url code
     :param df_hist_pl_tracks: dataframe of historic track
     :param overwrite: if set to true will reload all tracks anyway, otherwise stops once the date of the last playlist refresh is reached
-    :return: dict of tracks
+    :return: dict of tracks from oldest (first) to newest (last)
     """
 
     r = requests.get("https://www.beatport.com/label/{}/tracks?per-page=150".format(label_bp_url_code))
@@ -97,7 +97,11 @@ def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite = ov
         df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
         df_loc_hist = df_hist_pl_tracks.loc[df_hist_pl_tracks.playlist_id == playlist["id"]]
         if len(df_loc_hist.index) > 0:
-            last_update = max(df_loc_hist.loc[:, "datetime_added"]).tz_localize(None)
+            last_update = max(df_loc_hist.loc[:, "datetime_added"])
+            if type(last_update) == str:
+                last_update = datetime.strptime(last_update, '%Y-%m-%dT%H:%M:%SZ')
+            else:
+                last_update = last_update.tz_localize(None)
             print("Label {} has {} pages. Last playlist update found {}(UTC): ".format(label, max_page_number,
                                                                                        last_update))
         else:

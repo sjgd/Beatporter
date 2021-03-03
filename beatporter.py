@@ -58,16 +58,10 @@ def update_hist(master_refresh = False):
 
 if __name__ == "__main__":
 
-    # import os
-    # path_cwd = os.getcwd()
-    # print(path_cwd)
-    # update_hist(master_refresh=True)
-
+    # Init
     start_time = datetime.now()
     print("[!] Starting @ {}\n".format(start_time))
-
     df_hist_pl_tracks = load_hist_file()
-
     beatport.charts = {beatport.parse_chart_url_datetime(k): beatport.parse_chart_url_datetime(v) for k, v in beatport.charts.items()}
 
     # if path.exists(file_name_hist):
@@ -75,15 +69,11 @@ if __name__ == "__main__":
     # else:
     #     df_hist_pl_tracks = pd.DataFrame(columns=['playlist_id', 'track_id', 'datetime_added', 'artist_name'])
 
-    top_100_charts = dict()
+    # Parse lists
     for genre, genre_bp_url_code in beatport.genres.items():
-        top_100_charts[genre] = beatport.get_top_100_tracks(genre)
-
-    for genre in top_100_charts:
-        print("\n***** {} *****".format(genre))
-        dump_tracks(top_100_charts[genre])
-        print("\n\n")
-        spotify.add_new_tracks_to_playlist(genre, top_100_charts[genre])
+        print("\n Getting genre : ***** {} *****".format(genre))
+        top_100_chart = beatport.get_top_100_tracks(genre)
+        df_hist_pl_tracks = spotify.add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks)
 
     for chart, chart_bp_url_code in beatport.charts.items():
         #TODO handle return None, handle chart_bp_url_code has ID already or not
@@ -110,6 +100,7 @@ if __name__ == "__main__":
         print("\n Backing up to playlist : ***** {} : {} *****".format(playlist_name, org_playlist_id))
         df_hist_pl_tracks = spotify.back_up_spotify_playlist(playlist_name, org_playlist_id, df_hist_pl_tracks)
 
+    # Output
     sleep(5) # try to avoid read-write errors if running too quickly
     df_hist_pl_tracks = df_hist_pl_tracks.loc[:, ['playlist_id', 'track_id', 'datetime_added', 'artist_name']]
     df_hist_pl_tracks.to_pickle(file_name_hist)

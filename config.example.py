@@ -44,7 +44,7 @@ parse_track = True
 playlist_prefix = "Beatport: "
 
 # Playlist description
-playlist_description = "Created using github.com/sjeangirard/Beatporter"
+playlist_description = "Created using github.com/sjeangirard/Beatporter."
 
 # Genres on Beatport ("Arbitrary name": "URL path for genre")
 genres = {
@@ -82,7 +82,9 @@ genres = {
     "Techno (Peak Time / Driving / Hard)": "techno-peak-time-driving-hard/6",
     "Techno (Raw / Deep / Hypnotic)": "techno-raw-deep-hypnotic/92",
     "Trance": "trance/7",
-    "Trap / Future Bass": "trap-future-bass/87"
+    "Trap / Future Bass": "trap-future-bass/87",
+    "Trap / Hip-Hop / R&B": "trap-hip-hop-rb/38",
+    "UK Garage / Bassline:": "uk-garage-bassline/86"
 }
 
 # Charts on Beatport ("Arbitrary name": "URL path for genre, without chart ID")

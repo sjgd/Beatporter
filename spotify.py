@@ -89,8 +89,9 @@ def create_playlist(playlist_name):
 def get_playlist_id(playlist_name):
     playlists = get_all_playlists()
     for playlist in playlists:
-        if playlist["name"] == playlist_name:
-            return playlist["id"]
+        if playlist['owner']['id'] == username: # Can only modify playlist that the user owns
+            if playlist["name"] == playlist_name:
+                return playlist["id"]
     return None
 
 
@@ -436,8 +437,8 @@ def add_new_tracks_to_playlist_chart_label(title, tracks_dict, df_hist_pl_tracks
 
 def add_new_tracks_to_playlist_id(playlist_name, track_ids, df_hist_pl_tracks):
     """
-    :param title: Chart or label playlist title
-    :param tracks_dict: dict of tracks to add
+    :param title: Playlist name to be used, will not be modified
+    :param tracks_dict: dict of tracks with their IDS
     :param df_hist_pl_tracks: dataframe of history of track, will not add track_id already present
     :return: updated df_hist_pl_tracks
     """
@@ -502,6 +503,134 @@ def add_new_tracks_to_playlist_id(playlist_name, track_ids, df_hist_pl_tracks):
     df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
 
     return df_hist_pl_tracks
+
+def add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks):
+    """
+    :param genre: Genre name
+    :param top_100_chart: dict of tracks to add
+    :param df_hist_pl_tracks: dataframe of history of track, will not add track_id already present
+    :return: updated df_hist_pl_tracks
+    """
+
+    # TODO export playlist anterior name to config
+    # persistent_top_100_playlist_name = "{}{} - Top 100".format(playlist_prefix, genre)
+    # daily_top_10_playlist_name = "{}{} - Daily Top".format(playlist_prefix, genre)
+    persistent_top_100_playlist_name = "Beatporter: {} - Top 100".format(genre)
+    daily_top_n_playlist_name = "Beatporter: {} - Daily Top".format(genre)
+    print("[+] Identifying new tracks for playlist: \"{}\"".format(persistent_top_100_playlist_name))
+
+    if daily_mode:
+        playlists = [
+            {"name": persistent_top_100_playlist_name, "id": get_playlist_id(persistent_top_100_playlist_name)},
+            {"name": daily_top_n_playlist_name, "id": get_playlist_id(daily_top_n_playlist_name)}]
+    else:
+        playlists = [{"name": persistent_top_100_playlist_name, "id": get_playlist_id(persistent_top_100_playlist_name)}]
+
+    for playlist in playlists:
+        df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
+        if not playlist["id"]:
+            print("\t[!] Playlist \"{}\" does not exist, creating it.".format(playlist["name"]))
+            playlist["id"] = create_playlist(playlist["name"])
+
+    # Create local hist for top 100 playlist
+    if digging_mode == "playlist":
+        df_local_hist = df_hist_pl_tracks.loc[df_hist_pl_tracks["playlist_id"] == playlists[0]["id"]]
+    elif digging_mode == "all":
+        df_local_hist = df_hist_pl_tracks
+    else:
+        df_local_hist = pd.DataFrame(columns=['playlist_id', 'track_id', 'datetime_added', 'artist_name'])
+    playlist_track_ids = df_hist_pl_tracks.loc[df_hist_pl_tracks["playlist_id"] == playlists[0]["id"], "track_id"]
+
+    if daily_mode :
+        if digging_mode == "":
+            # Clear daily playlist if digging mode is not using hist otherwise will delete tracks not yet listened
+            clear_playlist(playlists[1]["id"])
+
+        # Create local hist for daily playlist
+        if digging_mode == "playlist":
+            df_local_hist_daily = df_hist_pl_tracks.loc[df_hist_pl_tracks["playlist_id"] == playlists[1]["id"]]
+        elif digging_mode == "all":
+            df_local_hist_daily = df_hist_pl_tracks
+        else:
+            df_local_hist_daily = pd.DataFrame(columns=['playlist_id', 'track_id', 'datetime_added', 'artist_name'])
+        playlist_track_ids_daily = df_hist_pl_tracks.loc[df_hist_pl_tracks["playlist_id"] == playlists[1]["id"], "track_id"]
+
+    persistent_track_ids = list()
+    daily_top_n_track_ids = list()
+    track_count = 0
+    track_count_tot = 0
+
+    for track in top_100_chart:
+        track_count_tot += 1
+        track_artist_name = track['artists'][0] + " - " + track['name'] + " - " + track["mix"]
+        # TODO reformat string
+        print("{}% : {} : nb {} out of {}".format(str(round(track_count_tot / len(top_100_chart) * 100,2)),track_artist_name, track_count_tot, len(top_100_chart)))
+
+        if not track_artist_name in df_local_hist.values:
+            if parse_track: track = parse_track_regex_beatport(track)
+            track_id = search_for_track(track)
+            if track_id and not track_id in playlist_track_ids.values and not track_id in df_local_hist.values:
+                print("\t[+] Adding track id : {} : nb {}".format(track_id, track_count))
+                persistent_track_ids.append(track_id)
+                track_count += 1
+                if track_count < daily_n_track and track_id not in playlist_track_ids_daily.values and track_id not in df_local_hist_daily.values:
+                    daily_top_n_track_ids.append(track_id)
+            if track_count >= 99: # Have limit of 100 trakcks per import
+                print("\n[+] Adding {} new tracks to the playlist: \"{}\"".format(len(persistent_track_ids), persistent_top_100_playlist_name))
+                add_tracks_to_playlist(playlists[0]["id"], persistent_track_ids)
+                # TODO consider only adding new ID to avoid reloading large playlist
+                df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
+                playlist_track_ids = df_hist_pl_tracks.loc[
+                    df_hist_pl_tracks["playlist_id"] == playlists[0]["id"], "track_id"]
+                track_count = 0
+                persistent_track_ids = list()
+        else: print("\tSimilar track name already found")
+
+        if track_count_tot % refresh_token_n_tracks == 0: # Avoid time out
+            spotify_auth()
+            print("[+] Identifying new tracks for playlist: \"{}\"\n".format(persistent_top_100_playlist_name))
+
+    print("\n[+] Adding {} new tracks to the playlist: \"{}\"".format(len(persistent_track_ids),
+                                                                      persistent_top_100_playlist_name))
+    print("\n[+] Adding {} new tracks to the playlist: \"{}\"".format(len(daily_top_n_track_ids),
+                                                                      daily_top_n_playlist_name))
+    add_tracks_to_playlist(playlists[0]["id"], persistent_track_ids)
+    add_tracks_to_playlist(playlists[1]["id"], daily_top_n_track_ids)
+
+    # Add more to daily playlist if not full
+    if daily_mode:
+        daily_playlist = spotify_ins.playlist(playlist_id=playlists[1]["id"])
+        n_daily_tracks = len(daily_playlist['tracks']['items'])
+        if n_daily_tracks < daily_n_track:
+            extra_daily_top_n_track_ids = list()
+            for track_id in playlist_track_ids: # Full playlist tracks ID
+                if n_daily_tracks < daily_n_track and track_id not in playlist_track_ids_daily.values:
+                    if track_id not in df_local_hist_daily.values and track_id not in daily_top_n_track_ids:
+                        extra_daily_top_n_track_ids.append(track_id)
+                        n_daily_tracks += 1
+
+            print("\n[+] Adding {} extra new tracks to the playlist: \"{}\"".format(len(extra_daily_top_n_track_ids),
+                                                                              daily_top_n_playlist_name))
+            add_tracks_to_playlist(playlists[1]["id"], extra_daily_top_n_track_ids)
+
+    for playlist in playlists:
+        df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
+        update_playlist_description_with_date(playlist)
+
+    return df_hist_pl_tracks
+
+
+def update_playlist_description_with_date(playlist):
+    """
+    :param playlist:
+    :return:
+    """
+    playlist_desc = spotify_ins.playlist(playlist_id=playlist["id"])
+    playlist_desc['description'] = re.sub(r'\s*Updated on \d{4}-\d{2}-\d{2}\.*', '', playlist_desc['description'])
+    playlist_desc['description'] = re.sub(r'&#x2F;', '/', playlist_desc['description'])
+    spotify_ins.playlist_change_details(playlist_id=playlist["id"],
+                                        description=playlist_desc['description'] + " Updated on {}.".format(
+                                            datetime.today().strftime('%Y-%m-%d')))
 
 def update_hist_from_playlist(title, df_hist_pl_tracks):
     # TODO test, to remove

@@ -45,7 +45,7 @@ def parse_tracks(tracks_json):
 
 
 def get_top_100_tracks(genre):
-    print("[+] Fetching Top 100 {} Tracks".format(genre))
+    # print("[+] Fetching Top 100 {} Tracks".format(genre))
     raw_tracks_dict = get_top_100_playables(genre)
     return parse_tracks(raw_tracks_dict)
 

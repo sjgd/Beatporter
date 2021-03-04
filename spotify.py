@@ -452,7 +452,7 @@ def add_new_tracks_to_playlist_chart_label(title, tracks_dict, df_hist_pl_tracks
 
     df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
     playlist_track_ids = df_hist_pl_tracks.loc[df_hist_pl_tracks["playlist_id"] == playlist["id"], "track_id"]
-    update_playlist_description_with_date(playlist["id"])
+    update_playlist_description_with_date(playlist)
 
     return df_hist_pl_tracks
 
@@ -522,7 +522,7 @@ def add_new_tracks_to_playlist_id(playlist_name, track_ids, df_hist_pl_tracks):
                                                                       persistent_playlist_name))
     add_tracks_to_playlist(playlist["id"], persistent_track_ids)
 
-    update_playlist_description_with_date(playlist["id"])
+    update_playlist_description_with_date(playlist)
     df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
 
     return df_hist_pl_tracks
@@ -663,8 +663,8 @@ def add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks):
 
 def update_playlist_description_with_date(playlist):
     """
-    :param playlist:
-    :return:
+    :param playlist: playlist dict
+    :return: None
     """
     playlist_desc = spotify_ins.playlist(playlist_id=playlist["id"])
     playlist_desc['description'] = re.sub(r'\s*Updated on \d{4}-\d{2}-\d{2}\.*', '', playlist_desc['description'])

@@ -212,6 +212,135 @@ def search_for_track(track, silent=silent_search):
     print("\t[!] Could not find this song on Spotify!")
     return None
 
+def parse_search_results_spotify(search_results, track, silent=silent_search):
+    """
+    :param search_results: Spotify API search result
+    :param track: track dict to search
+    :param silent: If false print detailed search results
+    :return: track_id as string if found, else None
+    """
+
+    track_id = None
+
+    if len(search_results["tracks"]["items"]) == 1:
+        track_id = search_results["tracks"]["items"][0]["id"]
+        if not silent: print("\t\t[+] Found an exact match on name, mix, artists, and release: {}".format(track_id))
+        do_durations_match(track["duration_ms"], search_results["tracks"]["items"][0]["duration_ms"])
+        return track_id
+
+    if len(search_results["tracks"]["items"]) > 1:
+        if not silent: print("\t\t[+] Found multiple exact matches ({}) on name, mix, artists, and release.".format(
+            len(search_results["tracks"]["items"])))
+        return best_of_multiple_matches(track, search_results["tracks"]["items"])
+
+    return track_id
+
+def parse_track_regex_beatport(track):
+    track_out = track.copy() # Otherwise modifies the dict
+    track_out["name"] = re.sub(r'(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)', '',
+                           track_out["name"])  # Remove feat info, mostly not present in spotify
+    track_out["name"] = re.sub(r'\W', ' ', track_out["name"])  # Remove special characters as they are not handled by Spotify API
+    # track_out["mix"] = re.sub(r'(Original Mix$)', '',
+    #                       track_out["mix"])  # Remove original mix info, mostly not present in spotify
+
+    return track_out
+
+def parse_track_regex_beatport_v2(track):
+    track_out = track.copy() # Otherwise modifies the dict
+    track_out["name"] = re.sub(r'(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)', '',
+                           track_out["name"])  # Remove feat info, mostly not present in spotify
+    track_out["name"] = re.sub(r'[^\w\s]', '', track_out["name"])  # Remove special characters as they are not handled by Spotify API
+    # track_out["mix"] = re.sub(r'(Original Mix$)', '',
+    #                       track_out["mix"])  # Remove original mix info, mostly not present in spotify
+
+    return track_out
+
+
+def search_for_track_v2(track, silent=silent_search, parse_track=parse_track):
+    """
+    :param track: track dict
+    :param silent: if true does not pring detailed, only if not found
+    :param parse_track: if true try to remove (.*) and mix information
+    :return: Spotify track_id
+    """
+    if parse_track:
+        track_parsed = [track.copy(), parse_track_regex_beatport(track), parse_track_regex_beatport_v2(track)]
+    else:
+        track_parsed = [track]
+
+    for track_ in track_parsed:
+        # Create a field name mix according to Spotify formatting
+        track_["name_mix"] = "{}{}".format(track_["name"], "" if not track_["mix"] else " - {}".format(track_["mix"]))
+
+        # Create a parsed artist and try both
+        artist_search = [*track_["artists"]]
+        if parse_track:
+            # Add parsed artist if not in list already
+            artist_search.extend(x for x in [re.sub(r'\s*\([^)]*\)', '', artist_) for artist_ in track_["artists"]] if
+                                 x not in artist_search) # Remove (UK) for example
+            artist_search.extend(x for x in [re.sub(r'\W+', ' ', artist_) for artist_ in track_["artists"]] if
+                                 x not in artist_search) # Remove special characters, in case it is not handled by Spotify API
+            artist_search.extend(x for x in [re.sub(r'[^\w\s]', '', artist_) for artist_ in track_["artists"]] if
+                                 x not in artist_search)  # Remove special characters, in case it is not handled by Spotify API
+
+        # Search artist and artist parsed if parsed is on
+        for artist in artist_search:
+            # Search track name and track name without mix (even if parsed is off)
+            for track_name in [track_["name_mix"], track_["name"]]:
+                # Search with Title, Mix, Artist, Release / Album and Label
+                if not silent:
+                    print("\n[+] Searching for track: {} by {} on {} on {} label".format(track_name, artist,
+                                                                                         track_["release"],
+                                                                                         track_["label"]))
+                query = 'track:"{}" artist:"{}" album:"{}" label:"{}"'.format(track_name, artist,
+                                                                              track_["release"],
+                                                                              track_["label"])
+                if not silent:
+                    print("\t[+] Search Query: {}".format(query))
+                search_results = spotify_ins.search(query)
+                track_id = parse_search_results_spotify(search_results, track_)
+                if track_id:
+                    return track_id
+
+                # Search with Title, Mix, Artist and Label, w/o Release / Album
+                if not silent:
+                    print("\n[+] Searching for track: {} by {} on {} label".format(track_name, artist, track_["label"]))
+                query = 'track:"{}" artist:"{}" label:"{}"'.format(track_name, artist, track_["label"])
+                if not silent:
+                    print("\t[+] Search Query: {}".format(query))
+                search_results = spotify_ins.search(query)
+                track_id = parse_search_results_spotify(search_results, track_)
+                if track_id:
+                    return track_id
+
+                # Search with Title, Mix, Artist, Release / Album, w/o  Label
+                if not silent:
+                    print(
+                        "\n[+] Searching for track: {} by {} on {} album".format(track_name, artist, track_["release"]))
+                query = 'track:"{}" artist:"{}" album:"{}"'.format(track_name, artist, track_["release"])
+                if not silent:
+                    print("\t[+] Search Query: {}".format(query))
+                search_results = spotify_ins.search(query)
+                track_id = parse_search_results_spotify(search_results, track_)
+                if track_id:
+                    return track_id
+
+                # Search with Title, Artist, Release / Album and Label, w/o Release and Label
+                if not silent:
+                    print("\n[+] Searching for track: {} by {}".format(track_name, artist))
+                query = 'track:"{}" artist:"{}"'.format(track_name, artist)
+                if not silent:
+                    print("\t[+] Search Query: {}".format(query))
+                search_results = spotify_ins.search(query)
+                track_id = parse_search_results_spotify(search_results, track_)
+                if track_id:
+                    return track_id
+
+    print("\t\t[+] No exact matches on name and artists.")
+    print("\t[!] Could not find this song on Spotify!")
+
+    return None
+
 
 def track_in_playlist(playlist_id, track_id):
     for track in get_all_tracks_in_playlist(playlist_id):
@@ -270,7 +399,7 @@ def add_new_tracks_to_playlist(genre, tracks_dict):
     daily_top_n_track_ids = list()
     track_count = 0
     for track in tracks_dict:
-        track_id = search_for_track(track)
+        track_id = search_for_track_v2(track)
         if track_id and not track_in_playlist(playlists[0]["id"], track_id):
             persistent_top_100_track_ids.append(track_id)
         if track_id and track_count < daily_n_track:
@@ -363,16 +492,6 @@ def find_playlist_chart_label(title):
 
     return playlist
 
-
-def parse_track_regex_beatport(track):
-    track["name"] = re.sub(r'(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)', '',
-                           track["name"])  # Remove feat info, mostly not present in spotify
-    track["mix"] = re.sub(r'(Original Mix$)', '',
-                          track["mix"])  # Remove original mix info, mostly not present in spotify
-
-    return track
-
-
 def add_new_tracks_to_playlist_chart_label(title, tracks_dict, df_hist_pl_tracks, use_prefix=True):
     """
     :param title: Chart or label playlist title
@@ -423,8 +542,7 @@ def add_new_tracks_to_playlist_chart_label(title, tracks_dict, df_hist_pl_tracks
                                                   track_artist_name, track_count_tot, len(tracks_dict)))
         if not track_artist_name in df_local_hist.values:
             # print("Search")
-            if parse_track: track = parse_track_regex_beatport(track)
-            track_id = search_for_track(track)
+            track_id = search_for_track_v2(track)
             if track_id and not track_id in playlist_track_ids.values and not track_id in df_local_hist.values:
                 print("\t[+] Adding track id : {} : nb {}".format(track_id, track_count))
                 persistent_track_ids.append(track_id)
@@ -601,10 +719,7 @@ def add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks):
         print("{}% : {} : nb {} out of {}".format(str(round(track_count_tot / len(top_100_chart) * 100, 2)),
                                                   track_artist_name, track_count_tot, len(top_100_chart)))
 
-        if parse_track:
-            track = parse_track_regex_beatport(track)
-
-        track_id = search_for_track(track)
+        track_id = search_for_track_v2(track)
 
         if track_id:
             if track_id not in playlist_track_ids.values and track_id not in df_local_hist.values:
@@ -705,3 +820,111 @@ def spotify_auth():
 
 sp_oauth = oauth2.SpotifyOAuth(client_id, client_secret, redirect_uri, username=username, scope=scope)
 spotify_auth()
+
+# Annex testing tracks
+
+track_working_mix = {
+    "title": "",
+    "name": "The Shake",
+    "mix": "Extended Mix",
+    "artists": [
+        "Ellis Moss"
+    ],
+    "remixers": [],
+    "release": "The Shake",
+    "label": "Toolroom Trax",
+    "published_date": "2021-01-29",
+    "released_date": "2021-01-29",
+    "duration": "6:14",
+    "duration_ms": 374032,
+    "genres": [
+        "Tech House"
+    ],
+    "bpm": 124,
+    "key": "G min"
+}
+
+track_not_working_mix = {
+    "title": "",
+    "name": "Jumpin'",
+    "mix": "Extended",
+    "artists": [
+        "CID",
+        "Westend"
+    ],
+    "remixers": [],
+    "release": "Jumpin'",
+    "label": "Repopulate Mars",
+    "published_date": "2021-02-12",
+    "released_date": "2021-02-12",
+    "duration": "5:04",
+    "duration_ms": 304761,
+    "genres": [
+        "Tech House"
+    ],
+    "bpm": 126,
+    "key": "A min"
+}
+
+track_not_working_artist = {
+    "title": "",
+    "name": "Set U Free",
+    "mix": "Extended Mix",
+    "artists": [
+        "GUZ (NL)"
+    ],
+    "remixers": [],
+    "release": "Set U Free (Extended Mix)",
+    "label": "Sink or Swim",
+    "published_date": "2021-01-29",
+    "released_date": "2021-01-29",
+    "duration": "4:23",
+    "duration_ms": 263040,
+    "genres": [
+        "Tech House"
+    ],
+    "bpm": 125,
+    "key": "B maj"
+}
+
+track_special_characters = {
+    "title": "",
+    "name": "Don't Touch The Pool",
+    "mix": "Original Mix",
+    "artists": [
+        "FOVOS"
+    ],
+    "remixers": [],
+    "release": "Hot Mess",
+    "label": "Country Club Disco",
+    "published_date": "2021-02-12",
+    "released_date": "2021-02-12",
+    "duration": "3:47",
+    "duration_ms": 227302,
+    "genres": [
+        "Tech House"
+    ],
+    "bpm": 128,
+    "key": "A maj"
+}
+
+track_name_special_char_cant_space = {
+    "title": "",
+    "name": "Don't Make Me",
+    "mix": "Original Mix",
+    "artists": [
+        "Dillon Nathaniel"
+    ],
+    "remixers": [],
+    "release": "Reason to Fly",
+    "label": "Sola",
+    "published_date": "2021-02-19",
+    "released_date": "2021-02-19",
+    "duration": "5:46",
+    "duration_ms": 346666,
+    "genres": [
+        "Tech House"
+    ],
+    "bpm": 126,
+    "key": "G\u266d min"
+}

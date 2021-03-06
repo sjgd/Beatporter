@@ -239,9 +239,8 @@ def parse_track_regex_beatport(track):
     track_out = track.copy() # Otherwise modifies the dict
     track_out["name"] = re.sub(r'(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)', '',
                            track_out["name"])  # Remove feat info, mostly not present in spotify
-    track_out["name"] = re.sub(r'\W', ' ', track_out["name"])  # Remove special characters as they are not handled by Spotify API
-    # track_out["mix"] = re.sub(r'(Original Mix$)', '',
-    #                       track_out["mix"])  # Remove original mix info, mostly not present in spotify
+    track_out["name"] = re.sub(r'\W', ' ',
+                               track_out["name"])  # Remove special characters as they are not handled by Spotify API
 
     return track_out
 
@@ -249,12 +248,37 @@ def parse_track_regex_beatport_v2(track):
     track_out = track.copy() # Otherwise modifies the dict
     track_out["name"] = re.sub(r'(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)', '',
                            track_out["name"])  # Remove feat info, mostly not present in spotify
-    track_out["name"] = re.sub(r'[^\w\s]', '', track_out["name"])  # Remove special characters as they are not handled by Spotify API
-    # track_out["mix"] = re.sub(r'(Original Mix$)', '',
-    #                       track_out["mix"])  # Remove original mix info, mostly not present in spotify
+    track_out["name"] = re.sub(r'[^\w\s]', '',
+                               track_out["name"])  # Remove special characters as they are not handled by Spotify API
 
     return track_out
 
+def parse_track_regex_beatport_v3(track):
+    track_out = track.copy() # Otherwise modifies the dict
+    track_out["name"] = re.sub(r'(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)', '',
+                           track_out["name"])  # Remove feat info, mostly not present in spotify
+    track_out["name"] = re.sub(r'[^\w\s]', '',
+                               track_out["name"])  # Remove special characters as they are not handled by Spotify API
+    track_out["mix"] = re.sub("[R|r]emix", 'mix',
+                               track_out["mix"])  # Change remix
+    track_out["mix"] = re.sub("[M|m]ix", 'Remix',
+                              track_out["mix"])  # Change to remix
+
+    return track_out
+
+def parse_track_regex_beatport_v4(track):
+    track_out = track.copy() # Otherwise modifies the dict
+    track_out["name"] = re.sub(r'(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)', '',
+                           track_out["name"])  # Remove feat info, mostly not present in spotify
+    track_out["name"] = re.sub(r'[^\w\s]', '',
+                               track_out["name"])  # Remove special characters as they are not handled by Spotify API
+    track_out["mix"] = re.sub("[M|m]ix", '',
+                               track_out["mix"])  # Remove special characters as they are not handled by Spotify API
+
+    return track_out
+
+def add_space(match):
+    return " " + match.group()
 
 def search_for_track_v2(track, silent=silent_search, parse_track=parse_track):
     """
@@ -264,7 +288,9 @@ def search_for_track_v2(track, silent=silent_search, parse_track=parse_track):
     :return: Spotify track_id
     """
     if parse_track:
-        track_parsed = [track.copy(), parse_track_regex_beatport(track), parse_track_regex_beatport_v2(track)]
+        track_parsed = [track.copy(), parse_track_regex_beatport(track),
+                        parse_track_regex_beatport_v2(track), parse_track_regex_beatport_v3(track),
+                        parse_track_regex_beatport_v4(track)]
     else:
         track_parsed = [track]
 
@@ -282,6 +308,11 @@ def search_for_track_v2(track, silent=silent_search, parse_track=parse_track):
                                  x not in artist_search) # Remove special characters, in case it is not handled by Spotify API
             artist_search.extend(x for x in [re.sub(r'[^\w\s]', '', artist_) for artist_ in track_["artists"]] if
                                  x not in artist_search)  # Remove special characters, in case it is not handled by Spotify API
+            artist_search.extend(x for x in [re.sub(r'(?<=\w)[A-Z]', add_space, artist_) for artist_ in track_["artists"]] if
+                                 x not in artist_search)  # Splitting artist name with a space after a capital letter
+            artist_search.extend(x for x in [re.sub(r'\s&.*$', "", artist_) for artist_ in track_["artists"]] if
+                                 x not in artist_search)  # Removing second part after &
+
 
         # Search artist and artist parsed if parsed is on
         for artist in artist_search:
@@ -339,7 +370,7 @@ def search_for_track_v2(track, silent=silent_search, parse_track=parse_track):
     print("\t\t[+] No exact matches on name and artists.")
     print("\t[!] Could not find this song on Spotify!")
 
-    return None
+    return search_for_track(track)
 
 
 def track_in_playlist(playlist_id, track_id):

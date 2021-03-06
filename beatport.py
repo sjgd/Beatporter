@@ -85,7 +85,7 @@ def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite = ov
     :return: dict of tracks from oldest (first) to newest (last)
     """
 
-    r = requests.get("https://www.beatport.com/label/{}/tracks?per-page=150".format(label_bp_url_code))
+    r = requests.get("https://www.beatport.com/label/{}/tracks?per-page=50".format(label_bp_url_code))
     soup = BeautifulSoup(r.text, features="lxml")
     page_numbers = soup.find_all(class_="pag-number")
     page_numbers = [page.text for page in page_numbers]
@@ -113,7 +113,7 @@ def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite = ov
 
     for i in range(1, int(max_page_number) + 1):
         print("\t[+] Getting label {}, page {}".format(label_bp_url_code, i))
-        r = requests.get("https://www.beatport.com/label/{}/tracks?page={}&per-page=150".format(label_bp_url_code, i))
+        r = requests.get("https://www.beatport.com/label/{}/tracks?page={}&per-page=50".format(label_bp_url_code, i))
         blob_start = r.text.find("window.Playables") + 19
         blob_end = r.text.find("};", blob_start) + 1
         blob = r.text[blob_start:blob_end].replace("\n", "")

@@ -3,11 +3,11 @@ import beatport
 from datetime import datetime
 from os import path
 import pandas as pd
-from config import username, shuffle_playlist, daily_mode, daily_n_track
+from config import username, shuffle_playlist, daily_mode, daily_n_track, folder_path
 from time import sleep
 import openpyxl
 
-file_name_hist = 'hist_playlists_tracks.parquet'
+file_name_hist = 'hist_playlists_tracks.pkl'
 curr_date = datetime.today().strftime('%Y-%m-%d')
 
 def dump_tracks(tracks):
@@ -21,8 +21,8 @@ def load_hist_file():
     :return: Returns existing history file of track ID per playlist
     """
     # TODO arguments for file path / type ?
-    if path.exists('hist_playlists_tracks.xlsx'):
-        df_hist_pl_tracks = pd.read_excel('hist_playlists_tracks.xlsx')
+    if path.exists(folder_path+'hist_playlists_tracks.xlsx'):
+        df_hist_pl_tracks = pd.read_excel(folder_path+'hist_playlists_tracks.xlsx')
     else:
         df_hist_pl_tracks = pd.DataFrame(columns=['playlist_id', 'track_id', 'datetime_added', 'artist_name'])
 
@@ -53,8 +53,8 @@ def update_hist(master_refresh = False):
                 df_hist_pl_tracks = spotify.update_hist_pl_tracks(df_hist_pl_tracks, playlist)
 
     df_hist_pl_tracks = df_hist_pl_tracks.loc[:, ['playlist_id', 'track_id', 'datetime_added', 'artist_name']]
-    df_hist_pl_tracks.to_pickle(file_name_hist)
-    df_hist_pl_tracks.to_excel('hist_playlists_tracks.xlsx', index = False)
+    df_hist_pl_tracks.to_pickle(folder_path+file_name_hist)
+    df_hist_pl_tracks.to_excel(folder_path+'hist_playlists_tracks.xlsx', index = False)
 
 if __name__ == "__main__":
 
@@ -64,8 +64,8 @@ if __name__ == "__main__":
     df_hist_pl_tracks = load_hist_file()
     beatport.charts = {beatport.parse_chart_url_datetime(k): beatport.parse_chart_url_datetime(v) for k, v in beatport.charts.items()}
 
-    # if path.exists(file_name_hist):
-    #     df_hist_pl_tracks = pd.read_parquet(file_name_hist)
+    # if path.exists(folder_path+file_name_hist):
+    #     df_hist_pl_tracks = pd.read_pickle(folder_path+file_name_hist)
     # else:
     #     df_hist_pl_tracks = pd.DataFrame(columns=['playlist_id', 'track_id', 'datetime_added', 'artist_name'])
 
@@ -104,7 +104,7 @@ if __name__ == "__main__":
     sleep(5) # try to avoid read-write errors if running too quickly
     df_hist_pl_tracks = df_hist_pl_tracks.loc[:, ['playlist_id', 'track_id', 'datetime_added', 'artist_name']]
     df_hist_pl_tracks.to_pickle(file_name_hist)
-    df_hist_pl_tracks.to_excel('hist_playlists_tracks.xlsx', index = False)
+    df_hist_pl_tracks.to_excel(folder_path+'hist_playlists_tracks.xlsx', index = False)
     # Save bkp
     df_hist_pl_tracks.to_excel('hist_playlists_tracks_{}.xlsx'.format(curr_date), index=False)
     end_time = datetime.now()

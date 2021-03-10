@@ -11,6 +11,9 @@ client_id = "CHANGE_ME"
 client_secret = "CHANGE_ME"
 redirect_uri = "http://localhost:65000"
 
+# Folder path where to save the history
+folder_path = "./"
+
 # Daily mode
 # TODO
 daily_mode = True
@@ -37,14 +40,14 @@ overwrite_label = True
 silent_search = True
 
 # Parse track
-# If set to true will remove feat artist2 and orgininal mix to improve the search
+# If set to true will remove feat artist2 and original mix to improve the search
 parse_track = True
 
 # Playlist prefix
 playlist_prefix = "Beatport: "
 
 # Playlist description
-playlist_description = "Created using github.com/sjeangirard/Beatporter."
+playlist_description = "Created using github.com/sjgd/Beatporter."
 
 # Genres on Beatport ("Arbitrary name": "URL path for genre")
 genres = {

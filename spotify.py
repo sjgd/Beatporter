@@ -13,7 +13,7 @@ from datetime import datetime
 from config import *
 
 tracks_dict_names = ['id', 'duration_ms', 'href', 'name', 'popularity', 'uri', 'artists']
-refresh_token_n_tracks = 50  # refresh token every n tracks to prevent timeout
+refresh_token_n_tracks = 100  # refresh token every n tracks to prevent timeout
 
 
 def listen_for_callback_code():
@@ -51,7 +51,7 @@ def do_spotify_oauth():
     except:
         token = None
     if token:
-        if int(time()) > (token["expires_at"] - 30):  # Take 30s margin to avoid timeout while searching
+        if int(time()) > (token["expires_at"] - 50):  # Take 50s margin to avoid timeout while searching
             print("Refreshing Spotify token")
             token = sp_oauth.refresh_access_token(token["refresh_token"])
     else:
@@ -208,7 +208,9 @@ def search_for_track(track, silent=silent_search):
             len(search_results["tracks"]["items"])))
         return best_of_multiple_matches(track, search_results["tracks"]["items"])
 
-    print("\t\t[+] No exact matches on name and artists.")
+    print("\t\t[+] No exact matches on name and artists v1 : {} - {}{}".format(track["artists"][0], track["name"],
+                                                                       "" if not track["mix"] else " - {}".format(
+                                                                           track["mix"])))
     print("\t[!] Could not find this song on Spotify!")
     return None
 
@@ -367,7 +369,9 @@ def search_for_track_v2(track, silent=silent_search, parse_track=parse_track):
                 if track_id:
                     return track_id
 
-    print("\t\t[+] No exact matches on name and artists.")
+    print("\t\t[+] No exact matches on name and artists v2 : {} - {}{}".format(track["artists"][0], track["name"],
+                                                                       "" if not track["mix"] else " - {}".format(
+                                                                           track["mix"])))
     print("\t[!] Could not find this song on Spotify!")
 
     return search_for_track(track)
@@ -523,7 +527,7 @@ def find_playlist_chart_label(title):
 
     return playlist
 
-def add_new_tracks_to_playlist_chart_label(title, tracks_dict, df_hist_pl_tracks, use_prefix=True):
+def add_new_tracks_to_playlist_chart_label(title, tracks_dict, df_hist_pl_tracks, use_prefix=True, silent=silent_search):
     """
     :param title: Chart or label playlist title
     :param tracks_dict: dict of tracks to add
@@ -564,18 +568,15 @@ def add_new_tracks_to_playlist_chart_label(title, tracks_dict, df_hist_pl_tracks
 
     for track in tracks_dict:
         track_count_tot += 1
-        # TODO check if parse track affects matching on artist_name
-        # Don't seem to have much effect, original mix is not that common, extended mix present, not feat
-        # print(track)
         track_artist_name = track['artists'][0] + " - " + track['name'] + " - " + track["mix"]
-        # TODO reformat string
-        print("{}% : {} : nb {} out of {}".format(str(round(track_count_tot / len(tracks_dict) * 100, 2)),
-                                                  track_artist_name, track_count_tot, len(tracks_dict)))
+        if not silent:
+            print("{}% : {} : nb {} out of {}".format(str(round(track_count_tot / len(tracks_dict) * 100, 2)),
+                                                      track_artist_name, track_count_tot, len(tracks_dict)))
         if not track_artist_name in df_local_hist.values:
-            # print("Search")
             track_id = search_for_track_v2(track)
             if track_id and not track_id in playlist_track_ids.values and not track_id in df_local_hist.values:
-                print("\t[+] Adding track id : {} : nb {}".format(track_id, track_count))
+                if not silent:
+                    print("\t[+] Adding track id : {} : nb {}".format(track_id, track_count))
                 persistent_track_ids.append(track_id)
                 track_count += 1
             if track_count >= 99:  # Have limit of 100 trakcks per import
@@ -589,7 +590,8 @@ def add_new_tracks_to_playlist_chart_label(title, tracks_dict, df_hist_pl_tracks
                 track_count = 0
                 persistent_track_ids = list()
         else:
-            print("\tSimilar track name already found")
+            if not silent:
+                print("\tSimilar track name already found")
 
         if track_count_tot % refresh_token_n_tracks == 0:  # Avoid time out
             spotify_auth()
@@ -606,7 +608,7 @@ def add_new_tracks_to_playlist_chart_label(title, tracks_dict, df_hist_pl_tracks
     return df_hist_pl_tracks
 
 
-def add_new_tracks_to_playlist_id(playlist_name, track_ids, df_hist_pl_tracks):
+def add_new_tracks_to_playlist_id(playlist_name, track_ids, df_hist_pl_tracks, silent=silent_search):
     """
     :param title: Playlist name to be used, will not be modified
     :param tracks_dict: dict of tracks with their IDS
@@ -647,7 +649,8 @@ def add_new_tracks_to_playlist_id(playlist_name, track_ids, df_hist_pl_tracks):
         track_count_tot += 1
         if not track_id in df_local_hist.values:
             if not track_id in playlist_track_ids.values:
-                print("\t[+] Adding track id : {} : nb {}".format(track_id, track_count))
+                if not silent:
+                    print("\t[+] Adding track id : {} : nb {}".format(track_id, track_count))
                 persistent_track_ids.append(track_id)
                 track_count += 1
             if track_count >= 99:  # Have limit of 100 trakcks per import
@@ -661,7 +664,8 @@ def add_new_tracks_to_playlist_id(playlist_name, track_ids, df_hist_pl_tracks):
                 track_count = 0
                 persistent_track_ids = list()
         else:
-            print("\tTrack already found in playlist or history")
+            if not silent:
+                print("\tTrack already found in playlist or history")
 
         if track_count_tot % refresh_token_n_tracks == 0:  # Avoid time out
             spotify_auth()
@@ -677,7 +681,7 @@ def add_new_tracks_to_playlist_id(playlist_name, track_ids, df_hist_pl_tracks):
     return df_hist_pl_tracks
 
 
-def add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks):
+def add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks, silent=silent_search):
     """
     :param genre: Genre name
     :param top_100_chart: dict of tracks to add
@@ -746,19 +750,21 @@ def add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks):
     for track in top_100_chart:
         track_count_tot += 1
         track_artist_name = track['artists'][0] + " - " + track['name'] + " - " + track["mix"]
-        # TODO reformat string
-        print("{}% : {} : nb {} out of {}".format(str(round(track_count_tot / len(top_100_chart) * 100, 2)),
-                                                  track_artist_name, track_count_tot, len(top_100_chart)))
+        if not silent:
+            print("{}% : {} : nb {} out of {}".format(str(round(track_count_tot / len(top_100_chart) * 100, 2)),
+                                                      track_artist_name, track_count_tot, len(top_100_chart)))
 
         track_id = search_for_track_v2(track)
 
         if track_id:
             if track_id not in playlist_track_ids.values and track_id not in df_local_hist.values:
-                print("\t[+] Adding track id : {} : nb {}".format(track_id, track_count))
+                if not silent:
+                    print("\t[+] Adding track id : {} : nb {}".format(track_id, track_count))
                 persistent_track_ids.append(track_id)
                 track_count += 1
             else:
-                print("\tSimilar track name already found")
+                if not silent:
+                    print("\tSimilar track name already found")
 
             if n_daily_tracks < daily_n_track and track_id not in playlist_track_ids_daily.values and track_id not in df_local_hist_daily.values:
                 daily_top_n_track_ids.append(track_id)

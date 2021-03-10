@@ -8,7 +8,7 @@ from pandas import to_datetime
 import pandas as pd
 
 from config import genres, charts, labels, spotify_bkp
-from config import overwrite_label
+from config import overwrite_label, silent_search
 from spotify import find_playlist_chart_label, update_hist_pl_tracks
 
 
@@ -49,6 +49,7 @@ def get_top_100_tracks(genre):
     raw_tracks_dict = get_top_100_playables(genre)
     return parse_tracks(raw_tracks_dict)
 
+
 def find_chart(chart_bp_url_code):
     r = requests.get("https://www.beatport.com/search?q="+chart_bp_url_code)
     soup = BeautifulSoup(r.text, features="lxml")
@@ -62,6 +63,7 @@ def find_chart(chart_bp_url_code):
     else:
         return None
 
+
 def get_chart(url):
     """
     :param url: label full url, including beatport.com
@@ -73,10 +75,12 @@ def get_chart(url):
     blob = r.text[blob_start:blob_end].replace("\n", "")
     return parse_tracks(json.loads(blob))
 
+
 def parse_chart_url_datetime(str):
     return datetime.today().strftime(str)
 
-def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite = overwrite_label):
+
+def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite = overwrite_label, silent=silent_search):
     """
     :param label: label name
     :param label_bp_url_code: label url code
@@ -112,7 +116,8 @@ def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite = ov
         print("Label {} has {} pages".format(label, max_page_number))
 
     for i in range(1, int(max_page_number) + 1):
-        print("\t[+] Getting label {}, page {}".format(label_bp_url_code, i))
+        if not silent:
+            print("\t[+] Getting label {}, page {}".format(label_bp_url_code, i))
         r = requests.get("https://www.beatport.com/label/{}/tracks?page={}&per-page=50".format(label_bp_url_code, i))
         blob_start = r.text.find("window.Playables") + 19
         blob_end = r.text.find("};", blob_start) + 1
@@ -123,7 +128,8 @@ def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite = ov
         label_tracks.extend(output)
 
         # Check if release date reached last update
-        reached_last_update = sum([to_datetime(track['released_date']).tz_localize(None) < last_update for track in output])
+        reached_last_update = sum(
+            [to_datetime(track['released_date']).tz_localize(None) < last_update for track in output])
         if reached_last_update > 0 and not overwrite:
             print("\t[+] Reached last updated date, stopping")
             break

@@ -1,12 +1,16 @@
 # Beatporter
 
-This tool scrapes Beatport Top 100 charts, by genre, and attempts to locate the tracks on Spotify and add them to genre-based playlists.
-
-For each genre, a new playlist will be created based on the Beatport charts.  Not all tracks from the chart will be available on Spotify and some tracks may be different mixes (if the exact mix is not available).
+This tool scrapes Beatport charts and attempts to locate the tracks on Spotify and add them to playlists.
+It can scrape:
+* Top 100 charts, by genre
+* Label tracks
+* Beatport chart by url
 
 There is also support for the overall, genre-agnostic, Top 100 chart.
 
-If a playlist already exists for a given genre being synced, any new tracks from the genre's Beatport chart will be added to the playlist. 
+Digging mode allows to save the history of track previously added (and removed) to a Spotify to avoid adding them again. (see config file for details)
+
+An additional feature have been added to allow to backup Spotify playlist to a new playlist (e.g. backup your Discover Weekly) 
 
 ## Prerequisites
 
@@ -15,7 +19,7 @@ If a playlist already exists for a given genre being synced, any new tracks from
 * Create / register an app on the [Spotify Developer](https://developer.spotify.com) site
     * Add the `redirect_uri` value to the _Redirect URIs_ within the app dashboard.  The value added to the dashboard must match the variable exactly. 
 
-## Dev in progress
+## Dev in progress [Beta]
 
 * Adding chart and label scrapping
 * Store history of track_id / playlist_id to avoid re-adding tracks that already have been added, see config.example.py for examples

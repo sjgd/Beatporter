@@ -110,13 +110,14 @@ if __name__ == "__main__":
     end_time = datetime.now()
     print("\n[!] Done @ {}\n (Ran for: {})".format(end_time, end_time - start_time))
 
-# TODO fix export, seem to add index col
 # TODO fix match artist name, remove original
     # Log could not find track
     # Regex out feat. artist2 remove brackets on (extended mix)
-    # Add option not to do regex
     # Check to include original mix then remove
-# TODO add config digging mode : add duplicated anyway, if not in playlist, if not in all
 # TODO check error on pickle
 # TODO review imports
-# TODO modify read me, add new packages
+# TODO modify read me
+# TODO shuffle playlist option
+# TODO add config to create playlist private per default
+# TODO improve search with parsing names contains brackets, commas or special characters :
+#  (feat. Aliz Smith) and feat. Griz-O and Feat. Denzel Curry, Pell

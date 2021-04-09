@@ -13,7 +13,6 @@ from datetime import datetime
 from config import *
 
 tracks_dict_names = ['id', 'duration_ms', 'href', 'name', 'popularity', 'uri', 'artists']
-refresh_token_n_tracks = 100  # refresh token every n tracks to prevent timeout
 
 
 def listen_for_callback_code():

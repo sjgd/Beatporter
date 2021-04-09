@@ -19,6 +19,9 @@ folder_path = "./"
 daily_mode = True
 daily_n_track = 15
 
+# Refresh token every n track  to prevent timeout
+refresh_token_n_tracks = 100
+
 # Shuffle playlists
 # TODO
 shuffle_playlist = False

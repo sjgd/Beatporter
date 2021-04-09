@@ -811,10 +811,8 @@ def add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks, si
         update_playlist_description_with_date(playlists[0])
 
     if len(daily_top_n_track_ids) > 0 & daily_mode:
-        add_tracks_to_playlist(playlist["id"], daily_top_n_track_ids)
-        update_playlist_description_with_date(playlists[1])
         add_tracks_to_playlist(playlists[1]["id"], daily_top_n_track_ids)
-        daily_top_n_track_ids = list()
+        update_playlist_description_with_date(playlists[1])
 
     # Add more to daily playlist if not full
     if daily_mode:

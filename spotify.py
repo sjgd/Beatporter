@@ -658,32 +658,33 @@ def add_new_tracks_to_playlist_id(playlist_name, track_ids, df_hist_pl_tracks, s
     track_count_tot = 0
 
     for track in track_ids:
-        track_id = track['track']['id']
-        track_count_tot += 1
-        if track_id not in df_local_hist.values:
-            if track_id not in playlist_track_ids.values:
+        if track['track'] is not None:  # Prevent error of empty track
+            track_id = track['track']['id']
+            track_count_tot += 1
+            if track_id not in df_local_hist.values:
+                if track_id not in playlist_track_ids.values:
+                    if not silent:
+                        print("\t[+] Adding track id : {} : nb {}".format(track_id, track_count))
+                    persistent_track_ids.append(track_id)
+                    track_count += 1
+                if track_count >= 99:  # Have limit of 100 trakcks per import
+                    print("\n[+] Adding {} new tracks to the playlist: \"{}\"".format(len(persistent_track_ids),
+                                                                                      persistent_playlist_name))
+                    add_tracks_to_playlist(playlist["id"], persistent_track_ids)
+                    # TODO consider only adding new ID to avoid reloading large playlist
+                    df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
+                    playlist_track_ids = df_hist_pl_tracks.loc[
+                        df_hist_pl_tracks["playlist_id"] == playlist["id"], "track_id"]
+                    track_count = 0
+                    persistent_track_ids = list()
+                    update_playlist_description_with_date(playlist)
+            else:
                 if not silent:
-                    print("\t[+] Adding track id : {} : nb {}".format(track_id, track_count))
-                persistent_track_ids.append(track_id)
-                track_count += 1
-            if track_count >= 99:  # Have limit of 100 trakcks per import
-                print("\n[+] Adding {} new tracks to the playlist: \"{}\"".format(len(persistent_track_ids),
-                                                                                  persistent_playlist_name))
-                add_tracks_to_playlist(playlist["id"], persistent_track_ids)
-                # TODO consider only adding new ID to avoid reloading large playlist
-                df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
-                playlist_track_ids = df_hist_pl_tracks.loc[
-                    df_hist_pl_tracks["playlist_id"] == playlist["id"], "track_id"]
-                track_count = 0
-                persistent_track_ids = list()
-                update_playlist_description_with_date(playlist)
-        else:
-            if not silent:
-                print("\tTrack already found in playlist or history")
+                    print("\tTrack already found in playlist or history")
 
-        if track_count_tot % refresh_token_n_tracks == 0:  # Avoid time out
-            spotify_auth()
-            print("[+] Identifying new tracks for playlist: \"{}\"\n".format(persistent_playlist_name))
+            if track_count_tot % refresh_token_n_tracks == 0:  # Avoid time out
+                spotify_auth()
+                print("[+] Identifying new tracks for playlist: \"{}\"\n".format(persistent_playlist_name))
 
     print("\n[+] Adding {} new tracks to the playlist: \"{}\"".format(len(persistent_track_ids),
                                                                       persistent_playlist_name))

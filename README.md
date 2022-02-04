@@ -35,10 +35,12 @@ An additional feature have been added to allow to backup Spotify playlist to a n
 * openpyxl (temp)
 
 ```
-pip install spotipy
 pip install datetime
-pip install BeautifulSoup
 pip install pandas
+pip install requests
+pip install bs4
+pip install lxml
+pip install spotipy
 pip install openpyxl
 ```
 

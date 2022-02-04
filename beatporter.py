@@ -69,12 +69,11 @@ if __name__ == "__main__":
     # else:
     #     df_hist_pl_tracks = pd.DataFrame(columns=['playlist_id', 'track_id', 'datetime_added', 'artist_name'])
 
-    # Parse lists
-    for genre, genre_bp_url_code in beatport.genres.items():
-        print("\n Getting genre : ***** {} *****".format(genre))
-        top_100_chart = beatport.get_top_100_tracks(genre)
-        df_hist_pl_tracks = spotify.add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks)
+    for playlist_name, org_playlist_id in beatport.spotify_bkp.items():
+        print("\n Backing up to playlist : ***** {} : {} *****".format(playlist_name, org_playlist_id))
+        df_hist_pl_tracks = spotify.back_up_spotify_playlist(playlist_name, org_playlist_id, df_hist_pl_tracks)
 
+    # Parse lists
     for chart, chart_bp_url_code in beatport.charts.items():
         #TODO handle return None, handle chart_bp_url_code has ID already or not
         print("\n Getting chart : ***** {} : {} *****".format(chart, chart_bp_url_code))
@@ -88,6 +87,11 @@ if __name__ == "__main__":
 
         df_hist_pl_tracks = spotify.add_new_tracks_to_playlist_chart_label(chart, tracks_dict, df_hist_pl_tracks)
 
+    for genre, genre_bp_url_code in beatport.genres.items():
+        print("\n Getting genre : ***** {} *****".format(genre))
+        top_100_chart = beatport.get_top_100_tracks(genre)
+        df_hist_pl_tracks = spotify.add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks)
+
     for label, label_bp_url_code in beatport.labels.items():
         # TODO avoid looping through all pages if already parsed before ?
         # TODO Add tracks per EP rather than track by track ?
@@ -96,11 +100,8 @@ if __name__ == "__main__":
         print("Found {} tracks for {}".format(len(tracks_dict), label))
         df_hist_pl_tracks = spotify.add_new_tracks_to_playlist_chart_label(label, tracks_dict, df_hist_pl_tracks)
 
-    for playlist_name, org_playlist_id in beatport.spotify_bkp.items():
-        print("\n Backing up to playlist : ***** {} : {} *****".format(playlist_name, org_playlist_id))
-        df_hist_pl_tracks = spotify.back_up_spotify_playlist(playlist_name, org_playlist_id, df_hist_pl_tracks)
-
     # Output
+    print("\n Saving file")
     sleep(5) # try to avoid read-write errors if running too quickly
     df_hist_pl_tracks = df_hist_pl_tracks.loc[:, ['playlist_id', 'track_id', 'datetime_added', 'artist_name']]
     df_hist_pl_tracks.to_pickle(file_name_hist)

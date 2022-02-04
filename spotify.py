@@ -9,11 +9,22 @@ from spotipy import oauth2
 import pandas as pd
 import re
 from datetime import datetime
+from time import sleep
 
 from config import *
 
 tracks_dict_names = ['id', 'duration_ms', 'href', 'name', 'popularity', 'uri', 'artists']
 
+def save_hist_file(df_hist_pl_tracks, folder_path=folder_path):
+    """
+    Function to save the playlist history in a Excel file
+    :param df_hist_pl_tracks: dataframe of the history of playlist tracks to save
+    :folder_path: Path where to save the dataframe as Excel file
+    """
+    sleep(1) # try to avoid read-write errors if running too quickly
+    df_hist_pl_tracks_out = df_hist_pl_tracks.loc[:, ['playlist_id', 'track_id', 'datetime_added', 'artist_name']]
+    df_hist_pl_tracks_out.to_excel(folder_path+'hist_playlists_tracks.xlsx', index = False)
+    print("\n Done saving file")
 
 def listen_for_callback_code():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -617,6 +628,9 @@ def add_new_tracks_to_playlist_chart_label(title, tracks_dict, df_hist_pl_tracks
 
     df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
 
+    if len(persistent_track_ids) > 0:
+        save_hist_file(df_hist_pl_tracks, folder_path=folder_path)
+
     return df_hist_pl_tracks
 
 
@@ -693,6 +707,9 @@ def add_new_tracks_to_playlist_id(playlist_name, track_ids, df_hist_pl_tracks, s
         update_playlist_description_with_date(playlist)
 
     df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
+
+    if len(persistent_track_ids) > 0:
+        save_hist_file(df_hist_pl_tracks, folder_path=folder_path)
 
     return df_hist_pl_tracks
 
@@ -832,6 +849,9 @@ def add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks, si
 
     for playlist in playlists:
         df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
+
+    if (len(persistent_track_ids) > 0) or (len(daily_top_n_track_ids) > 0):
+        save_hist_file(df_hist_pl_tracks, folder_path=folder_path)
 
     return df_hist_pl_tracks
 

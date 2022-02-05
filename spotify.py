@@ -521,7 +521,7 @@ def update_hist_pl_tracks(df_hist_pl_tracks, playlist):
 
         df_tracks_o = pd.DataFrame()
         for row in df_tracks.iterrows():
-            df_tracks_o = df_tracks_o.append(pd.DataFrame(row[1]['track'], index=[0]))
+            df_tracks_o = pd.concat([df_tracks_o, pd.DataFrame(row[1]['track'], index=[0])])
         df_tracks_o = df_tracks_o.loc[:, tracks_dict_names].reset_index(drop=True)
         df_tracks_o['artist_name'] = df_tracks_o['artists'] + " - " + df_tracks_o['name']
 
@@ -531,7 +531,8 @@ def update_hist_pl_tracks(df_hist_pl_tracks, playlist):
         df_temp['playlist_id'] = playlist["id"]
         df_temp = df_temp.rename(columns={'id': 'track_id', 'added_at': 'datetime_added'})
 
-        df_hist_pl_tracks = df_hist_pl_tracks.append(df_temp).drop_duplicates().reset_index(drop=True)
+        df_hist_pl_tracks = pd.concat([df_hist_pl_tracks, df_temp])
+        df_hist_pl_tracks = df_hist_pl_tracks.drop_duplicates().reset_index(drop=True)
 
     return (df_hist_pl_tracks)
 

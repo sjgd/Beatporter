@@ -22,7 +22,7 @@ def save_hist_file(df_hist_pl_tracks, folder_path=folder_path):
     :folder_path: Path where to save the dataframe as Excel file
     """
     sleep(1) # try to avoid read-write errors if running too quickly
-    df_hist_pl_tracks_out = df_hist_pl_tracks.loc[:, ['playlist_id', 'track_id', 'datetime_added', 'artist_name']]
+    df_hist_pl_tracks_out = df_hist_pl_tracks.loc[:, ['playlist_id', 'playlist_name', 'track_id', 'datetime_added', 'artist_name']]
     df_hist_pl_tracks_out.to_excel(folder_path+'hist_playlists_tracks.xlsx', index = False)
     print("\n Done saving file")
 
@@ -529,6 +529,7 @@ def update_hist_pl_tracks(df_hist_pl_tracks, playlist):
 
         df_temp = df_tracks.loc[:, ['id', 'added_at', 'artist_name']]
         df_temp['playlist_id'] = playlist["id"]
+        df_temp['playlist_name'] = playlist["name"]
         df_temp = df_temp.rename(columns={'id': 'track_id', 'added_at': 'datetime_added'})
 
         df_hist_pl_tracks = df_hist_pl_tracks.append(df_temp).drop_duplicates().reset_index(drop=True)
@@ -582,11 +583,14 @@ def add_new_tracks_to_playlist_chart_label(title, tracks_dict, df_hist_pl_tracks
     elif digging_mode == "all":
         df_local_hist = df_hist_pl_tracks
     else:
-        df_local_hist = pd.DataFrame(columns=['playlist_id', 'track_id', 'datetime_added', 'artist_name'])
+        df_local_hist = pd.DataFrame(columns=['playlist_id', 'playlist_name', 'track_id', 'datetime_added', 'artist_name'])
 
     persistent_track_ids = list()
     track_count = 0
     track_count_tot = 0
+
+    # TODO Refresh oauth to avoid time out
+    spotify_auth()
 
     for track in tracks_dict:
         track_count_tot += 1
@@ -665,7 +669,7 @@ def add_new_tracks_to_playlist_id(playlist_name, track_ids, df_hist_pl_tracks, s
     elif digging_mode == "all":
         df_local_hist = df_hist_pl_tracks
     else:
-        df_local_hist = pd.DataFrame(columns=['playlist_id', 'track_id', 'datetime_added', 'artist_name'])
+        df_local_hist = pd.DataFrame(columns=['playlist_id', 'playlist_name', 'track_id', 'datetime_added', 'artist_name'])
 
     persistent_track_ids = list()
     track_count = 0
@@ -750,7 +754,7 @@ def add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks, si
     elif digging_mode == "all":
         df_local_hist = df_hist_pl_tracks
     else:
-        df_local_hist = pd.DataFrame(columns=['playlist_id', 'track_id', 'datetime_added', 'artist_name'])
+        df_local_hist = pd.DataFrame(columns=['playlist_id', 'playlist_name', 'track_id', 'datetime_added', 'artist_name'])
     playlist_track_ids = df_hist_pl_tracks.loc[df_hist_pl_tracks["playlist_id"] == playlists[0]["id"], "track_id"]
 
     if daily_mode:
@@ -759,7 +763,7 @@ def add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks, si
             clear_playlist(playlists[1]["id"])
             df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlists[1])
             playlist_track_ids_daily = pd.Series([], name="track_id", dtype=object)
-            df_local_hist_daily = pd.DataFrame(columns=['playlist_id', 'track_id', 'datetime_added', 'artist_name'])
+            df_local_hist_daily = pd.DataFrame(columns=['playlist_id', 'playlist_name', 'track_id', 'datetime_added', 'artist_name'])
         else:
             # Create local hist for daily playlist
             if digging_mode == "playlist":

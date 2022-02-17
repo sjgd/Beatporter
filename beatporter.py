@@ -3,9 +3,10 @@ import beatport
 from datetime import datetime
 from os import path
 import pandas as pd
-from config import username, shuffle_playlist, daily_mode, daily_n_track, folder_path
+from config import username, shuffle_label, daily_mode, daily_n_track, folder_path
 from time import sleep
 import openpyxl
+import random
 
 file_name_hist = 'hist_playlists_tracks.pkl'
 curr_date = datetime.today().strftime('%Y-%m-%d')
@@ -24,7 +25,7 @@ def load_hist_file():
     if path.exists(folder_path+'hist_playlists_tracks.xlsx'):
         df_hist_pl_tracks = pd.read_excel(folder_path+'hist_playlists_tracks.xlsx')
     else:
-        df_hist_pl_tracks = pd.DataFrame(columns=['playlist_id', 'track_id', 'datetime_added', 'artist_name'])
+        df_hist_pl_tracks = pd.DataFrame(columns=['playlist_id', 'playlist_name', 'track_id', 'datetime_added', 'artist_name'])
 
     return(df_hist_pl_tracks)
 
@@ -52,7 +53,7 @@ def update_hist(master_refresh = False):
                 playlist = {"name": playlist['name'], "id": playlist['id']}
                 df_hist_pl_tracks = spotify.update_hist_pl_tracks(df_hist_pl_tracks, playlist)
 
-    df_hist_pl_tracks = df_hist_pl_tracks.loc[:, ['playlist_id', 'track_id', 'datetime_added', 'artist_name']]
+    df_hist_pl_tracks = df_hist_pl_tracks.loc[:, ['playlist_id', 'playlist_name', 'track_id', 'datetime_added', 'artist_name']]
     df_hist_pl_tracks.to_pickle(folder_path+file_name_hist)
     df_hist_pl_tracks.to_excel(folder_path+'hist_playlists_tracks.xlsx', index = False)
 
@@ -67,7 +68,7 @@ if __name__ == "__main__":
     # if path.exists(folder_path+file_name_hist):
     #     df_hist_pl_tracks = pd.read_pickle(folder_path+file_name_hist)
     # else:
-    #     df_hist_pl_tracks = pd.DataFrame(columns=['playlist_id', 'track_id', 'datetime_added', 'artist_name'])
+    #     df_hist_pl_tracks = pd.DataFrame(columns=['playlist_id', 'playlist_name', 'track_id', 'datetime_added', 'artist_name'])
 
     for playlist_name, org_playlist_id in beatport.spotify_bkp.items():
         print("\n Backing up to playlist : ***** {} : {} *****".format(playlist_name, org_playlist_id))
@@ -98,12 +99,14 @@ if __name__ == "__main__":
         print("\n Getting label : ***** {} : {} *****".format(label, label_bp_url_code))
         tracks_dict = beatport.get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks)
         print("Found {} tracks for {}".format(len(tracks_dict), label))
+        if shuffle_label:
+            random.shuffle(tracks_dict)
         df_hist_pl_tracks = spotify.add_new_tracks_to_playlist_chart_label(label, tracks_dict, df_hist_pl_tracks)
 
     # Output
     print("\n Saving file")
     sleep(5) # try to avoid read-write errors if running too quickly
-    df_hist_pl_tracks = df_hist_pl_tracks.loc[:, ['playlist_id', 'track_id', 'datetime_added', 'artist_name']]
+    df_hist_pl_tracks = df_hist_pl_tracks.loc[:, ['playlist_id', 'playlist_name', 'track_id', 'datetime_added', 'artist_name']]
     df_hist_pl_tracks.to_pickle(file_name_hist)
     df_hist_pl_tracks.to_excel(folder_path+'hist_playlists_tracks.xlsx', index = False)
     # Save bkp

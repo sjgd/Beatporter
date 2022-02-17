@@ -24,7 +24,7 @@ refresh_token_n_tracks = 100
 
 # Shuffle playlists
 # TODO
-shuffle_playlist = False
+shuffle_label = False
 
 # Digging mode
 # Allows to avoid adding tracks that have been previously added, (listened to) and deleted.

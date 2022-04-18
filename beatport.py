@@ -11,6 +11,10 @@ from config import genres, charts, labels, spotify_bkp
 from config import overwrite_label, silent_search
 from spotify import find_playlist_chart_label, update_hist_pl_tracks
 
+import logging
+logging.getLogger().setLevel(logging.INFO)
+logging.basicConfig(format='%(message)s')
+
 
 def get_top_100_playables(genre):
     r = requests.get("https://www.beatport.com/{}/{}/top-100".format("genre" if genres[genre] else "", genres[genre]))
@@ -45,7 +49,7 @@ def parse_tracks(tracks_json):
 
 
 def get_top_100_tracks(genre):
-    # print("[+] Fetching Top 100 {} Tracks".format(genre))
+    # logging.info("[+] Fetching Top 100 {} Tracks".format(genre))
     raw_tracks_dict = get_top_100_playables(genre)
     return parse_tracks(raw_tracks_dict)
 
@@ -106,18 +110,18 @@ def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite = ov
                 last_update = datetime.strptime(last_update, '%Y-%m-%dT%H:%M:%SZ')
             else:
                 last_update = last_update.tz_localize(None)
-            print("Label {} has {} pages. Last playlist update found {}(UTC): ".format(label, max_page_number,
+            logging.info("Label {} has {} pages. Last playlist update found {}(UTC): ".format(label, max_page_number,
                                                                                        last_update))
         else:
             last_update = datetime.min
-            print("Label {} has {} pages".format(label, max_page_number))
+            logging.info("Label {} has {} pages".format(label, max_page_number))
     else:
         last_update = datetime.min
-        print("Label {} has {} pages".format(label, max_page_number))
+        logging.info("Label {} has {} pages".format(label, max_page_number))
 
     for i in range(1, int(max_page_number) + 1):
         if not silent:
-            print("\t[+] Getting label {}, page {}".format(label_bp_url_code, i))
+            logging.info("\t[+] Getting label {}, page {}".format(label_bp_url_code, i))
         r = requests.get("https://www.beatport.com/label/{}/tracks?page={}&per-page=50".format(label_bp_url_code, i))
         blob_start = r.text.find("window.Playables") + 19
         blob_end = r.text.find("};", blob_start) + 1
@@ -131,7 +135,7 @@ def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite = ov
         reached_last_update = sum(
             [to_datetime(track['released_date']).tz_localize(None) < last_update for track in output])
         if reached_last_update > 0 and not overwrite:
-            print("\t[+] Reached last updated date, stopping")
+            logging.info("\t[+] Reached last updated date, stopping")
             break
 
     label_tracks.reverse()

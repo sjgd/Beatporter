@@ -653,9 +653,6 @@ def add_new_tracks_to_playlist_id(playlist_name, track_ids, df_hist_pl_tracks, s
     """
     # TODO unify all add_new_track in one function
 
-    # TODO Refresh oauth to avoid time out
-    spotify_auth()
-
     # TODO export playlist prefix name to config
     persistent_playlist_name = playlist_name
     logging.info("[+] Identifying new tracks for playlist: \"{}\"".format(persistent_playlist_name))
@@ -679,6 +676,9 @@ def add_new_tracks_to_playlist_id(playlist_name, track_ids, df_hist_pl_tracks, s
     persistent_track_ids = list()
     track_count = 0
     track_count_tot = 0
+
+    # TODO Refresh oauth to avoid time out
+    spotify_auth()
 
     for track in track_ids:
         if track['track'] is not None:  # Prevent error of empty track
@@ -789,6 +789,9 @@ def add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks, si
         n_daily_tracks = len(daily_playlist['tracks']['items'])
     else:
         n_daily_tracks = 0
+
+    # TODO Refresh oauth to avoid time out
+    spotify_auth()
 
     for track in top_100_chart:
         track_count_tot += 1

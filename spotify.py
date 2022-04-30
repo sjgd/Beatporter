@@ -11,13 +11,17 @@ import re
 from datetime import datetime
 from time import sleep
 
-from config import *
+from config import folder_path, redirect_uri, username, playlist_description, silent_search
+from config import parse_track, daily_mode, daily_n_track, playlist_prefix, digging_mode
+from config import refresh_token_n_tracks, client_id, client_secret, scope
 
 import logging
-logging.getLogger().setLevel(logging.INFO)
-logging.basicConfig(format='%(message)s')
 
-tracks_dict_names = ['id', 'duration_ms', 'href', 'name', 'popularity', 'uri', 'artists']
+logging.getLogger().setLevel(logging.INFO)
+logging.basicConfig(format="%(message)s")
+
+tracks_dict_names = ["id", "duration_ms", "href", "name", "popularity", "uri", "artists"]
+
 
 def save_hist_file(df_hist_pl_tracks, folder_path=folder_path):
     """
@@ -25,14 +29,17 @@ def save_hist_file(df_hist_pl_tracks, folder_path=folder_path):
     :param df_hist_pl_tracks: dataframe of the history of playlist tracks to save
     :folder_path: Path where to save the dataframe as Excel file
     """
-    sleep(1) # try to avoid read-write errors if running too quickly
-    df_hist_pl_tracks_out = df_hist_pl_tracks.loc[:, ['playlist_id', 'playlist_name', 'track_id', 'datetime_added', 'artist_name']]
-    df_hist_pl_tracks_out.to_excel(folder_path+'hist_playlists_tracks.xlsx', index = False)
-    logging.info("\n Done saving file")
+    sleep(1)  # try to avoid read-write errors if running too quickly
+    df_hist_pl_tracks_out = df_hist_pl_tracks.loc[
+        :, ["playlist_id", "playlist_name", "track_id", "datetime_added", "artist_name"]
+    ]
+    df_hist_pl_tracks_out.to_excel(folder_path + "hist_playlists_tracks.xlsx", index=False)
+    logging.info("Done saving file")
+
 
 def listen_for_callback_code():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(('localhost', int(redirect_uri.split(":")[-1])))
+    s.bind(("localhost", int(redirect_uri.split(":")[-1])))
     s.listen(1)
     while True:
         connection, address = s.accept()
@@ -62,27 +69,27 @@ def do_spotify_oauth():
         with open("token.json", "r") as fh:
             token = fh.read()
         token = json.loads(token)
-    except:
+    except Exception:
         token = None
     if token:
         if int(time()) > (token["expires_at"] - 50):  # Take 50s margin to avoid timeout while searching
-            logging.info("Refreshing Spotify token")
+            logging.info("[+][+] Refreshing Spotify token")
             token = sp_oauth.refresh_access_token(token["refresh_token"])
     else:
         authorization_code = asyncio.run(async_get_auth_code())
         logging.info(authorization_code)
         if not authorization_code:
-            logging.info("\n[!] Unable to authenticate to Spotify.  Couldn't get authorization code")
+            logging.info("[!] Unable to authenticate to Spotify.  Couldn't get authorization code")
             sys.exit(-1)
         token = sp_oauth.get_access_token(authorization_code)
     if not token:
-        logging.info("\n[!] Unable to authenticate to Spotify.  Couldn't get access token.")
+        logging.info("[!] Unable to authenticate to Spotify.  Couldn't get access token.")
         sys.exit(-1)
     try:
         with open("token.json", "w+") as fh:
             fh.write(json.dumps(token))
-    except:
-        logging.info("\n[!] Unable to to write token object to disk.  This is non-fatal.")
+    except Exception:
+        logging.info("[!] Unable to to write token object to disk.  This is non-fatal.")
     return token
 
 
@@ -104,7 +111,7 @@ def create_playlist(playlist_name):
 def get_playlist_id(playlist_name):
     playlists = get_all_playlists()
     for playlist in playlists:
-        if playlist['owner']['id'] == username:  # Can only modify playlist that the user owns
+        if playlist["owner"]["id"] == username:  # Can only modify playlist that the user owns
             if playlist["name"] == playlist_name:
                 return playlist["id"]
     return None
@@ -112,10 +119,12 @@ def get_playlist_id(playlist_name):
 
 def do_durations_match(source_track_duration, found_track_duration, silent=silent_search):
     if source_track_duration == found_track_duration:
-        if not silent: logging.info("\t\t\t\t[+] Durations match")
+        if not silent:
+            logging.info("\t\t\t\t[+] Durations match")
         return True
     else:
-        if not silent: logging.info("\t\t\t\t[!] Durations do not match")
+        if not silent:
+            logging.info("\t\t\t\t[!] Durations do not match")
         return False
 
 
@@ -132,100 +141,148 @@ def most_popular_track(tracks):
 
 def best_of_multiple_matches(source_track, found_tracks, silent=silent_search):
     counter = 1
-    duration_matches = [0, ]
+    duration_matches = [
+        0,
+    ]
     for track in found_tracks:
-        if not silent: logging.info("\t\t\t[+] Match {}: {}".format(counter, track["id"]))
+        if not silent:
+            logging.info("\t\t\t[+] Match {}: {}".format(counter, track["id"]))
         if do_durations_match(source_track["duration_ms"], track["duration_ms"]):
             duration_matches[0] += 1
             duration_matches.append(track)
         counter += 1
     if duration_matches[0] == 1:
         best_track = duration_matches.pop()["id"]
-        if not silent: logging.info(
-            "\t\t\t[+] Only one exact match with matching duration, going with that one: {}".format(best_track))
+        if not silent:
+            logging.info(
+                "\t\t\t[+] Only one exact match with matching duration, going with that one: {}".format(best_track)
+            )
         return best_track
     # TODO: Popularity does not always yield the correct result
     best_track = most_popular_track(found_tracks)
-    if not silent: logging.info(
-        "\t\t\t[+] Multiple exact matches with matching durations, going with the most popular one: {}".format(
-            best_track))
+    if not silent:
+        logging.info(
+            "\t\t\t[+] Multiple exact matches with matching durations, going with the most popular one: {}".format(
+                best_track
+            )
+        )
     return best_track
 
 
 def search_for_track(track, silent=silent_search):
     # TODO: This is repetitive, can probably refactor but works for now
-    if not silent: logging.info("\n[+] Searching for track: {}{}by {} on {}".format(track["name"], " " if not track[
-        "mix"] else " ({}) ".format(track["mix"]), ", ".join(track["artists"]), track["release"]))
+    if not silent:
+        logging.info(
+            "[+] Searching for track: {}{}by {} on {}".format(
+                track["name"],
+                " " if not track["mix"] else " ({}) ".format(track["mix"]),
+                ", ".join(track["artists"]),
+                track["release"],
+            )
+        )
     # Search with Title, Mix, Artists, and Release / Album
-    query = "{}{}{} {}".format(track["name"], " " if not track["mix"] else " {} ".format(track["mix"]),
-                               " ".join(track["artists"]), track["release"])
-    if not silent: logging.info("\t[+] Search Query: {}".format(query))
+    query = "{}{}{} {}".format(
+        track["name"],
+        " " if not track["mix"] else " {} ".format(track["mix"]),
+        " ".join(track["artists"]),
+        track["release"],
+    )
+    if not silent:
+        logging.info("\t[+] Search Query: {}".format(query))
     search_results = spotify_ins.search(query)
     if len(search_results["tracks"]["items"]) == 1:
         track_id = search_results["tracks"]["items"][0]["id"]
-        if not silent: logging.info("\t\t[+] Found an exact match on name, mix, artists, and release: {}".format(track_id))
+        if not silent:
+            logging.info("\t\t[+] Found an exact match on name, mix, artists, and release: {}".format(track_id))
         do_durations_match(track["duration_ms"], search_results["tracks"]["items"][0]["duration_ms"])
         return track_id
 
     if len(search_results["tracks"]["items"]) > 1:
-        if not silent: logging.info("\t\t[+] Found multiple exact matches ({}) on name, mix, artists, and release.".format(
-            len(search_results["tracks"]["items"])))
+        if not silent:
+            logging.info(
+                "\t\t[+] Found multiple exact matches ({}) on name, mix, artists, and release.".format(
+                    len(search_results["tracks"]["items"])
+                )
+            )
         return best_of_multiple_matches(track, search_results["tracks"]["items"])
 
     # Not enough results, search w/o release
-    if not silent: logging.info("\t\t[+] No exact matches on name, mix, artists, and release.  Trying without release.")
+    if not silent:
+        logging.info("\t\t[+] No exact matches on name, mix, artists, and release.  Trying without release.")
     # Search with Title, Mix, and Artists
-    query = "{}{}{}".format(track["name"], " " if not track["mix"] else " {} ".format(track["mix"]),
-                            " ".join(track["artists"]))
-    if not silent: logging.info("\t[+] Search Query: {}".format(query))
+    query = "{}{}{}".format(
+        track["name"], " " if not track["mix"] else " {} ".format(track["mix"]), " ".join(track["artists"])
+    )
+    if not silent:
+        logging.info("\t[+] Search Query: {}".format(query))
     search_results = spotify_ins.search(query)
     if len(search_results["tracks"]["items"]) == 1:
         track_id = search_results["tracks"]["items"][0]["id"]
-        if not silent: logging.info("\t\t[+] Found an exact match on name, mix, and artists: {}".format(track_id))
+        if not silent:
+            logging.info("\t\t[+] Found an exact match on name, mix, and artists: {}".format(track_id))
         do_durations_match(track["duration_ms"], search_results["tracks"]["items"][0]["duration_ms"])
         return track_id
 
     if len(search_results["tracks"]["items"]) > 1:
-        if not silent: logging.info("\t\t[+] Found multiple exact matches ({}) on name, mix, and artists.".format(
-            len(search_results["tracks"]["items"])))
+        if not silent:
+            logging.info(
+                "\t\t[+] Found multiple exact matches ({}) on name, mix, and artists.".format(
+                    len(search_results["tracks"]["items"])
+                )
+            )
         return best_of_multiple_matches(track, search_results["tracks"]["items"])
 
     # Not enough results, search w/o mix, but with release
-    if not silent: logging.info("\t\t[+] No exact matches on name, mix, and artists.  Trying without mix, but with release.")
+    if not silent:
+        logging.info("\t\t[+] No exact matches on name, mix, and artists.  Trying without mix, but with release.")
     query = "{} {} {}".format(track["name"], " ".join(track["artists"]), track["release"])
-    if not silent: logging.info("\t[+] Search Query: {}".format(query))
+    if not silent:
+        logging.info("\t[+] Search Query: {}".format(query))
     search_results = spotify_ins.search(query)
     if len(search_results["tracks"]["items"]) == 1:
         track_id = search_results["tracks"]["items"][0]["id"]
-        if not silent: logging.info("\t\t[+] Found an exact match on name, artists, and release: {}".format(track_id))
+        if not silent:
+            logging.info("\t\t[+] Found an exact match on name, artists, and release: {}".format(track_id))
         do_durations_match(track["duration_ms"], search_results["tracks"]["items"][0]["duration_ms"])
         return track_id
 
     if len(search_results["tracks"]["items"]) > 1:
-        if not silent: logging.info("\t\t[+] Found multiple exact matches ({}) on name, artists, and release.".format(
-            len(search_results["tracks"]["items"])))
+        if not silent:
+            logging.info(
+                "\t\t[+] Found multiple exact matches ({}) on name, artists, and release.".format(
+                    len(search_results["tracks"]["items"])
+                )
+            )
         return best_of_multiple_matches(track, search_results["tracks"]["items"])
 
     # Not enough results, search w/o mix or release
-    if not silent: logging.info("\t\t[+] No exact matches on name, artists, and release.  Trying with just name and artists.")
+    if not silent:
+        logging.info("\t\t[+] No exact matches on name, artists, and release.  Trying with just name and artists.")
     query = "{} {}".format(track["name"], " ".join(track["artists"]))
-    if not silent: logging.info("\t[+] Search Query: {}".format(query))
+    if not silent:
+        logging.info("\t[+] Search Query: {}".format(query))
     search_results = spotify_ins.search(query)
     if len(search_results["tracks"]["items"]) == 1:
         track_id = search_results["tracks"]["items"][0]["id"]
-        if not silent: logging.info("\t\t[+] Found an exact match on name and artists: {}".format(track_id))
+        if not silent:
+            logging.info("\t\t[+] Found an exact match on name and artists: {}".format(track_id))
         do_durations_match(track["duration_ms"], search_results["tracks"]["items"][0]["duration_ms"])
         return track_id
 
     if len(search_results["tracks"]["items"]) > 1:
-        if not silent: logging.info("\t\t[+] Found multiple exact matches ({}) on name and artists.".format(
-            len(search_results["tracks"]["items"])))
+        if not silent:
+            logging.info(
+                "\t\t[+] Found multiple exact matches ({}) on name and artists.".format(
+                    len(search_results["tracks"]["items"])
+                )
+            )
         return best_of_multiple_matches(track, search_results["tracks"]["items"])
 
-    logging.info("\t\t[+] No exact matches on name and artists v1 : {} - {}{}".format(track["artists"][0], track["name"],
-                                                                               "" if not track[
-                                                                                   "mix"] else " - {}".format(
-                                                                                   track["mix"])))
+    logging.info(
+        "\t\t[+] No exact matches on name and artists v1 : {} - {}{}".format(
+            track["artists"][0], track["name"], "" if not track["mix"] else " - {}".format(track["mix"])
+        )
+    )
     logging.info("\t[!] Could not find this song on Spotify!")
     return None
 
@@ -242,13 +299,18 @@ def parse_search_results_spotify(search_results, track, silent=silent_search):
 
     if len(search_results["tracks"]["items"]) == 1:
         track_id = search_results["tracks"]["items"][0]["id"]
-        if not silent: logging.info("\t\t[+] Found an exact match on name, mix, artists, and release: {}".format(track_id))
+        if not silent:
+            logging.info("\t\t[+] Found an exact match on name, mix, artists, and release: {}".format(track_id))
         do_durations_match(track["duration_ms"], search_results["tracks"]["items"][0]["duration_ms"])
         return track_id
 
     if len(search_results["tracks"]["items"]) > 1:
-        if not silent: logging.info("\t\t[+] Found multiple exact matches ({}) on name, mix, artists, and release.".format(
-            len(search_results["tracks"]["items"])))
+        if not silent:
+            logging.info(
+                "\t\t[+] Found multiple exact matches ({}) on name, mix, artists, and release.".format(
+                    len(search_results["tracks"]["items"])
+                )
+            )
         return best_of_multiple_matches(track, search_results["tracks"]["items"])
 
     return track_id
@@ -256,46 +318,53 @@ def parse_search_results_spotify(search_results, track, silent=silent_search):
 
 def parse_track_regex_beatport(track):
     track_out = track.copy()  # Otherwise modifies the dict
-    track_out["name"] = re.sub(r'(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)', '',
-                               track_out["name"])  # Remove feat info, mostly not present in spotify
-    track_out["name"] = re.sub(r'\W', ' ',
-                               track_out["name"])  # Remove special characters as they are not handled by Spotify API
+    track_out["name"] = re.sub(
+        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
+    )  # Remove feat info, mostly not present in spotify
+    track_out["name"] = re.sub(
+        r"\W", " ", track_out["name"]
+    )  # Remove special characters as they are not handled by Spotify API
 
     return track_out
 
 
 def parse_track_regex_beatport_v2(track):
     track_out = track.copy()  # Otherwise modifies the dict
-    track_out["name"] = re.sub(r'(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)', '',
-                               track_out["name"])  # Remove feat info, mostly not present in spotify
-    track_out["name"] = re.sub(r'[^\w\s]', '',
-                               track_out["name"])  # Remove special characters as they are not handled by Spotify API
+    track_out["name"] = re.sub(
+        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
+    )  # Remove feat info, mostly not present in spotify
+    track_out["name"] = re.sub(
+        r"[^\w\s]", "", track_out["name"]
+    )  # Remove special characters as they are not handled by Spotify API
 
     return track_out
 
 
 def parse_track_regex_beatport_v3(track):
     track_out = track.copy()  # Otherwise modifies the dict
-    track_out["name"] = re.sub(r'(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)', '',
-                               track_out["name"])  # Remove feat info, mostly not present in spotify
-    track_out["name"] = re.sub(r'[^\w\s]', '',
-                               track_out["name"])  # Remove special characters as they are not handled by Spotify API
-    track_out["mix"] = re.sub("[R|r]emix", 'mix',
-                              track_out["mix"])  # Change remix
-    track_out["mix"] = re.sub("[M|m]ix", 'Remix',
-                              track_out["mix"])  # Change to remix
+    track_out["name"] = re.sub(
+        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
+    )  # Remove feat info, mostly not present in spotify
+    track_out["name"] = re.sub(
+        r"[^\w\s]", "", track_out["name"]
+    )  # Remove special characters as they are not handled by Spotify API
+    track_out["mix"] = re.sub("[R|r]emix", "mix", track_out["mix"])  # Change remix
+    track_out["mix"] = re.sub("[M|m]ix", "Remix", track_out["mix"])  # Change to remix
 
     return track_out
 
 
 def parse_track_regex_beatport_v4(track):
     track_out = track.copy()  # Otherwise modifies the dict
-    track_out["name"] = re.sub(r'(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)', '',
-                               track_out["name"])  # Remove feat info, mostly not present in spotify
-    track_out["name"] = re.sub(r'[^\w\s]', '',
-                               track_out["name"])  # Remove special characters as they are not handled by Spotify API
-    track_out["mix"] = re.sub("[M|m]ix", '',
-                              track_out["mix"])  # Remove special characters as they are not handled by Spotify API
+    track_out["name"] = re.sub(
+        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
+    )  # Remove feat info, mostly not present in spotify
+    track_out["name"] = re.sub(
+        r"[^\w\s]", "", track_out["name"]
+    )  # Remove special characters as they are not handled by Spotify API
+    track_out["mix"] = re.sub(
+        "[M|m]ix", "", track_out["mix"]
+    )  # Remove special characters as they are not handled by Spotify API
 
     return track_out
 
@@ -312,9 +381,13 @@ def search_for_track_v2(track, silent=silent_search, parse_track=parse_track):
     :return: Spotify track_id
     """
     if parse_track:
-        track_parsed = [track.copy(), parse_track_regex_beatport(track),
-                        parse_track_regex_beatport_v2(track), parse_track_regex_beatport_v3(track),
-                        parse_track_regex_beatport_v4(track)]
+        track_parsed = [
+            track.copy(),
+            parse_track_regex_beatport(track),
+            parse_track_regex_beatport_v2(track),
+            parse_track_regex_beatport_v3(track),
+            parse_track_regex_beatport_v4(track),
+        ]
     else:
         track_parsed = [track]
 
@@ -326,17 +399,25 @@ def search_for_track_v2(track, silent=silent_search, parse_track=parse_track):
         artist_search = [*track_["artists"]]
         if parse_track:
             # Add parsed artist if not in list already
-            artist_search.extend(x for x in [re.sub(r'\s*\([^)]*\)', '', artist_) for artist_ in track_["artists"]] if
-                                 x not in artist_search)  # Remove (UK) for example
-            artist_search.extend(x for x in [re.sub(r'\W+', ' ', artist_) for artist_ in track_["artists"]] if
-                                 x not in artist_search)  # Remove special characters, in case it is not handled by Spotify API
-            artist_search.extend(x for x in [re.sub(r'[^\w\s]', '', artist_) for artist_ in track_["artists"]] if
-                                 x not in artist_search)  # Remove special characters, in case it is not handled by Spotify API
             artist_search.extend(
-                x for x in [re.sub(r'(?<=\w)[A-Z]', add_space, artist_) for artist_ in track_["artists"]] if
-                x not in artist_search)  # Splitting artist name with a space after a capital letter
-            artist_search.extend(x for x in [re.sub(r'\s&.*$', "", artist_) for artist_ in track_["artists"]] if
-                                 x not in artist_search)  # Removing second part after &
+                x
+                for x in [re.sub(r"\s*\([^)]*\)", "", artist_) for artist_ in track_["artists"]]
+                if x not in artist_search
+            )  # Remove (UK) for example
+            artist_search.extend(
+                x for x in [re.sub(r"\W+", " ", artist_) for artist_ in track_["artists"]] if x not in artist_search
+            )  # Remove special characters, in case it is not handled by Spotify API
+            artist_search.extend(
+                x for x in [re.sub(r"[^\w\s]", "", artist_) for artist_ in track_["artists"]] if x not in artist_search
+            )  # Remove special characters, in case it is not handled by Spotify API
+            artist_search.extend(
+                x
+                for x in [re.sub(r"(?<=\w)[A-Z]", add_space, artist_) for artist_ in track_["artists"]]
+                if x not in artist_search
+            )  # Splitting artist name with a space after a capital letter
+            artist_search.extend(
+                x for x in [re.sub(r"\s&.*$", "", artist_) for artist_ in track_["artists"]] if x not in artist_search
+            )  # Removing second part after &
 
         # Search artist and artist parsed if parsed is on
         for artist in artist_search:
@@ -344,12 +425,14 @@ def search_for_track_v2(track, silent=silent_search, parse_track=parse_track):
             for track_name in [track_["name_mix"], track_["name"]]:
                 # Search with Title, Mix, Artist, Release / Album and Label
                 if not silent:
-                    logging.info("\n[+] Searching for track: {} by {} on {} on {} label".format(track_name, artist,
-                                                                                         track_["release"],
-                                                                                         track_["label"]))
-                query = 'track:"{}" artist:"{}" album:"{}" label:"{}"'.format(track_name, artist,
-                                                                              track_["release"],
-                                                                              track_["label"])
+                    logging.info(
+                        "\n[+] Searching for track: {} by {} on {} on {} label".format(
+                            track_name, artist, track_["release"], track_["label"]
+                        )
+                    )
+                query = 'track:"{}" artist:"{}" album:"{}" label:"{}"'.format(
+                    track_name, artist, track_["release"], track_["label"]
+                )
                 if not silent:
                     logging.info("\t[+] Search Query: {}".format(query))
                 search_results = spotify_ins.search(query)
@@ -359,7 +442,9 @@ def search_for_track_v2(track, silent=silent_search, parse_track=parse_track):
 
                 # Search with Title, Mix, Artist and Label, w/o Release / Album
                 if not silent:
-                    logging.info("\n[+] Searching for track: {} by {} on {} label".format(track_name, artist, track_["label"]))
+                    logging.info(
+                        "[+] Searching for track: {} by {} on {} label".format(track_name, artist, track_["label"])
+                    )
                 query = 'track:"{}" artist:"{}" label:"{}"'.format(track_name, artist, track_["label"])
                 if not silent:
                     logging.info("\t[+] Search Query: {}".format(query))
@@ -371,7 +456,8 @@ def search_for_track_v2(track, silent=silent_search, parse_track=parse_track):
                 # Search with Title, Mix, Artist, Release / Album, w/o  Label
                 if not silent:
                     logging.info(
-                        "\n[+] Searching for track: {} by {} on {} album".format(track_name, artist, track_["release"]))
+                        "[+] Searching for track: {} by {} on {} album".format(track_name, artist, track_["release"])
+                    )
                 query = 'track:"{}" artist:"{}" album:"{}"'.format(track_name, artist, track_["release"])
                 if not silent:
                     logging.info("\t[+] Search Query: {}".format(query))
@@ -391,10 +477,11 @@ def search_for_track_v2(track, silent=silent_search, parse_track=parse_track):
                 if track_id:
                     return track_id
 
-    logging.info("\t[+] No exact matches on name and artists v2 : {} - {}{}".format(track["artists"][0], track["name"],
-                                                                               "" if not track[
-                                                                                   "mix"] else " - {}".format(
-                                                                                   track["mix"])))
+    logging.info(
+        "\t[+] No exact matches on name and artists v2 : {} - {}{}".format(
+            track["artists"][0], track["name"], "" if not track["mix"] else " - {}".format(track["mix"])
+        )
+    )
 
     # Possible to use return search_for_track(track) but do not improve search results
     return None
@@ -425,7 +512,13 @@ def get_all_tracks_in_playlist(playlist_id):
 
 def clear_playlist(playlist_id):
     for track in get_all_tracks_in_playlist(playlist_id):
-        spotify_ins.user_playlist_remove_all_occurrences_of_tracks(username, playlist_id, [track["track"]["id"], ])
+        spotify_ins.user_playlist_remove_all_occurrences_of_tracks(
+            username,
+            playlist_id,
+            [
+                track["track"]["id"],
+            ],
+        )
 
 
 def add_new_tracks_to_playlist(genre, tracks_dict):
@@ -434,19 +527,21 @@ def add_new_tracks_to_playlist(genre, tracks_dict):
     # daily_top_10_playlist_name = "{}{} - Daily Top".format(playlist_prefix, genre)
     persistent_top_100_playlist_name = "Beatporter: {} - Top 100".format(genre)
     daily_top_n_playlist_name = "Beatporter: {} - Daily Top".format(genre)
-    logging.info("[+] Identifying new tracks for playlist: \"{}\"".format(persistent_top_100_playlist_name))
+    logging.info('[+] Identifying new tracks for playlist: "{}"'.format(persistent_top_100_playlist_name))
 
     if daily_mode:
         playlists = [
             {"name": persistent_top_100_playlist_name, "id": get_playlist_id(persistent_top_100_playlist_name)},
-            {"name": daily_top_n_playlist_name, "id": get_playlist_id(daily_top_n_playlist_name)}]
+            {"name": daily_top_n_playlist_name, "id": get_playlist_id(daily_top_n_playlist_name)},
+        ]
     else:
         playlists = [
-            {"name": persistent_top_100_playlist_name, "id": get_playlist_id(persistent_top_100_playlist_name)}]
+            {"name": persistent_top_100_playlist_name, "id": get_playlist_id(persistent_top_100_playlist_name)}
+        ]
 
     for playlist in playlists:
         if not playlist["id"]:
-            logging.info("\t[!] Playlist \"{}\" does not exist, creating it.".format(playlist["name"]))
+            logging.info('\t[!] Playlist "{}" does not exist, creating it.'.format(playlist["name"]))
             playlist["id"] = create_playlist(playlist["name"])
 
     if daily_mode:
@@ -463,12 +558,18 @@ def add_new_tracks_to_playlist(genre, tracks_dict):
         if track_id and track_count < daily_n_track:
             daily_top_n_track_ids.append(track_id)
         track_count += 1
-    logging.info("\n[+] Adding {} new tracks to the playlist: \"{}\"".format(len(persistent_top_100_track_ids),
-                                                                      persistent_top_100_playlist_name))
+    logging.info(
+        '[+] Adding {} new tracks to the playlist: "{}"'.format(
+            len(persistent_top_100_track_ids), persistent_top_100_playlist_name
+        )
+    )
     add_tracks_to_playlist(playlists[0]["id"], persistent_top_100_track_ids)
     if daily_mode:
-        logging.info("\n[+] Adding {} new tracks to the playlist: \"{}\"".format(len(daily_top_n_track_ids),
-                                                                          daily_top_n_playlist_name))
+        logging.info(
+            '[+] Adding {} new tracks to the playlist: "{}"'.format(
+                len(daily_top_n_track_ids), daily_top_n_playlist_name
+            )
+        )
         add_tracks_to_playlist(playlists[1]["id"], daily_top_n_track_ids)
 
 
@@ -490,7 +591,7 @@ def parse_tracks_spotify(tracks_json):
                 "duration_ms": track["duration"]["milliseconds"],
                 "genres": [genre["name"] for genre in track["genres"]],
                 "bpm": track["bpm"],
-                "key": track["key"]
+                "key": track["key"],
             }
         )
     return tracks
@@ -498,8 +599,8 @@ def parse_tracks_spotify(tracks_json):
 
 def parse_artist(value, key):
     # TODO find better method
-    if key == 'artists':
-        value = value[0]['name']
+    if key == "artists":
+        value = value[0]["name"]
     else:
         value
 
@@ -518,28 +619,30 @@ def update_hist_pl_tracks(df_hist_pl_tracks, playlist):
     df_tracks = pd.DataFrame.from_dict(track_list)
 
     if len(df_tracks.index) > 0:
-        df_tracks['track'] = [{key: value for key, value in track.items() if key in tracks_dict_names} for track in
-                              df_tracks['track']]
-        df_tracks['track'] = [{key: parse_artist(value, key) for key, value in track.items()} for track in
-                              df_tracks['track']]
+        df_tracks["track"] = [
+            {key: value for key, value in track.items() if key in tracks_dict_names} for track in df_tracks["track"]
+        ]
+        df_tracks["track"] = [
+            {key: parse_artist(value, key) for key, value in track.items()} for track in df_tracks["track"]
+        ]
 
         df_tracks_o = pd.DataFrame()
         for row in df_tracks.iterrows():
-            df_tracks_o = pd.concat([df_tracks_o, pd.DataFrame(row[1]['track'], index=[0])])
+            df_tracks_o = pd.concat([df_tracks_o, pd.DataFrame(row[1]["track"], index=[0])])
         df_tracks_o = df_tracks_o.loc[:, tracks_dict_names].reset_index(drop=True)
-        df_tracks_o['artist_name'] = df_tracks_o['artists'] + " - " + df_tracks_o['name']
+        df_tracks_o["artist_name"] = df_tracks_o["artists"] + " - " + df_tracks_o["name"]
 
-        df_tracks = pd.concat([df_tracks_o, df_tracks.loc[:, 'added_at']], axis=1)
+        df_tracks = pd.concat([df_tracks_o, df_tracks.loc[:, "added_at"]], axis=1)
 
-        df_temp = df_tracks.loc[:, ['id', 'added_at', 'artist_name']]
-        df_temp['playlist_id'] = playlist["id"]
-        df_temp['playlist_name'] = playlist["name"]
-        df_temp = df_temp.rename(columns={'id': 'track_id', 'added_at': 'datetime_added'})
+        df_temp = df_tracks.loc[:, ["id", "added_at", "artist_name"]]
+        df_temp["playlist_id"] = playlist["id"]
+        df_temp["playlist_name"] = playlist["name"]
+        df_temp = df_temp.rename(columns={"id": "track_id", "added_at": "datetime_added"})
 
         df_hist_pl_tracks = pd.concat([df_hist_pl_tracks, df_temp])
         df_hist_pl_tracks = df_hist_pl_tracks.drop_duplicates().reset_index(drop=True)
 
-    return (df_hist_pl_tracks)
+    return df_hist_pl_tracks
 
 
 def find_playlist_chart_label(title):
@@ -553,8 +656,9 @@ def find_playlist_chart_label(title):
     return playlist
 
 
-def add_new_tracks_to_playlist_chart_label(title, tracks_dict, df_hist_pl_tracks, use_prefix=True,
-                                           silent=silent_search):
+def add_new_tracks_to_playlist_chart_label(
+    title, tracks_dict, df_hist_pl_tracks, use_prefix=True, silent=silent_search
+):
     """
     :param title: Chart or label playlist title
     :param tracks_dict: dict of tracks to add
@@ -572,12 +676,12 @@ def add_new_tracks_to_playlist_chart_label(title, tracks_dict, df_hist_pl_tracks
         persistent_playlist_name = "{}{}".format(playlist_prefix, title)
     else:
         persistent_playlist_name = title
-    logging.info("[+] Identifying new tracks for playlist: \"{}\"".format(persistent_playlist_name))
+    logging.info('[+] Identifying new tracks for playlist: "{}"'.format(persistent_playlist_name))
 
     playlist = {"name": persistent_playlist_name, "id": get_playlist_id(persistent_playlist_name)}
 
     if not playlist["id"]:
-        logging.info("\t[!] Playlist \"{}\" does not exist, creating it.".format(playlist["name"]))
+        logging.info('\t[!] Playlist "{}" does not exist, creating it.'.format(playlist["name"]))
         playlist["id"] = create_playlist(playlist["name"])
 
     df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
@@ -588,7 +692,9 @@ def add_new_tracks_to_playlist_chart_label(title, tracks_dict, df_hist_pl_tracks
     elif digging_mode == "all":
         df_local_hist = df_hist_pl_tracks
     else:
-        df_local_hist = pd.DataFrame(columns=['playlist_id', 'playlist_name', 'track_id', 'datetime_added', 'artist_name'])
+        df_local_hist = pd.DataFrame(
+            columns=["playlist_id", "playlist_name", "track_id", "datetime_added", "artist_name"]
+        )
 
     persistent_track_ids = list()
     track_count = 0
@@ -599,10 +705,16 @@ def add_new_tracks_to_playlist_chart_label(title, tracks_dict, df_hist_pl_tracks
 
     for track in tracks_dict:
         track_count_tot += 1
-        track_artist_name = track['artists'][0] + " - " + track['name'] + " - " + track["mix"]
+        track_artist_name = track["artists"][0] + " - " + track["name"] + " - " + track["mix"]
         if not silent:
-            logging.info("{}% : {} : nb {} out of {}".format(str(round(track_count_tot / len(tracks_dict) * 100, 2)),
-                                                      track_artist_name, track_count_tot, len(tracks_dict)))
+            logging.info(
+                "{}% : {} : nb {} out of {}".format(
+                    str(round(track_count_tot / len(tracks_dict) * 100, 2)),
+                    track_artist_name,
+                    track_count_tot,
+                    len(tracks_dict),
+                )
+            )
         if track_artist_name not in df_local_hist.values:
             track_id = search_for_track_v2(track)
             if track_id and track_id not in playlist_track_ids.values and track_id not in df_local_hist.values:
@@ -611,13 +723,17 @@ def add_new_tracks_to_playlist_chart_label(title, tracks_dict, df_hist_pl_tracks
                 persistent_track_ids.append(track_id)
                 track_count += 1
             if track_count >= 99:  # Have limit of 100 trakcks per import
-                logging.info("\n[+] Adding {} new tracks to the playlist: \"{}\"".format(len(persistent_track_ids),
-                                                                                  persistent_playlist_name))
+                logging.info(
+                    '[+] Adding {} new tracks to the playlist: "{}"'.format(
+                        len(persistent_track_ids), persistent_playlist_name
+                    )
+                )
                 add_tracks_to_playlist(playlist["id"], persistent_track_ids)
                 # TODO consider only adding new ID to avoid reloading large playlist
                 df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
                 playlist_track_ids = df_hist_pl_tracks.loc[
-                    df_hist_pl_tracks["playlist_id"] == playlist["id"], "track_id"]
+                    df_hist_pl_tracks["playlist_id"] == playlist["id"], "track_id"
+                ]
                 track_count = 0
                 persistent_track_ids = list()
                 update_playlist_description_with_date(playlist)
@@ -627,10 +743,11 @@ def add_new_tracks_to_playlist_chart_label(title, tracks_dict, df_hist_pl_tracks
 
         if track_count_tot % refresh_token_n_tracks == 0:  # Avoid time out
             spotify_auth()
-            logging.info("[+] Identifying new tracks for playlist: \"{}\"\n".format(persistent_playlist_name))
+            logging.info('[+] Identifying new tracks for playlist: "{}"\n'.format(persistent_playlist_name))
 
-    logging.info("\n[+] Adding {} new tracks to the playlist: \"{}\"".format(len(persistent_track_ids),
-                                                                      persistent_playlist_name))
+    logging.info(
+        '[+] Adding {} new tracks to the playlist: "{}"'.format(len(persistent_track_ids), persistent_playlist_name)
+    )
     if len(persistent_track_ids) > 0:
         add_tracks_to_playlist(playlist["id"], persistent_track_ids)
         update_playlist_description_with_date(playlist)
@@ -655,12 +772,12 @@ def add_new_tracks_to_playlist_id(playlist_name, track_ids, df_hist_pl_tracks, s
 
     # TODO export playlist prefix name to config
     persistent_playlist_name = playlist_name
-    logging.info("[+] Identifying new tracks for playlist: \"{}\"".format(persistent_playlist_name))
+    logging.info('[+] Identifying new tracks for playlist: "{}"'.format(persistent_playlist_name))
 
     playlist = {"name": persistent_playlist_name, "id": get_playlist_id(persistent_playlist_name)}
 
     if not playlist["id"]:
-        logging.info("\t[!] Playlist \"{}\" does not exist, creating it.".format(playlist["name"]))
+        logging.info('\t[!] Playlist "{}" does not exist, creating it.'.format(playlist["name"]))
         playlist["id"] = create_playlist(playlist["name"])
 
     df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
@@ -671,7 +788,9 @@ def add_new_tracks_to_playlist_id(playlist_name, track_ids, df_hist_pl_tracks, s
     elif digging_mode == "all":
         df_local_hist = df_hist_pl_tracks
     else:
-        df_local_hist = pd.DataFrame(columns=['playlist_id', 'playlist_name', 'track_id', 'datetime_added', 'artist_name'])
+        df_local_hist = pd.DataFrame(
+            columns=["playlist_id", "playlist_name", "track_id", "datetime_added", "artist_name"]
+        )
 
     persistent_track_ids = list()
     track_count = 0
@@ -681,8 +800,8 @@ def add_new_tracks_to_playlist_id(playlist_name, track_ids, df_hist_pl_tracks, s
     spotify_auth()
 
     for track in track_ids:
-        if track['track'] is not None:  # Prevent error of empty track
-            track_id = track['track']['id']
+        if track["track"] is not None:  # Prevent error of empty track
+            track_id = track["track"]["id"]
             track_count_tot += 1
             if track_id not in df_local_hist.values:
                 if track_id not in playlist_track_ids.values:
@@ -691,13 +810,17 @@ def add_new_tracks_to_playlist_id(playlist_name, track_ids, df_hist_pl_tracks, s
                     persistent_track_ids.append(track_id)
                     track_count += 1
                 if track_count >= 99:  # Have limit of 100 trakcks per import
-                    logging.info("\n[+] Adding {} new tracks to the playlist: \"{}\"".format(len(persistent_track_ids),
-                                                                                      persistent_playlist_name))
+                    logging.info(
+                        '[+] Adding {} new tracks to the playlist: "{}"'.format(
+                            len(persistent_track_ids), persistent_playlist_name
+                        )
+                    )
                     add_tracks_to_playlist(playlist["id"], persistent_track_ids)
                     # TODO consider only adding new ID to avoid reloading large playlist
                     df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
                     playlist_track_ids = df_hist_pl_tracks.loc[
-                        df_hist_pl_tracks["playlist_id"] == playlist["id"], "track_id"]
+                        df_hist_pl_tracks["playlist_id"] == playlist["id"], "track_id"
+                    ]
                     track_count = 0
                     persistent_track_ids = list()
                     update_playlist_description_with_date(playlist)
@@ -707,10 +830,11 @@ def add_new_tracks_to_playlist_id(playlist_name, track_ids, df_hist_pl_tracks, s
 
             if track_count_tot % refresh_token_n_tracks == 0:  # Avoid time out
                 spotify_auth()
-                logging.info("[+] Identifying new tracks for playlist: \"{}\"\n".format(persistent_playlist_name))
+                logging.info('[+] Identifying new tracks for playlist: "{}"\n'.format(persistent_playlist_name))
 
-    logging.info("\n[+] Adding {} new tracks to the playlist: \"{}\"".format(len(persistent_track_ids),
-                                                                      persistent_playlist_name))
+    logging.info(
+        '[+] Adding {} new tracks to the playlist: "{}"'.format(len(persistent_track_ids), persistent_playlist_name)
+    )
     if len(persistent_track_ids) > 0:
         add_tracks_to_playlist(playlist["id"], persistent_track_ids)
         update_playlist_description_with_date(playlist)
@@ -737,19 +861,21 @@ def add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks, si
     # daily_top_10_playlist_name = "{}{} - Daily Top".format(playlist_prefix, genre)
     persistent_top_100_playlist_name = "Beatporter: {} - Top 100".format(genre)
     daily_top_n_playlist_name = "Beatporter: {} - Daily Top".format(genre)
-    logging.info("[+] Identifying new tracks for playlist: \"{}\"".format(persistent_top_100_playlist_name))
+    logging.info('[+] Identifying new tracks for playlist: "{}"'.format(persistent_top_100_playlist_name))
 
     if daily_mode:
         playlists = [
             {"name": persistent_top_100_playlist_name, "id": get_playlist_id(persistent_top_100_playlist_name)},
-            {"name": daily_top_n_playlist_name, "id": get_playlist_id(daily_top_n_playlist_name)}]
+            {"name": daily_top_n_playlist_name, "id": get_playlist_id(daily_top_n_playlist_name)},
+        ]
     else:
         playlists = [
-            {"name": persistent_top_100_playlist_name, "id": get_playlist_id(persistent_top_100_playlist_name)}]
+            {"name": persistent_top_100_playlist_name, "id": get_playlist_id(persistent_top_100_playlist_name)}
+        ]
 
     for playlist in playlists:
         if not playlist["id"]:
-            logging.info("\t[!] Playlist \"{}\" does not exist, creating it.".format(playlist["name"]))
+            logging.info('\t[!] Playlist "{}" does not exist, creating it.'.format(playlist["name"]))
             playlist["id"] = create_playlist(playlist["name"])
         df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
 
@@ -759,7 +885,9 @@ def add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks, si
     elif digging_mode == "all":
         df_local_hist = df_hist_pl_tracks
     else:
-        df_local_hist = pd.DataFrame(columns=['playlist_id', 'playlist_name', 'track_id', 'datetime_added', 'artist_name'])
+        df_local_hist = pd.DataFrame(
+            columns=["playlist_id", "playlist_name", "track_id", "datetime_added", "artist_name"]
+        )
     playlist_track_ids = df_hist_pl_tracks.loc[df_hist_pl_tracks["playlist_id"] == playlists[0]["id"], "track_id"]
 
     if daily_mode:
@@ -768,7 +896,9 @@ def add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks, si
             clear_playlist(playlists[1]["id"])
             df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlists[1])
             playlist_track_ids_daily = pd.Series([], name="track_id", dtype=object)
-            df_local_hist_daily = pd.DataFrame(columns=['playlist_id', 'playlist_name', 'track_id', 'datetime_added', 'artist_name'])
+            df_local_hist_daily = pd.DataFrame(
+                columns=["playlist_id", "playlist_name", "track_id", "datetime_added", "artist_name"]
+            )
         else:
             # Create local hist for daily playlist
             if digging_mode == "playlist":
@@ -776,7 +906,8 @@ def add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks, si
             elif digging_mode == "all":
                 df_local_hist_daily = df_hist_pl_tracks
             playlist_track_ids_daily = df_hist_pl_tracks.loc[
-                df_hist_pl_tracks["playlist_id"] == playlists[1]["id"], "track_id"]
+                df_hist_pl_tracks["playlist_id"] == playlists[1]["id"], "track_id"
+            ]
 
     persistent_track_ids = list()
     daily_top_n_track_ids = list()
@@ -786,7 +917,7 @@ def add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks, si
     # Get the number of tracks in the daily playlist
     if daily_mode:
         daily_playlist = spotify_ins.playlist(playlist_id=playlists[1]["id"])
-        n_daily_tracks = len(daily_playlist['tracks']['items'])
+        n_daily_tracks = len(daily_playlist["tracks"]["items"])
     else:
         n_daily_tracks = 0
 
@@ -795,10 +926,16 @@ def add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks, si
 
     for track in top_100_chart:
         track_count_tot += 1
-        track_artist_name = track['artists'][0] + " - " + track['name'] + " - " + track["mix"]
+        track_artist_name = track["artists"][0] + " - " + track["name"] + " - " + track["mix"]
         if not silent:
-            logging.info("{}% : {} : nb {} out of {}".format(str(round(track_count_tot / len(top_100_chart) * 100, 2)),
-                                                      track_artist_name, track_count_tot, len(top_100_chart)))
+            logging.info(
+                "{}% : {} : nb {} out of {}".format(
+                    str(round(track_count_tot / len(top_100_chart) * 100, 2)),
+                    track_artist_name,
+                    track_count_tot,
+                    len(top_100_chart),
+                )
+            )
 
         track_id = search_for_track_v2(track)
 
@@ -812,29 +949,41 @@ def add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks, si
                 if not silent:
                     logging.info("\tSimilar track name already found")
 
-            if n_daily_tracks < daily_n_track and track_id not in playlist_track_ids_daily.values and track_id not in df_local_hist_daily.values:
+            if (
+                n_daily_tracks < daily_n_track
+                and track_id not in playlist_track_ids_daily.values
+                and track_id not in df_local_hist_daily.values
+            ):
                 daily_top_n_track_ids.append(track_id)
                 n_daily_tracks += 1
         if track_count >= 99:  # Have limit of 100 tracks per import
-            logging.info("\n[+] Adding {} new tracks to the playlist: \"{}\"".format(len(persistent_track_ids),
-                                                                              persistent_top_100_playlist_name))
+            logging.info(
+                '[+] Adding {} new tracks to the playlist: "{}"'.format(
+                    len(persistent_track_ids), persistent_top_100_playlist_name
+                )
+            )
             add_tracks_to_playlist(playlists[0]["id"], persistent_track_ids)
             # TODO consider only adding new ID to avoid reloading large playlist
             df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
             playlist_track_ids = df_hist_pl_tracks.loc[
-                df_hist_pl_tracks["playlist_id"] == playlists[0]["id"], "track_id"]
+                df_hist_pl_tracks["playlist_id"] == playlists[0]["id"], "track_id"
+            ]
             track_count = 0
             persistent_track_ids = list()
             update_playlist_description_with_date(playlists[0])
 
         if track_count_tot % refresh_token_n_tracks == 0:  # Avoid time out
             spotify_auth()
-            logging.info("[+] Identifying new tracks for playlist: \"{}\"\n".format(persistent_top_100_playlist_name))
+            logging.info('[+] Identifying new tracks for playlist: "{}"\n'.format(persistent_top_100_playlist_name))
 
-    logging.info("\n[+] Adding {} new tracks to the playlist: \"{}\"".format(len(persistent_track_ids),
-                                                                      persistent_top_100_playlist_name))
-    logging.info("\n[+] Adding {} new tracks to the playlist: \"{}\"".format(len(daily_top_n_track_ids),
-                                                                      daily_top_n_playlist_name))
+    logging.info(
+        '[+] Adding {} new tracks to the playlist: "{}"'.format(
+            len(persistent_track_ids), persistent_top_100_playlist_name
+        )
+    )
+    logging.info(
+        '[+] Adding {} new tracks to the playlist: "{}"'.format(len(daily_top_n_track_ids), daily_top_n_playlist_name)
+    )
     if len(persistent_track_ids) > 0:
         add_tracks_to_playlist(playlists[0]["id"], persistent_track_ids)
         update_playlist_description_with_date(playlists[0])
@@ -854,8 +1003,11 @@ def add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks, si
                         extra_daily_top_n_track_ids.append(track_id)
                         n_daily_tracks += 1
 
-            logging.info("\n[+] Adding {} extra new tracks to the playlist: \"{}\"".format(len(extra_daily_top_n_track_ids),
-                                                                                    daily_top_n_playlist_name))
+            logging.info(
+                '[+] Adding {} extra new tracks to the playlist: "{}"'.format(
+                    len(extra_daily_top_n_track_ids), daily_top_n_playlist_name
+                )
+            )
             add_tracks_to_playlist(playlists[1]["id"], extra_daily_top_n_track_ids)
             update_playlist_description_with_date(playlists[1])
 
@@ -874,17 +1026,18 @@ def update_playlist_description_with_date(playlist):
     :return: None
     """
     playlist_desc = spotify_ins.playlist(playlist_id=playlist["id"])
-    playlist_desc['description'] = re.sub(r'\s*Updated on \d{4}-\d{2}-\d{2}\.*', '', playlist_desc['description'])
-    playlist_desc['description'] = re.sub(r'&#x2F;', '/', playlist_desc['description'])
-    spotify_ins.playlist_change_details(playlist_id=playlist["id"],
-                                        description=playlist_desc['description'] + " Updated on {}.".format(
-                                            datetime.today().strftime('%Y-%m-%d')))
+    playlist_desc["description"] = re.sub(r"\s*Updated on \d{4}-\d{2}-\d{2}\.*", "", playlist_desc["description"])
+    playlist_desc["description"] = re.sub(r"&#x2F;", "/", playlist_desc["description"])
+    spotify_ins.playlist_change_details(
+        playlist_id=playlist["id"],
+        description=playlist_desc["description"] + " Updated on {}.".format(datetime.today().strftime("%Y-%m-%d")),
+    )
 
 
 def update_hist_from_playlist(title, df_hist_pl_tracks):
     # TODO test, to remove
     persistent_playlist_name = "{}{}".format(playlist_prefix, title)
-    logging.info("[+] Getting hist of tracks for playlist: \"{}\"".format(persistent_playlist_name))
+    logging.info('[+] Getting hist of tracks for playlist: "{}"'.format(persistent_playlist_name))
 
     playlist = {"name": persistent_playlist_name, "id": get_playlist_id(persistent_playlist_name)}
 
@@ -902,9 +1055,10 @@ def back_up_spotify_playlist(playlist_name, org_playlist_id, df_hist_pl_tracks):
     return df_hist_pl_tracks
 
 
-def spotify_auth():
+def spotify_auth(verbose_aut=False):
     # Get authenticated to Spotify
-    logging.info("\nRefreshing Spotify auth")
+    if verbose_aut:
+        logging.info("[+][+] Refreshing Spotify auth")
     global spotify_ins
     token_info = do_spotify_oauth()
     spotify_ins = spotipy.Spotify(auth=token_info["access_token"])
@@ -919,9 +1073,7 @@ track_working_mix = {
     "title": "",
     "name": "The Shake",
     "mix": "Extended Mix",
-    "artists": [
-        "Ellis Moss"
-    ],
+    "artists": ["Ellis Moss"],
     "remixers": [],
     "release": "The Shake",
     "label": "Toolroom Trax",
@@ -929,21 +1081,16 @@ track_working_mix = {
     "released_date": "2021-01-29",
     "duration": "6:14",
     "duration_ms": 374032,
-    "genres": [
-        "Tech House"
-    ],
+    "genres": ["Tech House"],
     "bpm": 124,
-    "key": "G min"
+    "key": "G min",
 }
 
 track_not_working_mix = {
     "title": "",
     "name": "Jumpin'",
     "mix": "Extended",
-    "artists": [
-        "CID",
-        "Westend"
-    ],
+    "artists": ["CID", "Westend"],
     "remixers": [],
     "release": "Jumpin'",
     "label": "Repopulate Mars",
@@ -951,20 +1098,16 @@ track_not_working_mix = {
     "released_date": "2021-02-12",
     "duration": "5:04",
     "duration_ms": 304761,
-    "genres": [
-        "Tech House"
-    ],
+    "genres": ["Tech House"],
     "bpm": 126,
-    "key": "A min"
+    "key": "A min",
 }
 
 track_not_working_artist = {
     "title": "",
     "name": "Set U Free",
     "mix": "Extended Mix",
-    "artists": [
-        "GUZ (NL)"
-    ],
+    "artists": ["GUZ (NL)"],
     "remixers": [],
     "release": "Set U Free (Extended Mix)",
     "label": "Sink or Swim",
@@ -972,20 +1115,16 @@ track_not_working_artist = {
     "released_date": "2021-01-29",
     "duration": "4:23",
     "duration_ms": 263040,
-    "genres": [
-        "Tech House"
-    ],
+    "genres": ["Tech House"],
     "bpm": 125,
-    "key": "B maj"
+    "key": "B maj",
 }
 
 track_special_characters = {
     "title": "",
     "name": "Don't Touch The Pool",
     "mix": "Original Mix",
-    "artists": [
-        "FOVOS"
-    ],
+    "artists": ["FOVOS"],
     "remixers": [],
     "release": "Hot Mess",
     "label": "Country Club Disco",
@@ -993,20 +1132,16 @@ track_special_characters = {
     "released_date": "2021-02-12",
     "duration": "3:47",
     "duration_ms": 227302,
-    "genres": [
-        "Tech House"
-    ],
+    "genres": ["Tech House"],
     "bpm": 128,
-    "key": "A maj"
+    "key": "A maj",
 }
 
 track_name_special_char_cant_space = {
     "title": "",
     "name": "Don't Make Me",
     "mix": "Original Mix",
-    "artists": [
-        "Dillon Nathaniel"
-    ],
+    "artists": ["Dillon Nathaniel"],
     "remixers": [],
     "release": "Reason to Fly",
     "label": "Sola",
@@ -1014,9 +1149,7 @@ track_name_special_char_cant_space = {
     "released_date": "2021-02-19",
     "duration": "5:46",
     "duration_ms": 346666,
-    "genres": [
-        "Tech House"
-    ],
+    "genres": ["Tech House"],
     "bpm": 126,
-    "key": "G\u266d min"
+    "key": "G\u266d min",
 }

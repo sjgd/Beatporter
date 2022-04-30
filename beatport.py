@@ -5,15 +5,14 @@ import re
 from datetime import datetime
 from pandas import to_datetime
 
-import pandas as pd
-
-from config import genres, charts, labels, spotify_bkp
+from config import genres
 from config import overwrite_label, silent_search
 from spotify import find_playlist_chart_label, update_hist_pl_tracks
 
 import logging
+
 logging.getLogger().setLevel(logging.INFO)
-logging.basicConfig(format='%(message)s')
+logging.basicConfig(format="%(message)s")
 
 
 def get_top_100_playables(genre):
@@ -42,7 +41,7 @@ def parse_tracks(tracks_json):
                 "duration_ms": track["duration"]["milliseconds"],
                 "genres": [genre["name"] for genre in track["genres"]],
                 "bpm": track["bpm"],
-                "key": track["key"]
+                "key": track["key"],
             }
         )
     return tracks
@@ -55,11 +54,11 @@ def get_top_100_tracks(genre):
 
 
 def find_chart(chart_bp_url_code):
-    r = requests.get("https://www.beatport.com/search?q="+chart_bp_url_code)
+    r = requests.get("https://www.beatport.com/search?q=" + chart_bp_url_code)
     soup = BeautifulSoup(r.text, features="lxml")
     chart_urls = soup.find_all(class_="chart-url")
-    chart_urls = ["https://www.beatport.com" + url.attrs['href'] for url in chart_urls]
-    reg = re.compile(".*"+chart_bp_url_code+".*") #.replace("-", " ")
+    chart_urls = ["https://www.beatport.com" + url.attrs["href"] for url in chart_urls]
+    reg = re.compile(".*" + chart_bp_url_code + ".*")  # .replace("-", " ")
     chart_urls = list(filter(reg.match, chart_urls))
 
     if len(chart_urls) >= 1:
@@ -84,12 +83,13 @@ def parse_chart_url_datetime(str):
     return datetime.today().strftime(str)
 
 
-def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite = overwrite_label, silent=silent_search):
+def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite=overwrite_label, silent=silent_search):
     """
     :param label: label name
     :param label_bp_url_code: label url code
     :param df_hist_pl_tracks: dataframe of historic track
-    :param overwrite: if set to true will reload all tracks anyway, otherwise stops once the date of the last playlist refresh is reached
+    :param overwrite: if set to true will reload all tracks anyway,
+    otherwise stops once the date of the last playlist refresh is reached
     :return: dict of tracks from oldest (first) to newest (last)
     """
 
@@ -107,11 +107,14 @@ def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite = ov
         if len(df_loc_hist.index) > 0:
             last_update = max(df_loc_hist.loc[:, "datetime_added"])
             if type(last_update) == str:
-                last_update = datetime.strptime(last_update, '%Y-%m-%dT%H:%M:%SZ')
+                last_update = datetime.strptime(last_update, "%Y-%m-%dT%H:%M:%SZ")
             else:
                 last_update = last_update.tz_localize(None)
-            logging.info("Label {} has {} pages. Last playlist update found {}(UTC): ".format(label, max_page_number,
-                                                                                       last_update))
+            logging.info(
+                "Label {} has {} pages. Last playlist update found {}(UTC): ".format(
+                    label, max_page_number, last_update
+                )
+            )
         else:
             last_update = datetime.min
             logging.info("Label {} has {} pages".format(label, max_page_number))
@@ -133,7 +136,8 @@ def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite = ov
 
         # Check if release date reached last update
         reached_last_update = sum(
-            [to_datetime(track['released_date']).tz_localize(None) < last_update for track in output])
+            [to_datetime(track["released_date"]).tz_localize(None) < last_update for track in output]
+        )
         if reached_last_update > 0 and not overwrite:
             logging.info("\t[+] Reached last updated date, stopping")
             break
@@ -141,4 +145,3 @@ def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite = ov
     label_tracks.reverse()
 
     return label_tracks
-

@@ -743,7 +743,6 @@ def add_new_tracks_to_playlist_chart_label(
 
         if track_count_tot % refresh_token_n_tracks == 0:  # Avoid time out
             spotify_auth()
-            logging.info('[+] Identifying new tracks for playlist: "{}"\n'.format(persistent_playlist_name))
 
     logging.info(
         '[+] Adding {} new tracks to the playlist: "{}"'.format(len(persistent_track_ids), persistent_playlist_name)
@@ -830,7 +829,6 @@ def add_new_tracks_to_playlist_id(playlist_name, track_ids, df_hist_pl_tracks, s
 
             if track_count_tot % refresh_token_n_tracks == 0:  # Avoid time out
                 spotify_auth()
-                logging.info('[+] Identifying new tracks for playlist: "{}"\n'.format(persistent_playlist_name))
 
     logging.info(
         '[+] Adding {} new tracks to the playlist: "{}"'.format(len(persistent_track_ids), persistent_playlist_name)
@@ -974,7 +972,6 @@ def add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks, si
 
         if track_count_tot % refresh_token_n_tracks == 0:  # Avoid time out
             spotify_auth()
-            logging.info('[+] Identifying new tracks for playlist: "{}"\n'.format(persistent_top_100_playlist_name))
 
     logging.info(
         '[+] Adding {} new tracks to the playlist: "{}"'.format(
@@ -1061,7 +1058,7 @@ def spotify_auth(verbose_aut=False):
         logging.info("[+][+] Refreshing Spotify auth")
     global spotify_ins
     token_info = do_spotify_oauth()
-    spotify_ins = spotipy.Spotify(auth=token_info["access_token"])
+    spotify_ins = spotipy.Spotify(auth=token_info["access_token"], requests_timeout=10, retries=10)
 
 
 sp_oauth = oauth2.SpotifyOAuth(client_id, client_secret, redirect_uri, username=username, scope=scope)

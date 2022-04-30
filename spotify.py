@@ -10,6 +10,7 @@ import pandas as pd
 import re
 from datetime import datetime
 from time import sleep
+from requests.exceptions import ReadTimeout
 
 from config import folder_path, redirect_uri, username, playlist_description, silent_search
 from config import parse_track, daily_mode, daily_n_track, playlist_prefix, digging_mode
@@ -552,7 +553,13 @@ def add_new_tracks_to_playlist(genre, tracks_dict):
     daily_top_n_track_ids = list()
     track_count = 0
     for track in tracks_dict:
-        track_id = search_for_track_v2(track)
+        try:
+            track_id = search_for_track_v2(track)
+        except ReadTimeout:
+            track_id = search_for_track_v2(track)
+        except spotipy.exceptions.SpotifyException:
+            spotify_auth()
+            track_id = search_for_track_v2(track)
         if track_id and not track_in_playlist(playlists[0]["id"], track_id):
             persistent_top_100_track_ids.append(track_id)
         if track_id and track_count < daily_n_track:
@@ -716,7 +723,13 @@ def add_new_tracks_to_playlist_chart_label(
                 )
             )
         if track_artist_name not in df_local_hist.values:
-            track_id = search_for_track_v2(track)
+            try:
+                track_id = search_for_track_v2(track)
+            except ReadTimeout:
+                track_id = search_for_track_v2(track)
+            except spotipy.exceptions.SpotifyException:
+                spotify_auth()
+                track_id = search_for_track_v2(track)
             if track_id and track_id not in playlist_track_ids.values and track_id not in df_local_hist.values:
                 if not silent:
                     logging.info("\t[+] Adding track id : {} : nb {}".format(track_id, track_count))
@@ -935,7 +948,13 @@ def add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks, si
                 )
             )
 
-        track_id = search_for_track_v2(track)
+        try:
+            track_id = search_for_track_v2(track)
+        except ReadTimeout:
+            track_id = search_for_track_v2(track)
+        except spotipy.exceptions.SpotifyException:
+            spotify_auth()
+            track_id = search_for_track_v2(track)
 
         if track_id:
             if track_id not in playlist_track_ids.values and track_id not in df_local_hist.values:

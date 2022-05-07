@@ -11,8 +11,7 @@ from spotify import find_playlist_chart_label, update_hist_pl_tracks
 
 import logging
 
-logging.getLogger().setLevel(logging.INFO)
-logging.basicConfig(format="%(message)s")
+logger = logging.getLogger()
 
 
 def get_top_100_playables(genre):

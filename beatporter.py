@@ -11,14 +11,20 @@ import random
 
 # import argparse
 import logging
-
-logging.getLogger().setLevel(logging.INFO)
-logging.basicConfig(format="%(message)s")
-# logging.basicConfig(level=logging.DEBUG)
+from logging.handlers import RotatingFileHandler
 
 file_name_hist = "hist_playlists_tracks.pkl"
 curr_date = datetime.today().strftime("%Y-%m-%d")
 option_parse = ["backup", "chart", "genre", "label"]
+
+logFile = "runtime-beatporter.log"
+logging.basicConfig(format="%(message)s", level=logging.INFO)
+logger = logging.getLogger()
+# fileh = RotatingFileHandler(logFile, mode="a", maxBytes=50 * 1024 * 1024, backupCount=5, encoding=None, delay=False)
+fileh = RotatingFileHandler(logFile, 'w', maxBytes=50 * 1024 * 1024)
+formatter = logging.Formatter('%(asctime)s - %(message)s')
+fileh.setFormatter(formatter)
+logger.addHandler(fileh)
 
 
 def dump_tracks(tracks):

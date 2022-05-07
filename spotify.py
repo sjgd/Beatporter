@@ -18,8 +18,7 @@ from config import refresh_token_n_tracks, client_id, client_secret, scope
 
 import logging
 
-logging.getLogger().setLevel(logging.INFO)
-logging.basicConfig(format="%(message)s")
+logger = logging.getLogger()
 
 tracks_dict_names = ["id", "duration_ms", "href", "name", "popularity", "uri", "artists"]
 

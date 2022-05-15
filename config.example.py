@@ -15,7 +15,6 @@ redirect_uri = "http://localhost:65000"
 folder_path = "./"
 
 # Daily mode
-# TODO
 daily_mode = True
 daily_n_track = 15
 
@@ -23,7 +22,6 @@ daily_n_track = 15
 refresh_token_n_tracks = 100
 
 # Shuffle playlists
-# TODO
 shuffle_label = False
 
 # Digging mode

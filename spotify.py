@@ -123,13 +123,13 @@ def get_playlist_id(playlist_name):
     return None
 
 
-def do_durations_match(source_track_duration, found_track_duration, silent=silent_search):
+def do_durations_match(source_track_duration, found_track_duration, silent=silent_search, debug_duration=False):
     if source_track_duration == found_track_duration:
         if not silent:
             logging.info("\t\t\t\t[+] Durations match")
         return True
     else:
-        if not silent:
+        if not silent and debug_duration:
             logging.info("\t\t\t\t[!] Durations do not match")
         return False
 
@@ -146,14 +146,15 @@ def most_popular_track(tracks):
 
 
 def best_of_multiple_matches(source_track, found_tracks, silent=silent_search):
+    debug_duration = False
     counter = 1
     duration_matches = [
         0,
     ]
     for track in found_tracks:
-        if not silent:
+        if not silent and debug_duration:
             logging.info("\t\t\t[+] Match {}: {}".format(counter, track["id"]))
-        if do_durations_match(source_track["duration_ms"], track["duration_ms"]):
+        if do_durations_match(source_track["duration_ms"], track["duration_ms"], debug_duration=debug_duration):
             duration_matches[0] += 1
             duration_matches.append(track)
         counter += 1

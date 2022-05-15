@@ -59,6 +59,7 @@ def find_chart(chart_bp_url_code):
     chart_urls = ["https://www.beatport.com" + url.attrs["href"] for url in chart_urls]
     reg = re.compile(".*" + chart_bp_url_code + ".*")  # .replace("-", " ")
     chart_urls = list(filter(reg.match, chart_urls))
+    chart_urls.sort(reverse=True)  # That way larger ID is on top = newest chart
 
     if len(chart_urls) >= 1:
         return chart_urls[0]

@@ -18,12 +18,27 @@ curr_date = datetime.today().strftime("%Y-%m-%d")
 option_parse = ["backup", "chart", "genre", "label"]
 
 logFile = "runtime-beatporter.log"
-logging.basicConfig(format="%(message)s", level=logging.INFO)
+logging.basicConfig(format="%(message)s", level=logging.DEBUG)
 logger = logging.getLogger()
+logger.handlers.clear()  # Avoid duplicated handlers
+
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.INFO)
+formatter = logging.Formatter("%(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
 # fileh = RotatingFileHandler(logFile, mode="a", maxBytes=50 * 1024 * 1024, backupCount=5, encoding=None, delay=False)
-fileh = RotatingFileHandler(logFile, 'w', maxBytes=50 * 1024 * 1024)
-formatter = logging.Formatter('%(asctime)s - %(message)s')
+fileh = RotatingFileHandler(logFile, "w", maxBytes=50 * 1024 * 1024)
+formatter = logging.Formatter("%(asctime)s - %(message)s")
 fileh.setFormatter(formatter)
+fileh.setLevel(logging.INFO)  # Added
+logger.addHandler(fileh)
+
+fileh = RotatingFileHandler("runtime-beatporter-debug.log", "w", maxBytes=50 * 1024 * 1024)
+formatter = logging.Formatter("%(asctime)s - %(message)s")
+fileh.setFormatter(formatter)
+fileh.setLevel(logging.DEBUG)  # Added
 logger.addHandler(fileh)
 
 
@@ -118,6 +133,7 @@ def main(spotify_bkp=spotify_bkp, charts=charts, genres=genres, labels=labels):
 
             if chart_url:
                 tracks_dict = beatport.get_chart(beatport.find_chart(chart_bp_url_code))
+                logging.debug(chart_bp_url_code + ":" + str(tracks_dict))
                 logging.info("\t[+] Found {} tracks for {}".format(len(tracks_dict), chart))
                 df_hist_pl_tracks = spotify.add_new_tracks_to_playlist_chart_label(
                     chart, tracks_dict, df_hist_pl_tracks
@@ -129,6 +145,7 @@ def main(spotify_bkp=spotify_bkp, charts=charts, genres=genres, labels=labels):
         for genre, genre_bp_url_code in genres.items():
             logging.info("\n-Getting genre : ***** {} *****".format(genre))
             top_100_chart = beatport.get_top_100_tracks(genre)
+            logging.debug(genre + ":" + str(top_100_chart))
             df_hist_pl_tracks = spotify.add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks)
 
     if "label" in args:

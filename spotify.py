@@ -414,6 +414,9 @@ def parse_search_results_spotify(search_results, track, silent=silent_search):
 
 
 def parse_track_regex_beatport(track):
+    tracks_out = []
+
+    # Method 1
     track_out = track.copy()  # Otherwise modifies the dict
     track_out["name"] = re.sub(
         r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
@@ -422,51 +425,9 @@ def parse_track_regex_beatport(track):
         r"\W", " ", track_out["name"]
     )  # Remove special characters as they are not handled by Spotify API
 
-    return track_out
+    tracks_out.append(track_out)
 
-
-def parse_track_regex_beatport_v2(track):
-    track_out = track.copy()  # Otherwise modifies the dict
-    track_out["name"] = re.sub(
-        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
-    )  # Remove feat info, mostly not present in spotify
-    track_out["name"] = re.sub(
-        r"[^\w\s]", "", track_out["name"]
-    )  # Remove special characters as they are not handled by Spotify API
-
-    return track_out
-
-
-def parse_track_regex_beatport_v3(track):
-    track_out = track.copy()  # Otherwise modifies the dict
-    track_out["name"] = re.sub(
-        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
-    )  # Remove feat info, mostly not present in spotify
-    track_out["name"] = re.sub(
-        r"[^\w\s]", "", track_out["name"]
-    )  # Remove special characters as they are not handled by Spotify API
-    track_out["mix"] = re.sub("[R|r]emix", "mix", track_out["mix"])  # Change remix
-    track_out["mix"] = re.sub("[M|m]ix", "Remix", track_out["mix"])  # Change to remix
-
-    return track_out
-
-
-def parse_track_regex_beatport_v4(track):
-    track_out = track.copy()  # Otherwise modifies the dict
-    track_out["name"] = re.sub(
-        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
-    )  # Remove feat info, mostly not present in spotify
-    track_out["name"] = re.sub(
-        r"[^\w\s]", "", track_out["name"]
-    )  # Remove special characters as they are not handled by Spotify API
-    track_out["mix"] = re.sub(
-        "[M|m]ix", "", track_out["mix"]
-    )  # Remove special characters as they are not handled by Spotify API
-
-    return track_out
-
-
-def parse_track_regex_beatport_v5(track):
+    # Method 2
     track_out = track.copy()  # Otherwise modifies the dict
     track_out["name"] = re.sub(
         r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
@@ -483,7 +444,47 @@ def parse_track_regex_beatport_v5(track):
         # TODO add track duration check in similarity
         track_out["mix"] = None
 
-    return track_out
+    tracks_out.append(track_out)
+
+    # Method 3
+    track_out = track.copy()  # Otherwise modifies the dict
+    track_out["name"] = re.sub(
+        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
+    )  # Remove feat info, mostly not present in spotify
+    track_out["name"] = re.sub(
+        r"[^\w\s]", "", track_out["name"]
+    )  # Remove special characters as they are not handled by Spotify API
+
+    tracks_out.append(track_out)
+
+    # Method 4
+    track_out = track.copy()  # Otherwise modifies the dict
+    track_out["name"] = re.sub(
+        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
+    )  # Remove feat info, mostly not present in spotify
+    track_out["name"] = re.sub(
+        r"[^\w\s]", "", track_out["name"]
+    )  # Remove special characters as they are not handled by Spotify API
+    track_out["mix"] = re.sub("[R|r]emix", "mix", track_out["mix"])  # Change remix
+    track_out["mix"] = re.sub("[M|m]ix", "Remix", track_out["mix"])  # Change to remix
+
+    tracks_out.append(track_out)
+
+    # Method 5
+    track_out = track.copy()  # Otherwise modifies the dict
+    track_out["name"] = re.sub(
+        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
+    )  # Remove feat info, mostly not present in spotify
+    track_out["name"] = re.sub(
+        r"[^\w\s]", "", track_out["name"]
+    )  # Remove special characters as they are not handled by Spotify API
+    track_out["mix"] = re.sub(
+        "[M|m]ix", "", track_out["mix"]
+    )  # Remove special characters as they are not handled by Spotify API
+
+    tracks_out.append(track_out)
+
+    return tracks_out
 
 
 def add_space(match):
@@ -500,11 +501,7 @@ def search_for_track_v2(track, silent=silent_search, parse_track=parse_track):
     if parse_track:
         track_parsed = [
             track.copy(),
-            parse_track_regex_beatport(track),
-            parse_track_regex_beatport_v2(track),
-            parse_track_regex_beatport_v3(track),
-            parse_track_regex_beatport_v4(track),
-            parse_track_regex_beatport_v5(track),
+            *parse_track_regex_beatport(track),
         ]
     else:
         track_parsed = [track]

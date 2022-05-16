@@ -29,7 +29,7 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 # fileh = RotatingFileHandler(logFile, mode="a", maxBytes=50 * 1024 * 1024, backupCount=5, encoding=None, delay=False)
-fileh = RotatingFileHandler(logFile, "w", maxBytes=50 * 1024 * 1024)
+fileh = RotatingFileHandler(logFile, "w", maxBytes=1000)
 formatter = logging.Formatter("%(asctime)s - %(message)s")
 fileh.setFormatter(formatter)
 fileh.setLevel(logging.INFO)  # Added

@@ -158,7 +158,7 @@ def tracks_similarity(source_track, found_tracks, debug_comp=False):
             logging.info("\t\t\t[+] {} vs {}: {}".format(artist_s, artist_r, sim_artists))
         artist_similar.append(sim_artists)
 
-        track_n_s = source_track["name"]
+        track_n_s = source_track["name"] + " - " + source_track["mix"]
         track_n_r = track["name"]
         sim_name = similar(track_n_s, track_n_r)
         if debug_comp:
@@ -212,14 +212,14 @@ def best_of_multiple_matches(source_track, found_tracks, silent=silent_search):
                 )
 
     # TODO: Popularity does not always yield the correct result
-    debug_comp = False
+    debug_comp = False  # Will show the comparison score between the tracks
     tracks_sim = tracks_similarity(source_track, found_tracks, debug_comp)
     tracks_sim_a = np.array(tracks_sim)
     if any(tracks_sim_a > 0.9):
         max_value = max(tracks_sim)
         max_index = tracks_sim.index(max_value)
         best_sim_id = found_tracks[max_index]["id"]
-        if debug_comp:
+        if not silent:
             logging.info(
                 "\t\t\t[+] Multiple matches with more than 90%: {}, max:{}, ID: {}".format(
                     sum(tracks_sim_a > 0.8), max_value, best_sim_id
@@ -227,7 +227,7 @@ def best_of_multiple_matches(source_track, found_tracks, silent=silent_search):
             )
         return best_sim_id
     else:
-        if debug_comp:
+        if not silent:
             logging.info("\t\t\t[+] No good match found, skipping")
         return None
 
@@ -504,7 +504,7 @@ def search_for_track_v2(track, silent=silent_search, parse_track=parse_track):
         # Search artist and artist parsed if parsed is on
         for artist in artist_search:
             # Search track name and track name without mix (even if parsed is off)
-            for track_name in [track_["name_mix"], track_["name"]]:
+            for track_name in [track_["name_mix"]]:  # , track_["name"]]:
                 # Search with Title, Mix, Artist, Release / Album and Label
                 if not silent:
                     logging.info(

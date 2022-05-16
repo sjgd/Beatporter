@@ -155,7 +155,7 @@ def tracks_similarity(source_track, found_tracks, debug_comp=False):
         artist_match = []
         for artist_s in source_track["artists"]:  # ", ".join(source_track["artists"])
             for artist_r in track["artists"]:
-                artist_match.append(similar(artist_s, artist_r["name"]))
+                artist_match.append(similar(artist_s.lower(), artist_r["name"].lower()))
                 if debug_comp:
                     logging.info("\t\t\t[+] {} vs {}: {}".format(artist_s, artist_r["name"], artist_match[-1]))
         sim_artists = max(artist_match)
@@ -166,7 +166,7 @@ def tracks_similarity(source_track, found_tracks, debug_comp=False):
         track_n_r = track["name"]
         sim_name = similar(track_n_s, track_n_r)
         if debug_comp:
-            logging.info("\t\t\t[+] {} vs {}: {}".format(track_n_s, track_n_r, sim_name))
+            logging.info("\t\t\t[+] {} vs {}: {}".format(track_n_s.lower(), track_n_r.lower(), sim_name))
         track_n_similar.append(sim_name)
 
         duration_s = source_track["duration_ms"]
@@ -195,7 +195,7 @@ def best_of_multiple_matches(source_track, found_tracks, silent=silent_search):
     # Only one diff in letter case is only 85% similarity
     match_threshold = 0.85
     debug_duration = False
-    debug_comp = False  # Will show the comparison score between the tracks
+    debug_comp = True  # Will show the comparison score between the tracks
 
     counter = 1
     duration_matches = [
@@ -510,20 +510,14 @@ def query_track_album_label(track_name, artist, track_, silent=silent_search):
 def query_track_label(track_name, artist, track_, silent=silent_search):
     # Search with Title, Mix, Artist and Label, w/o Release / Album
     if not silent:
-        logging.info(
-            "[+]\tSearching for track: {} by {} on {} label".format(track_name, artist, track_["label"])
-        )
+        logging.info("[+]\tSearching for track: {} by {} on {} label".format(track_name, artist, track_["label"]))
     return 'track:"{}" artist:"{}" label:"{}"'.format(track_name, artist, track_["label"])
 
 
 def query_track_album(track_name, artist, track_, silent=silent_search):
     # Search with Title, Mix, Artist, Release / Album, w/o  Label
     if not silent:
-        logging.info(
-            "[+]\tSearching for track: {} by {} on {} album".format(
-                track_name, artist, track_["release"]
-            )
-        )
+        logging.info("[+]\tSearching for track: {} by {} on {} album".format(track_name, artist, track_["release"]))
     return 'track:"{}" artist:"{}" album:"{}"'.format(track_name, artist, track_["release"])
 
 

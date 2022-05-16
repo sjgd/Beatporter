@@ -151,23 +151,28 @@ def tracks_similarity(source_track, found_tracks, debug_comp=False):
     duration_similar = []
 
     for track in found_tracks:
-        artist_s = source_track["artists"][0]  # ", ".join(source_track["artists"])
-        artist_r = track["artists"][0]["name"]  # ", ".join([artist["name"] for artist in track["artists"]])
-        sim_artists = similar(artist_s, artist_r)
-        if debug_comp:
-            logging.info("\t\t\t[+] {} vs {}: {}".format(artist_s, artist_r, sim_artists))
+        # artist_r = track["artists"][0]["name"]  # ", ".join([artist["name"] for artist in track["artists"]])
+        artist_match = []
+        for artist_s in source_track["artists"]:  # ", ".join(source_track["artists"])
+            for artist_r in track["artists"]:
+                artist_match.append(similar(artist_s, artist_r["name"]))
+                if debug_comp:
+                    logging.info("\t\t\t[+] {} vs {}: {}".format(artist_s, artist_r["name"], artist_match[-1]))
+        sim_artists = max(artist_match)
+
         artist_similar.append(sim_artists)
 
-        track_n_s = source_track["name"] + " - " + source_track["mix"]
+        track_n_s = source_track["name"] + ("" if not source_track["mix"] else " - {}".format(source_track["mix"]))
         track_n_r = track["name"]
         sim_name = similar(track_n_s, track_n_r)
         if debug_comp:
             logging.info("\t\t\t[+] {} vs {}: {}".format(track_n_s, track_n_r, sim_name))
         track_n_similar.append(sim_name)
 
-        # duration_s = source_track["duration_ms"]
-        # duration_r = track["duration_ms"]
-        sim_duration = 1  # TODO duration_r / duration_s
+        duration_s = source_track["duration_ms"]
+        duration_r = track["duration_ms"]
+        sim_duration = duration_r / duration_s
+        sim_duration = 1  # TODO: remove this
         # if debug_comp:
         #     logging.info("\t\t\t[+] {} vs {}: {}".format(duration_s, duration_r, sim_duration))
         duration_similar.append(sim_duration)
@@ -180,7 +185,18 @@ def tracks_similarity(source_track, found_tracks, debug_comp=False):
 
 
 def best_of_multiple_matches(source_track, found_tracks, silent=silent_search):
+    """"
+
+    :param source_track:
+    :param found_tracks:
+    :param silent:
+    :return:
+    """
+    # Only one diff in letter case is only 85% similarity
+    match_threshold = 0.85
     debug_duration = False
+    debug_comp = False  # Will show the comparison score between the tracks
+
     counter = 1
     duration_matches = [
         0,
@@ -195,7 +211,7 @@ def best_of_multiple_matches(source_track, found_tracks, silent=silent_search):
     if duration_matches[0] == 1:
         best_track = duration_matches.pop()
         tracks_sim = tracks_similarity(source_track, [best_track])
-        if tracks_sim[0] > 0.9:
+        if tracks_sim[0] >= match_threshold:
             if not silent:
                 logging.info(
                     "\t\t\t[+] Only one exact match with matching duration, going with that one: {}".format(
@@ -212,17 +228,16 @@ def best_of_multiple_matches(source_track, found_tracks, silent=silent_search):
                 )
 
     # TODO: Popularity does not always yield the correct result
-    debug_comp = False  # Will show the comparison score between the tracks
     tracks_sim = tracks_similarity(source_track, found_tracks, debug_comp)
     tracks_sim_a = np.array(tracks_sim)
-    if any(tracks_sim_a > 0.9):
+    if any(tracks_sim_a >= match_threshold):
         max_value = max(tracks_sim)
         max_index = tracks_sim.index(max_value)
         best_sim_id = found_tracks[max_index]["id"]
         if not silent:
             logging.info(
-                "\t\t\t[+] Multiple matches with more than 90%: {}, max:{}, ID: {}".format(
-                    sum(tracks_sim_a > 0.8), max_value, best_sim_id
+                "\t\t\t[+] Multiple matches with more than 85%: {}, max:{}, ID: {}".format(
+                    sum(tracks_sim_a >= match_threshold), max_value, best_sim_id
                 )
             )
         return best_sim_id
@@ -451,6 +466,26 @@ def parse_track_regex_beatport_v4(track):
     return track_out
 
 
+def parse_track_regex_beatport_v5(track):
+    track_out = track.copy()  # Otherwise modifies the dict
+    track_out["name"] = re.sub(
+        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
+    )  # Remove feat info, mostly not present in spotify
+    # track_out["name"] = re.sub(
+    #     r"[^\w\s]", "", track_out["name"]
+    # )  # Remove special characters as they are not handled by Spotify API
+    if re.search("[O|o]riginal [M|m]ix", track_out["mix"]):
+        # Remove original mix as not used in Spotify
+        # TODO add track duration check in similarity
+        track_out["mix"] = None
+    if track_out["mix"] == "Extended Mix":
+        # Remove Extended Mix as not used in Spotify
+        # TODO add track duration check in similarity
+        track_out["mix"] = None
+
+    return track_out
+
+
 def add_space(match):
     return " " + match.group()
 
@@ -469,6 +504,7 @@ def search_for_track_v2(track, silent=silent_search, parse_track=parse_track):
             parse_track_regex_beatport_v2(track),
             parse_track_regex_beatport_v3(track),
             parse_track_regex_beatport_v4(track),
+            parse_track_regex_beatport_v5(track),
         ]
     else:
         track_parsed = [track]

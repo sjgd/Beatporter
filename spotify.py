@@ -185,7 +185,7 @@ def tracks_similarity(source_track, found_tracks, debug_comp=False):
 
 
 def best_of_multiple_matches(source_track, found_tracks, silent=silent_search):
-    """"
+    """
 
     :param source_track:
     :param found_tracks:
@@ -414,6 +414,11 @@ def parse_search_results_spotify(search_results, track, silent=silent_search):
 
 
 def parse_track_regex_beatport(track):
+    """ "
+    Modifies track name and mix with regex
+    :param track: track dict to search
+    :return: list of modified track dicts
+    """
     tracks_out = []
 
     # Method 1
@@ -489,6 +494,44 @@ def parse_track_regex_beatport(track):
 
 def add_space(match):
     return " " + match.group()
+
+
+def query_track_album_label(track_name, artist, track_, silent=silent_search):
+    # Search with Title, Mix, Artist, Release / Album and Label
+    if not silent:
+        logging.info(
+            "\t[+] Searching for track: {} by {} on {} on {} label".format(
+                track_name, artist, track_["release"], track_["label"]
+            )
+        )
+    return 'track:"{}" artist:"{}" album:"{}" label:"{}"'.format(track_name, artist, track_["release"], track_["label"])
+
+
+def query_track_label(track_name, artist, track_, silent=silent_search):
+    # Search with Title, Mix, Artist and Label, w/o Release / Album
+    if not silent:
+        logging.info(
+            "[+]\tSearching for track: {} by {} on {} label".format(track_name, artist, track_["label"])
+        )
+    return 'track:"{}" artist:"{}" label:"{}"'.format(track_name, artist, track_["label"])
+
+
+def query_track_album(track_name, artist, track_, silent=silent_search):
+    # Search with Title, Mix, Artist, Release / Album, w/o  Label
+    if not silent:
+        logging.info(
+            "[+]\tSearching for track: {} by {} on {} album".format(
+                track_name, artist, track_["release"]
+            )
+        )
+    return 'track:"{}" artist:"{}" album:"{}"'.format(track_name, artist, track_["release"])
+
+
+def query_track(track_name, artist, track_, silent=silent_search):
+    # Search with Title, Artist, w/o Release or Label
+    if not silent:
+        logging.info("\t\t[+] Searching for track: {} by {}".format(track_name, artist))
+    return 'track:"{}" artist:"{}"'.format(track_name, artist)
 
 
 def search_for_track_v2(track, silent=silent_search, parse_track=parse_track):
@@ -602,6 +645,81 @@ def search_for_track_v2(track, silent=silent_search, parse_track=parse_track):
     return None
 
 
+def search_for_track_v3(track, silent=silent_search, parse_track=parse_track):
+    """
+    :param track: track dict
+    :param silent: if true does not pring detailed, only if not found
+    :param parse_track: if true try to remove (.*) and mix information
+    :return: Spotify track_id
+    """
+    if parse_track:
+        track_parsed = [
+            track.copy(),
+            *parse_track_regex_beatport(track),
+        ]
+    else:
+        track_parsed = [track]
+
+    queries_functions = [
+        query_track_album_label,
+        query_track_label,
+        query_track_album,
+        query_track,
+    ]
+
+    # Create a parsed artist and try both
+    # TODO: Export to function
+    artist_search = [*track["artists"]]
+    if parse_track:
+        # Add parsed artist if not in list already
+        artist_search.extend(
+            x for x in [re.sub(r"\s*\([^)]*\)", "", artist_) for artist_ in track["artists"]] if x not in artist_search
+        )  # Remove (UK) for example
+        artist_search.extend(
+            x for x in [re.sub(r"\W+", " ", artist_) for artist_ in track["artists"]] if x not in artist_search
+        )  # Remove special characters, in case it is not handled by Spotify API
+        artist_search.extend(
+            x for x in [re.sub(r"[^\w\s]", "", artist_) for artist_ in track["artists"]] if x not in artist_search
+        )  # Remove special characters, in case it is not handled by Spotify API
+        artist_search.extend(
+            x
+            for x in [re.sub(r"(?<=\w)[A-Z]", add_space, artist_) for artist_ in track["artists"]]
+            if x not in artist_search
+        )  # Splitting artist name with a space after a capital letter
+        artist_search.extend(
+            x for x in [re.sub(r"\s&.*$", "", artist_) for artist_ in track["artists"]] if x not in artist_search
+        )  # Removing second part after &
+
+    # Search artist and artist parsed if parsed is on
+    for artist in artist_search:
+        # Search track name and track name without mix (even if parsed is off)
+
+        for query_function in queries_functions:
+
+            for track_ in track_parsed:
+                # Create a field name mix according to Spotify formatting
+                track_["name_mix"] = "{}{}".format(
+                    track_["name"], "" if not track_["mix"] else " - {}".format(track_["mix"])
+                )
+                for track_name in [track_["name_mix"]]:  # , track_["name"]]:
+                    query = query_function(track_name, artist, track_, silent)
+                    if not silent:
+                        logging.info("\t\t[+] Search Query: {}".format(query))
+                    search_results = spotify_ins.search(query)
+                    track_id = parse_search_results_spotify(search_results, track_)
+                    if track_id:
+                        return track_id
+
+    logging.info(
+        " [Done] No exact matches on name and artists v2 : {} - {}{}".format(
+            track["artists"][0], track["name"], "" if not track["mix"] else " - {}".format(track["mix"])
+        )
+    )
+
+    # Possible to use return search_for_track(track) but do not improve search results
+    return None
+
+
 def track_in_playlist(playlist_id, track_id):
     for track in get_all_tracks_in_playlist(playlist_id):
         if track["track"]["id"] == track_id:
@@ -636,6 +754,9 @@ def clear_playlist(playlist_id):
         )
 
 
+search_track_function = search_for_track_v2
+
+
 def add_new_tracks_to_playlist(genre, tracks_dict):
     # TODO export playlist anterior name to config
     # persistent_top_100_playlist_name = "{}{} - Top 100".format(playlist_prefix, genre)
@@ -668,12 +789,12 @@ def add_new_tracks_to_playlist(genre, tracks_dict):
     track_count = 0
     for track in tracks_dict:
         try:
-            track_id = search_for_track_v2(track)
+            track_id = search_track_function(track)
         except ReadTimeout:
-            track_id = search_for_track_v2(track)
+            track_id = search_track_function(track)
         except spotipy.exceptions.SpotifyException:
             spotify_auth()
-            track_id = search_for_track_v2(track)
+            track_id = search_track_function(track)
         if track_id and not track_in_playlist(playlists[0]["id"], track_id):
             persistent_top_100_track_ids.append(track_id)
         if track_id and track_count < daily_n_track:
@@ -838,12 +959,12 @@ def add_new_tracks_to_playlist_chart_label(
             )
         if track_artist_name not in df_local_hist.values:
             try:
-                track_id = search_for_track_v2(track)
+                track_id = search_track_function(track)
             except ReadTimeout:
-                track_id = search_for_track_v2(track)
+                track_id = search_track_function(track)
             except spotipy.exceptions.SpotifyException:
                 spotify_auth()
-                track_id = search_for_track_v2(track)
+                track_id = search_track_function(track)
             if track_id and track_id not in playlist_track_ids.values and track_id not in df_local_hist.values:
                 if not silent:
                     logging.info(
@@ -1071,12 +1192,12 @@ def add_new_tracks_to_playlist_genre(genre, top_100_chart, df_hist_pl_tracks, si
 
         if track_artist_name not in df_local_hist.values:
             try:
-                track_id = search_for_track_v2(track)
+                track_id = search_track_function(track)
             except ReadTimeout:
-                track_id = search_for_track_v2(track)
+                track_id = search_track_function(track)
             except spotipy.exceptions.SpotifyException:
                 spotify_auth()
-                track_id = search_for_track_v2(track)
+                track_id = search_track_function(track)
 
             if track_id:
                 if track_id not in playlist_track_ids.values and track_id not in df_local_hist.values:

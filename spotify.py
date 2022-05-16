@@ -433,6 +433,7 @@ def parse_track_regex_beatport(track):
     tracks_out.append(track_out)
 
     # Method 2
+    # Remove feat, special char and mixes
     track_out = track.copy()  # Otherwise modifies the dict
     track_out["name"] = re.sub(
         r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
@@ -486,6 +487,26 @@ def parse_track_regex_beatport(track):
     track_out["mix"] = re.sub(
         "[M|m]ix", "", track_out["mix"]
     )  # Remove special characters as they are not handled by Spotify API
+
+    tracks_out.append(track_out)
+
+    # Method 6
+    # Remove feat, special char and replace mixes with radio edit as often exists on Spotify only
+    track_out = track.copy()  # Otherwise modifies the dict
+    track_out["name"] = re.sub(
+        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
+    )  # Remove feat info, mostly not present in spotify
+    # track_out["name"] = re.sub(
+    #     r"[^\w\s]", "", track_out["name"]
+    # )  # Remove special characters as they are not handled by Spotify API
+    if re.search("[O|o]riginal [M|m]ix", track_out["mix"]):
+        # Remove original mix as not used in Spotify
+        # TODO add track duration check in similarity
+        track_out["mix"] = "Radio Edit"
+    if track_out["mix"] == "Extended Mix":
+        # Remove Extended Mix as not used in Spotify
+        # TODO add track duration check in similarity
+        track_out["mix"] = "Radio Edit"
 
     tracks_out.append(track_out)
 

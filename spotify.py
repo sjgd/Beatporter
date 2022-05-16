@@ -195,7 +195,7 @@ def best_of_multiple_matches(source_track, found_tracks, silent=silent_search):
     # Only one diff in letter case is only 85% similarity
     match_threshold = 0.85
     debug_duration = False
-    debug_comp = True  # Will show the comparison score between the tracks
+    debug_comp = False  # Will show the comparison score between the tracks
 
     counter = 1
     duration_matches = [

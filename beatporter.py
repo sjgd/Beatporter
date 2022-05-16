@@ -32,13 +32,13 @@ logger.addHandler(handler)
 fileh = RotatingFileHandler(logFile, "w", maxBytes=1000)
 formatter = logging.Formatter("%(asctime)s - %(message)s")
 fileh.setFormatter(formatter)
-fileh.setLevel(logging.INFO)  # Added
+fileh.setLevel(logging.INFO)
 logger.addHandler(fileh)
 
 fileh = RotatingFileHandler("runtime-beatporter-debug.log", "w", maxBytes=50 * 1024 * 1024)
 formatter = logging.Formatter("%(asctime)s - %(message)s")
 fileh.setFormatter(formatter)
-fileh.setLevel(logging.DEBUG)  # Added
+fileh.setLevel(logging.DEBUG)
 logger.addHandler(fileh)
 
 

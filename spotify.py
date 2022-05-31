@@ -31,14 +31,14 @@ formatter = logging.Formatter("%(message)s")
 console.setFormatter(formatter)
 logging.getLogger().addHandler(console)
 
-fileh = RotatingFileHandler(logFile, mode="w", maxBytes=1000, backupCount=1, encoding=None, delay=False)
+fileh = RotatingFileHandler(logFile, mode="w", maxBytes=50 * 1024 * 1024, backupCount=1, encoding=None, delay=False)
 formatter = logging.Formatter("%(asctime)s - %(message)s")
 fileh.setFormatter(formatter)
 fileh.setLevel(logging.INFO)
 logging.getLogger().addHandler(fileh)
 
 fileh = RotatingFileHandler(
-    "runtime-beatporter-debug.log", "w", maxBytes=1000, backupCount=1, encoding=None, delay=False
+    "runtime-beatporter-debug.log", "w", maxBytes=50 * 1024 * 1024, backupCount=1, encoding=None, delay=False
 )
 formatter = logging.Formatter("%(asctime)s - %(message)s")
 fileh.setFormatter(formatter)

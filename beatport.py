@@ -76,7 +76,15 @@ def get_chart(url):
 
 
 def parse_chart_url_datetime(str):
-    return datetime.today().strftime(str)
+    """
+    Format string, if Sunday returns previous week.
+    :param str: string to format
+    :return: datetime object
+    """
+    if datetime.today().weekday() > 5:
+       return (datetime.today() - timedelta(days=6)).strftime(str)
+    else:
+        return datetime.today().strftime(str)
 
 
 def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite=overwrite_label, silent=silent_search):

@@ -2,7 +2,7 @@ import json
 import requests
 from bs4 import BeautifulSoup
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from pandas import to_datetime
 
 from config import genres

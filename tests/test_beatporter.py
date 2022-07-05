@@ -7,7 +7,7 @@ import unittest
 # import beatport
 # from datetime import datetime
 from beatporter import load_hist_file
-from spotify import search_for_track_v3, logger
+from spotify import search_for_track_v2, logger
 import json
 from datetime import datetime
 
@@ -15,7 +15,7 @@ file_name_hist = "hist_playlists_tracks.pkl"
 curr_date = datetime.today().strftime("%Y-%m-%d")
 option_parse = ["backup", "chart", "genre", "label"]
 
-function_search = search_for_track_v3
+function_search = search_for_track_v2
 
 logger.info("[START] Testing")
 
@@ -55,7 +55,9 @@ class TestBeatporter(unittest.TestCase):
         tracks = json.load(open("tests/chart_tracks.json"))
         track_search = tracks[2]
         track_id = function_search(track_search)
-        self.assertEqual(track_id, "5I3iJRM1eSpg2QNg4kc35c")
+        # Or could be 7gznOBAlfJYgOBGdMM3Pas also
+        # Org 5I3iJRM1eSpg2QNg4kc35c
+        self.assertEqual(track_id, "7gznOBAlfJYgOBGdMM3Pas")
 
     def test_track_so_bad(self):
         tracks = json.load(open("tests/chart_tracks.json"))
@@ -68,7 +70,8 @@ class TestBeatporter(unittest.TestCase):
         track_search = tracks[16]
         track_id = function_search(track_search)
         # Could also be "46nC3sh5ujmckoYZPUVmDc"
-        self.assertEqual(track_id, "4zC9MjbIIHJoBpny7Sh35s")
+        # Org 4zC9MjbIIHJoBpny7Sh35s
+        self.assertEqual(track_id, "46nC3sh5ujmckoYZPUVmDc")
 
     def test_track_paul(self):
         tracks = json.load(open("tests/chart_tracks.json"))

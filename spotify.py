@@ -5,7 +5,7 @@ import spotipy
 import asyncio
 import webbrowser
 from time import time
-from spotipy import oauth2
+from spotipy import oauth2, SpotifyException
 import pandas as pd
 import re
 from datetime import datetime
@@ -283,13 +283,18 @@ def best_of_multiple_matches(source_track, found_tracks, silent=silent_search):
     return best_track
 
 
-def search_wrapper(query):
+def search_wrapper(query, logger=logger):
+    logger.setLevel(logging.FATAL)
     try:
         result = spotify_ins.search(query)
-    except Exception as e:
+    except SpotifyException as e:
+        logger.setLevel(logging.INFO)
         if e.http_status == 404:
             # Return empty result
             return {"tracks": {"items": []}}
+        else:
+            pass
+    logger.setLevel(logging.INFO)
     return result
 
 

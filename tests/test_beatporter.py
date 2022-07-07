@@ -1,3 +1,4 @@
+# Use https://open.spotify.com/track/4zC9MjbIIHJoBpny7Sh35s to explore a track
 import unittest
 # import os
 # import numpy as np
@@ -69,9 +70,9 @@ class TestBeatporter(unittest.TestCase):
         tracks = json.load(open("tests/chart_tracks.json"))
         track_search = tracks[16]
         track_id = function_search(track_search)
-        # Could also be "46nC3sh5ujmckoYZPUVmDc"
+        # Could also be "46nC3sh5ujmckoYZPUVmDc" or "4zC9MjbIIHJoBpny7Sh35s"
         # Org 4zC9MjbIIHJoBpny7Sh35s
-        self.assertEqual(track_id, "46nC3sh5ujmckoYZPUVmDc")
+        self.assertEqual(track_id, "4zC9MjbIIHJoBpny7Sh35s")
 
     def test_track_paul(self):
         tracks = json.load(open("tests/chart_tracks.json"))

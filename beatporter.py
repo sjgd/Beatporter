@@ -104,10 +104,10 @@ def main(spotify_bkp=spotify_bkp, charts=charts, genres=genres, labels=labels):
         for chart, chart_bp_url_code in charts.items():
             # TODO handle return None, handle chart_bp_url_code has ID already or not
             logger.info("\n-Getting chart : ***** {} : {} *****".format(chart, chart_bp_url_code))
-            chart_url = beatport.find_chart(chart_bp_url_code)
+            chart_url = beatport.find_chart(chart, chart_bp_url_code)
 
             if chart_url:
-                tracks_dict = beatport.get_chart(beatport.find_chart(chart_bp_url_code))
+                tracks_dict = beatport.get_chart(chart_url)
                 logger.debug(chart_bp_url_code + ":" + str(tracks_dict))
                 logger.info("\t[+] Found {} tracks for {}".format(len(tracks_dict), chart))
                 df_hist_pl_tracks = spotify.add_new_tracks_to_playlist_chart_label(

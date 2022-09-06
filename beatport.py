@@ -48,7 +48,7 @@ def get_top_100_tracks(genre):
     return parse_tracks(raw_tracks_dict)
 
 
-def find_chart(chart_bp_url_code):
+def find_chart(chart, chart_bp_url_code):
     r = requests.get("https://www.beatport.com/search?q=" + chart_bp_url_code)
     soup = BeautifulSoup(r.text, features="lxml")
     chart_urls = soup.find_all(class_="chart-url")
@@ -58,7 +58,35 @@ def find_chart(chart_bp_url_code):
     chart_urls.sort(reverse=True)  # That way larger ID is on top = newest chart
 
     if len(chart_urls) >= 1:
-        return chart_urls[0]
+        # TODO export as function ?
+        # Checking if '(2XXX)' year is present in chart name and matching chart release year
+        match_year_name = re.match(r'.*(\(2[0-9]{3}\))', chart)
+        if match_year_name is not None:
+            match_year_name = match_year_name.group(1)
+            logger.info("Found year {} in chart name, checking if release is matching".format(match_year_name))
+            r = requests.get(chart_urls[0])
+            soup = BeautifulSoup(r.text, features="lxml")
+            # TODO: better match release year
+            release_date = soup.find("span", {"class": "value"}).text
+            is_year = bool(re.search(r'2[0-9]{3}-[0-9]{2}-[0-9]{2}', release_date))
+            if not is_year:
+                logger.warn("ERROR - Release date: {}, does not seem to be a date, aborting".format(release_date))
+            else:
+                release_year = re.match(r'2[0-9]{3}', release_date).group(0)
+                if f"({release_year})" == match_year_name:
+                    logger.info("Years match ({}), returning chart {}".format(release_year, chart_urls[0]))
+                    return chart_urls[0]
+                else:
+                    logger.warn(
+                        "ERROR - Release date: {}, does not match, aborting chart: {}".format(
+                            release_date,
+                            chart_urls[0]
+                        )
+                    )
+                    return None
+        else:
+            logger.info("No year found in chart name, returning {}".format(chart_urls[0]))
+            return chart_urls[0]
     else:
         return None
 

@@ -5,7 +5,7 @@ import spotipy
 import asyncio
 import webbrowser
 from time import time
-from spotipy import oauth2
+from spotipy import oauth2, SpotifyException
 import pandas as pd
 import re
 from datetime import datetime
@@ -283,6 +283,21 @@ def best_of_multiple_matches(source_track, found_tracks, silent=silent_search):
     return best_track
 
 
+def search_wrapper(query, logger=logger):
+    logger.setLevel(logging.FATAL)
+    try:
+        result = spotify_ins.search(query)
+    except SpotifyException as e:
+        logger.setLevel(logging.INFO)
+        if e.http_status == 404:
+            # Return empty result
+            return {"tracks": {"items": []}}
+        else:
+            pass
+    logger.setLevel(logging.INFO)
+    return result
+
+
 def search_for_track(track, silent=silent_search):
     # TODO: This is repetitive, can probably refactor but works for now
     if not silent:
@@ -303,7 +318,7 @@ def search_for_track(track, silent=silent_search):
     )
     if not silent:
         logger.info("\t[+] Search Query: {}".format(query))
-    search_results = spotify_ins.search(query)
+    search_results = search_wrapper(query)
     if len(search_results["tracks"]["items"]) == 1:
         track_id = search_results["tracks"]["items"][0]["id"]
         if not silent:
@@ -329,7 +344,7 @@ def search_for_track(track, silent=silent_search):
     )
     if not silent:
         logger.info("\t[+] Search Query: {}".format(query))
-    search_results = spotify_ins.search(query)
+    search_results = search_wrapper(query)
     if len(search_results["tracks"]["items"]) == 1:
         track_id = search_results["tracks"]["items"][0]["id"]
         if not silent:
@@ -352,7 +367,7 @@ def search_for_track(track, silent=silent_search):
     query = "{} {} {}".format(track["name"], " ".join(track["artists"]), track["release"])
     if not silent:
         logger.info("\t[+] Search Query: {}".format(query))
-    search_results = spotify_ins.search(query)
+    search_results = search_wrapper(query)
     if len(search_results["tracks"]["items"]) == 1:
         track_id = search_results["tracks"]["items"][0]["id"]
         if not silent:
@@ -375,7 +390,7 @@ def search_for_track(track, silent=silent_search):
     query = "{} {}".format(track["name"], " ".join(track["artists"]))
     if not silent:
         logger.info("\t[+] Search Query: {}".format(query))
-    search_results = spotify_ins.search(query)
+    search_results = search_wrapper(query)
     if len(search_results["tracks"]["items"]) == 1:
         track_id = search_results["tracks"]["items"][0]["id"]
         if not silent:
@@ -621,35 +636,35 @@ def search_for_track_v2(track, silent=silent_search, parse_track=parse_track):
         for artist in artist_search:
             # Search track name and track name without mix (even if parsed is off)
             for track_name in [track_["name_mix"]]:  # , track_["name"]]:
-                # Search with Title, Mix, Artist, Release / Album and Label
-                if not silent:
-                    logger.info(
-                        "\t[+] Searching for track: {} by {} on {} on {} label".format(
-                            track_name, artist, track_["release"], track_["label"]
-                        )
-                    )
-                query = 'track:"{}" artist:"{}" album:"{}" label:"{}"'.format(
-                    track_name, artist, track_["release"], track_["label"]
-                )
-                if not silent:
-                    logger.info("\t\t[+] Search Query: {}".format(query))
-                search_results = spotify_ins.search(query)
-                track_id = parse_search_results_spotify(search_results, track_)
-                if track_id:
-                    return track_id
+                # # Search with Title, Mix, Artist, Release / Album and Label
+                # if not silent:
+                #     logger.info(
+                #         "\t[+] Searching for track: {} by {} on {} on {} label".format(
+                #             track_name, artist, track_["release"], track_["label"]
+                #         )
+                #     )
+                # query = 'track:"{}" artist:"{}" album:"{}" label:"{}"'.format(
+                #     track_name, artist, track_["release"], track_["label"]
+                # )
+                # if not silent:
+                #     logger.info("\t\t[+] Search Query: {}".format(query))
+                # search_results = search_wrapper(query)
+                # track_id = parse_search_results_spotify(search_results, track_)
+                # if track_id:
+                #     return track_id
 
-                # Search with Title, Mix, Artist and Label, w/o Release / Album
-                if not silent:
-                    logger.info(
-                        "[+]\tSearching for track: {} by {} on {} label".format(track_name, artist, track_["label"])
-                    )
-                query = 'track:"{}" artist:"{}" label:"{}"'.format(track_name, artist, track_["label"])
-                if not silent:
-                    logger.info("\t\t[+] Search Query: {}".format(query))
-                search_results = spotify_ins.search(query)
-                track_id = parse_search_results_spotify(search_results, track_)
-                if track_id:
-                    return track_id
+                # # Search with Title, Mix, Artist and Label, w/o Release / Album
+                # if not silent:
+                #     logger.info(
+                #         "[+]\tSearching for track: {} by {} on {} label".format(track_name, artist, track_["label"])
+                #     )
+                # query = 'track:"{}" artist:"{}" label:"{}"'.format(track_name, artist, track_["label"])
+                # if not silent:
+                #     logger.info("\t\t[+] Search Query: {}".format(query))
+                # search_results = search_wrapper(query)
+                # track_id = parse_search_results_spotify(search_results, track_)
+                # if track_id:
+                #     return track_id
 
                 # Search with Title, Mix, Artist, Release / Album, w/o  Label
                 if not silent:
@@ -659,7 +674,7 @@ def search_for_track_v2(track, silent=silent_search, parse_track=parse_track):
                 query = 'track:"{}" artist:"{}" album:"{}"'.format(track_name, artist, track_["release"])
                 if not silent:
                     logger.info("\t\t[+] Search Query: {}".format(query))
-                search_results = spotify_ins.search(query)
+                search_results = search_wrapper(query)
                 track_id = parse_search_results_spotify(search_results, track_)
                 if track_id:
                     return track_id
@@ -670,7 +685,7 @@ def search_for_track_v2(track, silent=silent_search, parse_track=parse_track):
                 query = 'track:"{}" artist:"{}"'.format(track_name, artist)
                 if not silent:
                     logger.info("\t\t[+] Search Query: {}".format(query))
-                search_results = spotify_ins.search(query)
+                search_results = search_wrapper(query)
                 track_id = parse_search_results_spotify(search_results, track_)
                 if track_id:
                     return track_id
@@ -745,7 +760,7 @@ def search_for_track_v3(track, silent=silent_search, parse_track=parse_track):
                     query = query_function(track_name, artist, track_, silent)
                     if not silent:
                         logger.info("\t\t[+] Search Query: {}".format(query))
-                    search_results = spotify_ins.search(query)
+                    search_results = search_wrapper(query)
                     track_id = parse_search_results_spotify(search_results, track_)
                     if track_id:
                         return track_id

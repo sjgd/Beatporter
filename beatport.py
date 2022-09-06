@@ -82,7 +82,7 @@ def parse_chart_url_datetime(str):
     :return: datetime object
     """
     if datetime.today().weekday() > 5:
-       return (datetime.today() - timedelta(days=6)).strftime(str)
+        return (datetime.today() - timedelta(days=6)).strftime(str)
     else:
         return datetime.today().strftime(str)
 

@@ -292,6 +292,9 @@ def search_wrapper(query, logger=logger):
         if e.http_status == 404:
             # Return empty result
             return {"tracks": {"items": []}}
+        elif e.http_status == 400 and e.code == -1:
+            # Return empty result
+            return {"tracks": {"items": []}}
         else:
             pass
     logger.setLevel(logging.INFO)

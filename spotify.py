@@ -1119,8 +1119,16 @@ def add_new_tracks_to_playlist_id(playlist_name, track_ids, df_hist_pl_tracks, s
                 if track_id not in playlist_track_ids.values:
                     if not silent:
                         logger.info("\t[+] Adding track id : {} : nb {}".format(track_id, track_count))
-                    persistent_track_ids.append(track_id)
-                    track_count += 1
+                    if track_id is not None:
+                        persistent_track_ids.append(track_id)
+                        track_count += 1
+                    else:
+                        logger.warn(
+                            "\t[+]! Trying to add track_id None : {} - {}".format(
+                                track["track"]["artists"][0]["name"],
+                                track["track"]["name"]
+                            )
+                        )
                 if track_count >= 99:  # Have limit of 100 trakcks per import
                     logger.info(
                         '[+] Adding {} new tracks to the playlist: "{}"'.format(

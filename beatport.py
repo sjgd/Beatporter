@@ -11,6 +11,11 @@ from spotify import find_playlist_chart_label, update_hist_pl_tracks, logger
 
 
 def get_top_100_playables(genre):
+    """
+    Get top 100 tracks for a genre
+    :param genre: Genre name
+    :return: Beatport JSON response
+    """
     r = requests.get("https://www.beatport.com/{}/{}/top-100".format("genre" if genres[genre] else "", genres[genre]))
     blob_start = r.text.find("window.Playables") + 19
     blob_end = r.text.find("};", blob_start) + 1
@@ -19,6 +24,12 @@ def get_top_100_playables(genre):
 
 
 def parse_tracks(tracks_json):
+    """
+    Parse tracks from Beatport JSON response
+    :param tracks_json: Beatport JSON response
+    :return: List of tracks
+    """
+
     tracks = list()
     for track in tracks_json["tracks"]:
         tracks.append(
@@ -43,19 +54,38 @@ def parse_tracks(tracks_json):
 
 
 def get_top_100_tracks(genre):
+    """
+    Get top 100 tracks from Beatport
+    :param genre: Beatport genre
+    :return: List of tracks
+    """
     # logger.info("[+] Fetching Top 100 {} Tracks".format(genre))
     raw_tracks_dict = get_top_100_playables(genre)
     return parse_tracks(raw_tracks_dict)
 
 
 def find_chart(chart, chart_bp_url_code):
-    r = requests.get("https://www.beatport.com/search?q=" + chart_bp_url_code)
-    soup = BeautifulSoup(r.text, features="lxml")
-    chart_urls = soup.find_all(class_="chart-url")
-    chart_urls = ["https://www.beatport.com" + url.attrs["href"] for url in chart_urls]
-    reg = re.compile(".*" + chart_bp_url_code + ".*")  # .replace("-", " ")
-    chart_urls = list(filter(reg.match, chart_urls))
-    chart_urls.sort(reverse=True)  # That way larger ID is on top = newest chart
+    """"
+    Find chart URL from Beatport chart name or URL code.
+    If chart 6 digits number is given, will return the URL directly.
+    If chart contains a year, will only return the URL of the chart if the publication year matches.
+    :param chart: Beatport chart name
+    :param chart_bp_url_code: Beatport chart URL code
+    :return: Beatport chart URL
+    """
+
+    # Check if got chart number in name already:
+    if re.match(r'.*(\/[0-9]{6})', chart_bp_url_code) is None:
+        # If not, search for chart code
+        r = requests.get("https://www.beatport.com/search?q=" + chart_bp_url_code)
+        soup = BeautifulSoup(r.text, features="lxml")
+        chart_urls = soup.find_all(class_="chart-url")
+        chart_urls = ["https://www.beatport.com" + url.attrs["href"] for url in chart_urls]
+        reg = re.compile(".*" + chart_bp_url_code + ".*")  # .replace("-", " ")
+        chart_urls = list(filter(reg.match, chart_urls))
+        chart_urls.sort(reverse=True)  # That way larger ID is on top = newest chart
+    else:
+        chart_urls = ["https://www.beatport.com/chart/" + chart_bp_url_code]
 
     if len(chart_urls) >= 1:
         # TODO export as function ?
@@ -117,6 +147,7 @@ def parse_chart_url_datetime(str):
 
 def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite=overwrite_label, silent=silent_search):
     """
+    Get all tracks from a label
     :param label: label name
     :param label_bp_url_code: label url code
     :param df_hist_pl_tracks: dataframe of historic track

@@ -25,7 +25,8 @@ refresh_token_n_tracks = 100
 shuffle_label = False
 
 # Digging mode
-# Allows to avoid adding tracks that have been previously added, (listened to) and deleted.
+# Allows to avoid adding tracks that have been previously added,
+# tracks listened and deleted will not be added again
 # Match is done on artist - track name, not on spotify track ID
 #   "" to do not skip tracks with similar artist - track name in playlists
 #   "playlist" to skip tracks that have been already added to this playlist only
@@ -33,7 +34,8 @@ shuffle_label = False
 digging_mode = "playlist"
 
 # Overwrite labels
-# If set to false will stop once reached the date of the last corresponding playlist update
+# If set to false,
+# it will stop once reached the date of the last corresponding playlist update
 overwrite_label = True
 
 # Silent search
@@ -97,7 +99,8 @@ charts = {"Kalambo Bontan": "kalambo", "Weekend Picks %U (%Y)": "weekend-picks-%
 # Labels on Beatport ("Arbitrary name": "URL path for genre, with chart ID")
 labels = {"8Bit Releases": "8bit/3248"}
 
-# Spotify backup, save some spotify playlist to a new name, using same logic for digging mode
+# Spotify backup, save some spotify playlist to a new name,
+# using same logic for digging mode
 spotify_bkp = {
     "BKP Discover Weekly": "ORIGINAL_PLAYLIST_ID",
 }

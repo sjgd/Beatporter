@@ -1,5 +1,7 @@
 # Use https://open.spotify.com/track/4zC9MjbIIHJoBpny7Sh35s to explore a track
+import json
 import unittest
+from datetime import datetime
 
 # import os
 # import numpy as np
@@ -8,10 +10,8 @@ import unittest
 # import spotify
 # import beatport
 # from datetime import datetime
-from beatporter import load_hist_file
-from spotify import search_for_track_v2, logger
-import json
-from datetime import datetime
+from src.beatporter import load_hist_file
+from src.spotify import logger, search_for_track_v2
 
 file_name_hist = "hist_playlists_tracks.pkl"
 curr_date = datetime.today().strftime("%Y-%m-%d")

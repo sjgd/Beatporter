@@ -1,3 +1,9 @@
+# Logs folder
+logs/*
+
+# Data folder
+data/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -113,3 +119,4 @@ token.json
 
 #History files
 *.xlsx
+.DS_Store

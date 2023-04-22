@@ -1,23 +1,34 @@
-import sys
-from os import path
-import spotify
-from spotify import logger
-import beatport
-from datetime import datetime
-import pandas as pd
-from config import username, shuffle_label, folder_path
-from config import charts, spotify_bkp, genres, labels
-from time import sleep
+"""Main module to run Beatporter."""
 import random
+import sys
+from datetime import datetime
+from os import path
+from time import sleep
+
+import pandas as pd
+
+import beatport
+import spotify
+from config import (
+    charts,
+    folder_path,
+    genres,
+    labels,
+    shuffle_label,
+    spotify_bkp,
+    username,
+)
+from spotify import logger
 
 # import argparse
 
-file_name_hist = "hist_playlists_tracks.pkl"
+file_name_hist = "../data/hist_playlists_tracks.pkl"
 curr_date = datetime.today().strftime("%Y-%m-%d")
 option_parse = ["backup", "chart", "genre", "label"]
 
 
-def dump_tracks(tracks):
+def dump_tracks(tracks: dict) -> None:
+    """Util function to print all tracks in list."""
     i = 1
     for track in tracks:
         logger.info(
@@ -32,13 +43,17 @@ def dump_tracks(tracks):
         i += 1
 
 
-def load_hist_file():
-    """
+def load_hist_file() -> pd.DataFrame:
+    """Function to load the hist file according to folder path in configs.
+
     :return: Returns existing history file of track ID per playlist
     """
     # TODO arguments for file path / type ?
     if path.exists(folder_path + "hist_playlists_tracks.xlsx"):
         df_hist_pl_tracks = pd.read_excel(folder_path + "hist_playlists_tracks.xlsx")
+        logger.info(
+            f"\n-Successfully loaded hist file with {df_hist_pl_tracks.shape[0]} records"
+        )
     else:
         df_hist_pl_tracks = pd.DataFrame(
             columns=[
@@ -53,7 +68,12 @@ def load_hist_file():
     return df_hist_pl_tracks
 
 
-def update_hist(master_refresh=False):
+def update_hist(master_refresh: bool = False) -> None:
+    """Update hist file with configs.
+
+    Args:
+        master_refresh: Refresh hist for all playlist of user?
+    """
     # TODO: testing, to refine usage, include in first init ?
 
     df_hist_pl_tracks = load_hist_file()
@@ -88,7 +108,20 @@ def update_hist(master_refresh=False):
     df_hist_pl_tracks.to_excel(folder_path + "hist_playlists_tracks.xlsx", index=False)
 
 
-def main(spotify_bkp=spotify_bkp, charts=charts, genres=genres, labels=labels):
+def main(
+    spotify_bkp: dict[str, str] = spotify_bkp,
+    charts: dict[str, str] = charts,
+    genres: dict[str, str] = genres,
+    labels: dict[str, str] = labels,
+) -> None:
+    """Main function to run Beatporter.
+
+    Args:
+        spotify_bkp: List of Spotify playlist to backup
+        charts: List of Beatport charts to add to Spotify playlists
+        genres: List of Beatport genres to add to Spotify playlists
+        labels: List of Beatport labels to add to Spotify playlists
+    """
     # Init
     start_time = datetime.now()
     logger.info("\n[!] Starting @ {}".format(start_time))
@@ -184,9 +217,12 @@ def main(spotify_bkp=spotify_bkp, charts=charts, genres=genres, labels=labels):
     ]
     df_hist_pl_tracks.to_pickle(file_name_hist)
     df_hist_pl_tracks.to_excel(folder_path + "hist_playlists_tracks.xlsx", index=False)
+    logger.info(
+        f"\n-Successfully saved hist file with {df_hist_pl_tracks.shape[0]} records"
+    )
     # Save bkp
     df_hist_pl_tracks.to_excel(
-        "hist_playlists_tracks_{}.xlsx".format(curr_date), index=False
+        "../data/hist_playlists_tracks_{}.xlsx".format(curr_date), index=False
     )
     end_time = datetime.now()
     logger.info("[!] Done @ {}\n (Ran for: {})".format(end_time, end_time - start_time))

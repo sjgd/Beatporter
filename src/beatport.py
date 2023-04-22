@@ -1,13 +1,13 @@
 import json
-import requests
-from bs4 import BeautifulSoup
 import re
 from datetime import datetime, timedelta
+
+import requests
+from bs4 import BeautifulSoup
 from pandas import to_datetime
 
-from config import genres
-from config import overwrite_label, silent_search
-from spotify import find_playlist_chart_label, update_hist_pl_tracks, logger
+from config import genres, overwrite_label, silent_search
+from spotify import find_playlist_chart_label, logger, update_hist_pl_tracks
 
 
 def get_top_100_playables(genre):

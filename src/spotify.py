@@ -1,33 +1,27 @@
-import sys
-import json
-import socket
-import spotipy
 import asyncio
-import webbrowser
-from time import time
-from spotipy import oauth2, SpotifyException
-import pandas as pd
-import re
-from datetime import datetime
-from time import sleep
-from requests.exceptions import ReadTimeout
-from difflib import SequenceMatcher
-import numpy as np
-
-from config import (
-    folder_path,
-    redirect_uri,
-    username,
-    playlist_description,
-    silent_search,
-)
-from config import parse_track, daily_mode, daily_n_track, playlist_prefix, digging_mode
-from config import refresh_token_n_tracks, client_id, client_secret, scope
-
+import json
 import logging
+import re
+import socket
+import sys
+import webbrowser
+from datetime import datetime
+from difflib import SequenceMatcher
 from logging.handlers import RotatingFileHandler
+from time import sleep, time
 
-logFile = "runtime-beatporter.log"
+import numpy as np
+import pandas as pd
+import spotipy
+from requests.exceptions import ReadTimeout
+from spotipy import SpotifyException, oauth2
+
+from config import (client_id, client_secret, daily_mode, daily_n_track,
+                    digging_mode, folder_path, parse_track,
+                    playlist_description, playlist_prefix, redirect_uri,
+                    refresh_token_n_tracks, scope, silent_search, username)
+
+logFile = "../logs/runtime-beatporter.log"
 logging.getLogger().setLevel(logging.NOTSET)
 logging.getLogger().handlers.clear()
 
@@ -51,7 +45,7 @@ fileh.setLevel(logging.INFO)
 logging.getLogger().addHandler(fileh)
 
 fileh = RotatingFileHandler(
-    "runtime-beatporter-debug.log",
+    "../logs/runtime-beatporter-debug.log",
     "w",
     maxBytes=50 * 1024 * 1024,
     backupCount=1,
@@ -72,9 +66,11 @@ def similar(a, b):
     return SequenceMatcher(None, str(a), str(b)).ratio()
 
 
-def save_hist_file(df_hist_pl_tracks, folder_path=folder_path):
-    """
-    Function to save the playlist history in a Excel file
+def save_hist_file(
+    df_hist_pl_tracks: pd.DataFrame, folder_path: str = folder_path
+) -> None:
+    """Function to save the playlist history in a Excel file.
+
     :param df_hist_pl_tracks: dataframe of the history of playlist tracks to save
     :folder_path: Path where to save the dataframe as Excel file
     """
@@ -85,7 +81,7 @@ def save_hist_file(df_hist_pl_tracks, folder_path=folder_path):
     df_hist_pl_tracks_out.to_excel(
         folder_path + "hist_playlists_tracks.xlsx", index=False
     )
-    logger.info("Done saving file")
+    logger.info(f"[+] Done saving file with {df_hist_pl_tracks_out.shape[0]} records")
 
 
 def listen_for_callback_code():
@@ -116,8 +112,9 @@ async def async_get_auth_code():
 
 
 def do_spotify_oauth():
+    TOKEN_PATH = "../data/token.json"
     try:
-        with open("token.json", "r") as fh:
+        with open(TOKEN_PATH, "r") as fh:
             token = fh.read()
         token = json.loads(token)
     except Exception:
@@ -141,7 +138,7 @@ def do_spotify_oauth():
         logger.info("[!] Unable to authenticate to Spotify.  Couldn't get access token.")
         sys.exit(-1)
     try:
-        with open("token.json", "w+") as fh:
+        with open(TOKEN_PATH, "w+") as fh:
             fh.write(json.dumps(token))
     except Exception:
         logger.info("[!] Unable to to write token object to disk.  This is non-fatal.")
@@ -902,7 +899,6 @@ def search_for_track_v3(track, silent=silent_search, parse_track=parse_track):
         # Search track name and track name without mix (even if parsed is off)
 
         for query_function in queries_functions:
-
             for track_ in track_parsed:
                 # Create a field name mix according to Spotify formatting
                 track_["name_mix"] = "{}{}".format(

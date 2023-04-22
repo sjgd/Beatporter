@@ -16,7 +16,11 @@ def get_top_100_playables(genre):
     :param genre: Genre name
     :return: Beatport JSON response
     """
-    r = requests.get("https://www.beatport.com/{}/{}/top-100".format("genre" if genres[genre] else "", genres[genre]))
+    r = requests.get(
+        "https://www.beatport.com/{}/{}/top-100".format(
+            "genre" if genres[genre] else "", genres[genre]
+        )
+    )
     blob_start = r.text.find("window.Playables") + 19
     blob_end = r.text.find("};", blob_start) + 1
     blob = r.text[blob_start:blob_end].replace("\n", "")
@@ -65,22 +69,25 @@ def get_top_100_tracks(genre):
 
 
 def find_chart(chart, chart_bp_url_code):
-    """"
+    """ "
     Find chart URL from Beatport chart name or URL code.
     If chart 6 digits number is given, will return the URL directly.
-    If chart contains a year, will only return the URL of the chart if the publication year matches.
+    If chart contains a year,
+      will only return the URL of the chart if the publication year matches.
     :param chart: Beatport chart name
     :param chart_bp_url_code: Beatport chart URL code
     :return: Beatport chart URL
     """
 
     # Check if got chart number in name already:
-    if re.match(r'.*(\/[0-9]{6})', chart_bp_url_code) is None:
+    if re.match(r".*(\/[0-9]{6})", chart_bp_url_code) is None:
         # If not, search for chart code
         r = requests.get("https://www.beatport.com/search?q=" + chart_bp_url_code)
         soup = BeautifulSoup(r.text, features="lxml")
         chart_urls = soup.find_all(class_="chart-url")
-        chart_urls = ["https://www.beatport.com" + url.attrs["href"] for url in chart_urls]
+        chart_urls = [
+            "https://www.beatport.com" + url.attrs["href"] for url in chart_urls
+        ]
         reg = re.compile(".*" + chart_bp_url_code + ".*")  # .replace("-", " ")
         chart_urls = list(filter(reg.match, chart_urls))
         chart_urls.sort(reverse=True)  # That way larger ID is on top = newest chart
@@ -89,29 +96,39 @@ def find_chart(chart, chart_bp_url_code):
 
     if len(chart_urls) >= 1:
         # TODO export as function ?
-        # Checking if '(2XXX)' year is present in chart name and matching chart release year
-        match_year_name = re.match(r'.*(\(2[0-9]{3}\))', chart)
+        # Checking if '(2XXX)' year is present
+        # in chart name and matching chart release year
+        match_year_name = re.match(r".*(\(2[0-9]{3}\))", chart)
         if match_year_name is not None:
             match_year_name = match_year_name.group(1)
-            logger.info("Found year {} in chart name, checking if release is matching".format(match_year_name))
+            logger.info(
+                "Found year {} in chart name, checking if release is matching".format(
+                    match_year_name
+                )
+            )
             r = requests.get(chart_urls[0])
             soup = BeautifulSoup(r.text, features="lxml")
             # TODO: better match release year
             release_date = soup.find("span", {"class": "value"}).text
-            is_year = bool(re.search(r'2[0-9]{3}-[0-9]{2}-[0-9]{2}', release_date))
+            is_year = bool(re.search(r"2[0-9]{3}-[0-9]{2}-[0-9]{2}", release_date))
             if not is_year:
-                logger.warn("ERROR - Release date: {}, does not seem to be a date, aborting".format(release_date))
+                logger.warn(
+                    "ERROR - Release date: {},"
+                    " does not seem to be a date, aborting".format(release_date)
+                )
             else:
-                release_year = re.match(r'2[0-9]{3}', release_date).group(0)
+                release_year = re.match(r"2[0-9]{3}", release_date).group(0)
                 if f"({release_year})" == match_year_name:
-                    logger.info("Years match ({}), returning chart {}".format(release_year, chart_urls[0]))
+                    logger.info(
+                        "Years match ({}), returning chart {}".format(
+                            release_year, chart_urls[0]
+                        )
+                    )
                     return chart_urls[0]
                 else:
                     logger.warn(
-                        "ERROR - Release date: {}, does not match, aborting chart: {}".format(
-                            release_date,
-                            chart_urls[0]
-                        )
+                        f"ERROR - Release date: {release_date}, does not match,"
+                        f" aborting chart: {chart_urls[0]}"
                     )
                     return None
         else:
@@ -145,7 +162,13 @@ def parse_chart_url_datetime(str):
         return datetime.today().strftime(str)
 
 
-def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite=overwrite_label, silent=silent_search):
+def get_label_tracks(
+    label,
+    label_bp_url_code,
+    df_hist_pl_tracks,
+    overwrite=overwrite_label,
+    silent=silent_search,
+):
     """
     Get all tracks from a label
     :param label: label name
@@ -156,7 +179,9 @@ def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite=over
     :return: dict of tracks from oldest (first) to newest (last)
     """
 
-    r = requests.get("https://www.beatport.com/label/{}/tracks?per-page=50".format(label_bp_url_code))
+    r = requests.get(
+        "https://www.beatport.com/label/{}/tracks?per-page=50".format(label_bp_url_code)
+    )
     soup = BeautifulSoup(r.text, features="lxml")
     page_numbers = soup.find_all(class_="pag-number")
     page_numbers = [page.text for page in page_numbers]
@@ -166,7 +191,9 @@ def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite=over
     playlist = find_playlist_chart_label(label)
     if playlist["id"]:
         df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
-        df_loc_hist = df_hist_pl_tracks.loc[df_hist_pl_tracks.playlist_id == playlist["id"]]
+        df_loc_hist = df_hist_pl_tracks.loc[
+            df_hist_pl_tracks.playlist_id == playlist["id"]
+        ]
         if len(df_loc_hist.index) > 0:
             last_update = max(df_loc_hist.loc[:, "datetime_added"])
             if type(last_update) == str:
@@ -188,7 +215,11 @@ def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite=over
     for i in range(1, int(max_page_number) + 1):
         if not silent:
             logger.info("\t[+] Getting label {}, page {}".format(label_bp_url_code, i))
-        r = requests.get("https://www.beatport.com/label/{}/tracks?page={}&per-page=50".format(label_bp_url_code, i))
+        r = requests.get(
+            "https://www.beatport.com/label/{}/tracks?page={}&per-page=50".format(
+                label_bp_url_code, i
+            )
+        )
         blob_start = r.text.find("window.Playables") + 19
         blob_end = r.text.find("};", blob_start) + 1
         blob = r.text[blob_start:blob_end].replace("\n", "")
@@ -199,7 +230,10 @@ def get_label_tracks(label, label_bp_url_code, df_hist_pl_tracks, overwrite=over
 
         # Check if release date reached last update
         reached_last_update = sum(
-            [to_datetime(track["released_date"]).tz_localize(None) < last_update for track in output]
+            [
+                to_datetime(track["released_date"]).tz_localize(None) < last_update
+                for track in output
+            ]
         )
         if reached_last_update > 0 and not overwrite:
             logger.info("\t[+] Reached last updated date, stopping")

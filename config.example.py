@@ -88,19 +88,14 @@ genres = {
     "Trance": "trance/7",
     # "Trap / Future Bass": "trap-future-bass/87",  # Removed by Beatport
     "Trap / Hip-Hop / R&B": "trap-hip-hop-rb/38",
-    "UK Garage / Bassline:": "uk-garage-bassline/86"
+    "UK Garage / Bassline:": "uk-garage-bassline/86",
 }
 
 # Charts on Beatport ("Arbitrary name": "URL path for genre, without chart ID")
-charts = {
-    "Kalambo Bontan": "kalambo",
-    "Weekend Picks %U (%Y)": "weekend-picks-%U"
-}
+charts = {"Kalambo Bontan": "kalambo", "Weekend Picks %U (%Y)": "weekend-picks-%U"}
 
 # Labels on Beatport ("Arbitrary name": "URL path for genre, with chart ID")
-labels = {
-    "8Bit Releases": "8bit/3248"
-}
+labels = {"8Bit Releases": "8bit/3248"}
 
 # Spotify backup, save some spotify playlist to a new name, using same logic for digging mode
 spotify_bkp = {

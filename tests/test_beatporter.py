@@ -1,5 +1,6 @@
 # Use https://open.spotify.com/track/4zC9MjbIIHJoBpny7Sh35s to explore a track
 import unittest
+
 # import os
 # import numpy as np
 # import pandas as pd
@@ -29,7 +30,7 @@ class TestBeatporter(unittest.TestCase):
     def test_load_hist_file(self):
         df_hist_pl_tracks = load_hist_file()
         # print(len(df_hist_pl_tracks))
-        self.assertTrue('df_hist_pl_tracks' in locals())
+        self.assertTrue("df_hist_pl_tracks" in locals())
 
     def test_track_matching(self):
         self.assertTrue(True)
@@ -50,7 +51,7 @@ class TestBeatporter(unittest.TestCase):
         tracks = json.load(open("tests/chart_tracks.json"))
         track_search = tracks[1]
         track_id = function_search(track_search)
-        self.assertEqual(track_id, '1blDpAjlQwkc7xHc9dJn8q')
+        self.assertEqual(track_id, "1blDpAjlQwkc7xHc9dJn8q")
 
     def test_track_mumble(self):
         tracks = json.load(open("tests/chart_tracks.json"))
@@ -64,7 +65,7 @@ class TestBeatporter(unittest.TestCase):
         tracks = json.load(open("tests/chart_tracks.json"))
         track_search = tracks[4]
         track_id = function_search(track_search)
-        self.assertEqual(track_id, '3NYSAj8EmsvR1JzwtjDJkf')
+        self.assertEqual(track_id, "3NYSAj8EmsvR1JzwtjDJkf")
 
     def test_track_eelke(self):
         tracks = json.load(open("tests/chart_tracks.json"))

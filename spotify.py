@@ -351,6 +351,9 @@ def search_wrapper(query, logger=logger):
             return {"tracks": {"items": []}}
         else:
             pass
+    except Exception as e:
+        logger.setLevel(logging.INFO)
+        logger.warning(f"NEW exception: {str(e)}")
     logger.setLevel(logging.INFO)
     return result
 

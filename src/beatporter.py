@@ -158,9 +158,16 @@ def main(
                     playlist_name, org_playlist_id
                 )
             )
-            df_hist_pl_tracks = spotify.back_up_spotify_playlist(
-                playlist_name, org_playlist_id, df_hist_pl_tracks
-            )
+            try:
+                df_hist_pl_tracks = spotify.back_up_spotify_playlist(
+                    playlist_name, org_playlist_id, df_hist_pl_tracks
+                )
+            except Exception as e:
+                logger.warning(
+                    "FAILED backing up playlist: "
+                    f"***** {playlist_name} : {org_playlist_id} ***** "
+                    f"with error: {e}"
+                )
 
     # Parse lists
     if "chart" in args:
@@ -172,14 +179,21 @@ def main(
             chart_url = beatport.find_chart(chart, chart_bp_url_code)
 
             if chart_url:
-                tracks_dict = beatport.get_chart(chart_url)
-                logger.debug(chart_bp_url_code + ":" + str(tracks_dict))
-                logger.info(
-                    "\t[+] Found {} tracks for {}".format(len(tracks_dict), chart)
-                )
-                df_hist_pl_tracks = spotify.add_new_tracks_to_playlist_chart_label(
-                    chart, tracks_dict, df_hist_pl_tracks
-                )
+                try:
+                    tracks_dict = beatport.get_chart(chart_url)
+                    logger.debug(chart_bp_url_code + ":" + str(tracks_dict))
+                    logger.info(
+                        "\t[+] Found {} tracks for {}".format(len(tracks_dict), chart)
+                    )
+                    df_hist_pl_tracks = spotify.add_new_tracks_to_playlist_chart_label(
+                        chart, tracks_dict, df_hist_pl_tracks
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "FAILED getting chart: "
+                        f"***** {chart} : {chart_bp_url_code} ***** "
+                        f"with error: {e}"
+                    )
             else:
                 logger.info("\t[+] Chart not found")
 
@@ -188,9 +202,14 @@ def main(
             logger.info("\n-Getting genre : ***** {} *****".format(genre))
             top_100_chart = beatport.get_top_100_tracks(genre)
             logger.debug(genre + ":" + str(top_100_chart))
-            df_hist_pl_tracks = spotify.add_new_tracks_to_playlist_genre(
-                genre, top_100_chart, df_hist_pl_tracks
-            )
+            try:
+                df_hist_pl_tracks = spotify.add_new_tracks_to_playlist_genre(
+                    genre, top_100_chart, df_hist_pl_tracks
+                )
+            except Exception as e:
+                logger.warning(
+                    f"FAILED getting genre: ***** {genre} ***** with error: {e}"
+                )
 
     if "label" in args:
         for label, label_bp_url_code in labels.items():
@@ -199,15 +218,22 @@ def main(
             logger.info(
                 "\n-Getting label : ***** {} : {} *****".format(label, label_bp_url_code)
             )
-            tracks_dict = beatport.get_label_tracks(
-                label, label_bp_url_code, df_hist_pl_tracks
-            )
-            logger.info("Found {} tracks for {}".format(len(tracks_dict), label))
-            if shuffle_label:
-                random.shuffle(tracks_dict)
-            df_hist_pl_tracks = spotify.add_new_tracks_to_playlist_chart_label(
-                label, tracks_dict, df_hist_pl_tracks
-            )
+            try:
+                tracks_dict = beatport.get_label_tracks(
+                    label, label_bp_url_code, df_hist_pl_tracks
+                )
+                logger.info("Found {} tracks for {}".format(len(tracks_dict), label))
+                if shuffle_label:
+                    random.shuffle(tracks_dict)
+                df_hist_pl_tracks = spotify.add_new_tracks_to_playlist_chart_label(
+                    label, tracks_dict, df_hist_pl_tracks
+                )
+            except Exception as e:
+                logger.warning(
+                    "FAILED getting label: "
+                    f"***** {label} : {label_bp_url_code} ***** "
+                    f"with error: {e}"
+                )
 
     # Output
     logger.info("\n-Saving file")

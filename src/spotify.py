@@ -16,10 +16,22 @@ import spotipy
 from requests.exceptions import ReadTimeout
 from spotipy import SpotifyException, oauth2
 
-from config import (client_id, client_secret, daily_mode, daily_n_track,
-                    digging_mode, folder_path, parse_track,
-                    playlist_description, playlist_prefix, redirect_uri,
-                    refresh_token_n_tracks, scope, silent_search, username)
+from config import (
+    client_id,
+    client_secret,
+    daily_mode,
+    daily_n_track,
+    digging_mode,
+    folder_path,
+    parse_track,
+    playlist_description,
+    playlist_prefix,
+    redirect_uri,
+    refresh_token_n_tracks,
+    scope,
+    silent_search,
+    username,
+)
 
 logFile = "../logs/runtime-beatporter.log"
 logging.getLogger().setLevel(logging.NOTSET)
@@ -943,6 +955,8 @@ def get_all_tracks_in_playlist(playlist_id):
     playlist_tracks_results = spotify_ins.user_playlist(
         username, playlist_id, fields="tracks"
     )
+    spotify_auth()
+
     playlist_tracks_pager = playlist_tracks_results["tracks"]
     playlist_tracks = playlist_tracks_pager["items"]
     while playlist_tracks_pager["next"]:
@@ -1075,13 +1089,15 @@ def parse_artist(value, key):
 
 
 def update_hist_pl_tracks(df_hist_pl_tracks, playlist):
-    """
+    """Update the history dataframe with a playlist.
+
     :param df_hist_pl_tracks: dataframe of history of track id and playlist id
     :param playlist: dict typ playlist = {"name": playlist_name, "id": playlist_id}
     :return: updated df_hist_pl_tracks
     """
-    # TODO find better method
+    spotify_auth()
 
+    # TODO find better method
     track_list = get_all_tracks_in_playlist(playlist["id"])
     df_tracks = pd.DataFrame.from_dict(track_list)
 
@@ -1133,7 +1149,8 @@ def find_playlist_chart_label(title):
 def add_new_tracks_to_playlist_chart_label(
     title, tracks_dict, df_hist_pl_tracks, use_prefix=True, silent=silent_search
 ):
-    """
+    """Add tracks from Beatport to a Spotify playlist.
+
     :param title: Chart or label playlist title
     :param tracks_dict: dict of tracks to add
     :param df_hist_pl_tracks: dataframe of history of track,
@@ -1142,8 +1159,6 @@ def add_new_tracks_to_playlist_chart_label(
     :param silent: If true do not display searching details except errors
     :return: updated df_hist_pl_tracks
     """
-
-    # TODO Refresh oauth to avoid time out
     spotify_auth()
 
     # TODO export playlist anterior name to config
@@ -1395,7 +1410,7 @@ def add_new_tracks_to_playlist_id(
 def add_new_tracks_to_playlist_genre(
     genre, top_100_chart, df_hist_pl_tracks, silent=silent_search
 ):
-    """
+    """Add Beatport tracks from genre category to Spotify playlist.
     :param genre: Genre name
     :param top_100_chart: dict of tracks to add
     :param df_hist_pl_tracks: dataframe of history of track,
@@ -1403,6 +1418,8 @@ def add_new_tracks_to_playlist_genre(
     :param silent: If true do not display searching details except errors
     :return: updated df_hist_pl_tracks
     """
+
+    spotify_auth()
 
     # TODO export playlist anterior name to config
     # persistent_top_100_playlist_name = "{}{} - Top 100".format(playlist_prefix, genre)
@@ -1678,6 +1695,9 @@ def update_hist_from_playlist(title, df_hist_pl_tracks):
 
 
 def back_up_spotify_playlist(playlist_name, org_playlist_id, df_hist_pl_tracks):
+    """Back-up tracks in Spotify playtlist."""
+    spotify_auth()
+
     track_ids = get_all_tracks_in_playlist(org_playlist_id)
     df_hist_pl_tracks = add_new_tracks_to_playlist_id(
         playlist_name, track_ids, df_hist_pl_tracks

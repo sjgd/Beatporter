@@ -17,6 +17,7 @@ from requests.exceptions import ReadTimeout
 from spotipy import SpotifyException, oauth2
 
 from config import (
+    add_at_top_playlist,
     client_id,
     client_secret,
     daily_mode,
@@ -948,7 +949,13 @@ def track_in_playlist(playlist_id, track_id):
 def add_tracks_to_playlist(playlist_id, track_ids):
     if track_ids:
         spotify_auth()
-        spotify_ins.user_playlist_add_tracks(username, playlist_id, track_ids)
+        if add_at_top_playlist:
+            position = 0
+        else:
+            position = None
+        spotify_ins.user_playlist_add_tracks(
+            user=username, playlist_id=playlist_id, tracks=track_ids, position=position
+        )
 
 
 def get_all_tracks_in_playlist(playlist_id):

@@ -45,7 +45,6 @@ def parse_tracks(raw_tracks_dicts):
     :return: List of tracks
     """
     tracks = list()
-    track = raw_tracks_dicts[10]
     for track in raw_tracks_dicts:
         tracks.append(
             {

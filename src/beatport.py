@@ -14,44 +14,57 @@ def get_top_100_playables(genre):
     """
     Get top 100 tracks for a genre
     :param genre: Genre name
-    :return: Beatport JSON response
+    :return raw_tracks_dicts: Beatport list of tracks as dict
     """
-    r = requests.get(
-        "https://www.beatport.com/{}/{}/top-100".format(
-            "genre" if genres[genre] else "", genres[genre]
-        )
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36",
+        "accept": "application/json",
+    }
+    url = "https://www.beatport.com/{}/{}/top-100".format(
+        "genre" if genres[genre] else "", genres[genre]
     )
-    blob_start = r.text.find("window.Playables") + 19
-    blob_end = r.text.find("};", blob_start) + 1
-    blob = r.text[blob_start:blob_end].replace("\n", "")
-    return json.loads(blob)
+    r = requests.get(url, headers=headers)
+    soup = BeautifulSoup(r.text, features="html.parser")
+    all_scripts = soup.find_all("script", type="application/json")
+    assert len(all_scripts) == 1
+    script = all_scripts[0]
+
+    results_data = json.loads(script.text)
+    raw_tracks_dicts = results_data["props"]["pageProps"]["dehydratedState"]["queries"][
+        0
+    ]["state"]["data"]["results"]
+
+    return raw_tracks_dicts
 
 
-def parse_tracks(tracks_json):
+def parse_tracks(raw_tracks_dicts):
     """
     Parse tracks from Beatport JSON response
-    :param tracks_json: Beatport JSON response
+    :param raw_tracks_dicts: Beatport list of tracks as dict
     :return: List of tracks
     """
-
     tracks = list()
-    for track in tracks_json["tracks"]:
+    track = raw_tracks_dicts[10]
+    for track in raw_tracks_dicts:
         tracks.append(
             {
-                "title": track["title"],
+                # "title": track["title"],
                 "name": track["name"],
-                "mix": track["mix"],
+                "mix": track["mix_name"],
                 "artists": [artist["name"] for artist in track["artists"]],
                 "remixers": [remixer["name"] for remixer in track["remixers"]],
                 "release": track["release"]["name"],
-                "label": track["label"]["name"],
-                "published_date": track["date"]["published"],
-                "released_date": track["date"]["released"],
-                "duration": track["duration"]["minutes"],
-                "duration_ms": track["duration"]["milliseconds"],
-                "genres": [genre["name"] for genre in track["genres"]],
+                "label": track["release"]["label"]["name"],
+                "published_date": track["publish_date"],
+                # "released_date": track["date"]["released"],
+                "duration": track[
+                    "length"
+                ],  # TODO was ["duration"]["minutes"] before, to check if the same
+                "duration_ms": track["length_ms"],
+                "genres": track["genre"]["name"],  # Used to be track["genres"] as list
                 "bpm": track["bpm"],
-                "key": track["key"],
+                "key": track["key"]["name"],  # Was only track["key"] before, but dict
             }
         )
     return tracks
@@ -64,8 +77,8 @@ def get_top_100_tracks(genre):
     :return: List of tracks
     """
     # logger.info("[+] Fetching Top 100 {} Tracks".format(genre))
-    raw_tracks_dict = get_top_100_playables(genre)
-    return parse_tracks(raw_tracks_dict)
+    raw_tracks_dicts = get_top_100_playables(genre)
+    return parse_tracks(raw_tracks_dicts)
 
 
 def find_chart(chart, chart_bp_url_code):

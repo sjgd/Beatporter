@@ -9,6 +9,32 @@ from pandas import to_datetime
 from config import genres, overwrite_label, silent_search
 from spotify import find_playlist_chart_label, logger, update_hist_pl_tracks
 
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36",
+    "accept": "application/json",
+}
+
+
+def get_beatport_page_script_queries(url):
+    """Extract script queries results from the Beatport URL
+
+    :param url: Url to query
+    :return results_data: JSON of the script queries"""
+
+    r = requests.get(url, headers=HEADERS)
+    soup = BeautifulSoup(r.text, features="html.parser")
+    all_scripts = soup.find_all("script", type="application/json")
+    assert len(all_scripts) == 1, "Found too many scripts in the result page"
+    script = all_scripts[0]
+
+    results_data = json.loads(script.text)
+    results_data_queries = results_data["props"]["pageProps"]["dehydratedState"][
+        "queries"
+    ]
+
+    return results_data_queries
+
 
 def get_top_100_playables(genre):
     """
@@ -16,24 +42,13 @@ def get_top_100_playables(genre):
     :param genre: Genre name
     :return raw_tracks_dicts: Beatport list of tracks as dict
     """
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36",
-        "accept": "application/json",
-    }
     url = "https://www.beatport.com/{}/{}/top-100".format(
         "genre" if genres[genre] else "", genres[genre]
     )
-    r = requests.get(url, headers=headers)
-    soup = BeautifulSoup(r.text, features="html.parser")
-    all_scripts = soup.find_all("script", type="application/json")
-    assert len(all_scripts) == 1
-    script = all_scripts[0]
 
-    results_data = json.loads(script.text)
-    raw_tracks_dicts = results_data["props"]["pageProps"]["dehydratedState"]["queries"][
-        0
-    ]["state"]["data"]["results"]
+    results_data = get_beatport_page_script_queries(url)
+    raw_tracks_dicts = results_data[0]["state"]["data"]["results"]
+    assert len(raw_tracks_dicts) > 0, f"No tracks found on the genre page: {url}"
 
     return raw_tracks_dicts
 
@@ -190,16 +205,17 @@ def get_label_tracks(
     otherwise stops once the date of the last playlist refresh is reached
     :return: dict of tracks from oldest (first) to newest (last)
     """
+    # Get max number of pages for label
+    url = "https://www.beatport.com/label/{}/tracks?per-page=50".format(label_bp_url_code)
+    results_data = get_beatport_page_script_queries(url)
+    page_numbers_string = results_data[1]["state"]["data"]["page"]
+    max_page_number = page_numbers_string.split("/")[1]
+    assert len(max_page_number) > 0, "No pages found in label page"
 
-    r = requests.get(
-        "https://www.beatport.com/label/{}/tracks?per-page=50".format(label_bp_url_code)
-    )
-    soup = BeautifulSoup(r.text, features="lxml")
-    page_numbers = soup.find_all(class_="pag-number")
-    page_numbers = [page.text for page in page_numbers]
-    max_page_number = page_numbers[len(page_numbers) - 1]
+    # Get tracks for label
     label_tracks = []
 
+    # Load history
     playlist = find_playlist_chart_label(label)
     if playlist["id"]:
         df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
@@ -224,27 +240,25 @@ def get_label_tracks(
         last_update = datetime.min
         logger.info("Label {} has {} pages".format(label, max_page_number))
 
-    for i in range(1, int(max_page_number) + 1):
+    # Parse label pages
+    for i in range(1, int(max_page_number)):
         if not silent:
             logger.info("\t[+] Getting label {}, page {}".format(label_bp_url_code, i))
-        r = requests.get(
-            "https://www.beatport.com/label/{}/tracks?page={}&per-page=50".format(
-                label_bp_url_code, i
-            )
+        url = "https://www.beatport.com/label/{}/tracks?page={}&per-page=50".format(
+            label_bp_url_code, i
         )
-        blob_start = r.text.find("window.Playables") + 19
-        blob_end = r.text.find("};", blob_start) + 1
-        blob = r.text[blob_start:blob_end].replace("\n", "")
-        output = json.loads(blob)
-        output = parse_tracks(output)
+        results_data = get_beatport_page_script_queries(url)
+        raw_tracks_dicts = results_data[1]["state"]["data"]["results"]
+        assert len(raw_tracks_dicts) > 0, f"No tracks found on the label page: {url}"
+        raw_tracks = parse_tracks(raw_tracks_dicts)
 
-        label_tracks.extend(output)
+        label_tracks.extend(raw_tracks)
 
         # Check if release date reached last update
         reached_last_update = sum(
             [
-                to_datetime(track["released_date"]).tz_localize(None) < last_update
-                for track in output
+                to_datetime(track["published_date"]).tz_localize(None) < last_update
+                for track in raw_tracks
             ]
         )
         if reached_last_update > 0 and not overwrite:

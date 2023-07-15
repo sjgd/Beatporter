@@ -173,6 +173,7 @@ def main(
     # Parse lists
     if "chart" in args:
         for chart, chart_bp_url_code in charts.items():
+            # TODO check if chart are working, otherwise do as genre and label
             # TODO handle return None, handle chart_bp_url_code has ID already or not
             logger.info(
                 "\n-Getting chart : ***** {} : {} *****".format(chart, chart_bp_url_code)

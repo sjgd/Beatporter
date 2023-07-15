@@ -14,6 +14,9 @@ redirect_uri = "http://localhost:65000"
 # Folder path where to save the history
 folder_path = "./"
 
+# Root path
+root_path = "../"
+
 # Add at top of playlist, if True will add at top, otherwise append
 add_at_top_playlist = True
 

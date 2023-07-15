@@ -14,6 +14,7 @@ from config import (
     folder_path,
     genres,
     labels,
+    root_path,
     shuffle_label,
     spotify_bkp,
     username,
@@ -22,7 +23,7 @@ from spotify import logger
 
 # import argparse
 
-file_name_hist = "../data/hist_playlists_tracks.pkl"
+file_name_hist = root_path + "data/hist_playlists_tracks.pkl"
 curr_date = datetime.today().strftime("%Y-%m-%d")
 option_parse = ["backup", "chart", "genre", "label"]
 
@@ -248,7 +249,7 @@ def main(
     )
     # Save bkp
     df_hist_pl_tracks.to_excel(
-        "../data/hist_playlists_tracks_{}.xlsx".format(curr_date), index=False
+        root_path + "data/hist_playlists_tracks_{}.xlsx".format(curr_date), index=False
     )
     end_time = datetime.now()
     logger.info("[!] Done @ {}\n (Ran for: {})".format(end_time, end_time - start_time))

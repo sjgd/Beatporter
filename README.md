@@ -25,24 +25,9 @@ An additional feature have been added to allow to backup Spotify playlist to a n
 * Store history of track_id / playlist_id to avoid re-adding tracks that already have been added, see config.example.py for examples
 * Add additional feature to backup spotify playlists
 
-### Python 3 Packages
+### Installation
 
-* spotipy
-* datetime
-* BeautifulSoup
-* pandas
-* re
-* openpyxl (temp)
-
-```
-pip install datetime
-pip install pandas
-pip install requests
-pip install bs4
-pip install lxml
-pip install spotipy
-pip install openpyxl
-```
+Run `poetry install`
 
 ## Configuration
 * Copy config.example.py to config.py and update the following values:
@@ -78,7 +63,7 @@ Your Spotify credentials are _not_ stored in these files.  The tokens in these f
 
 To run the application:
  
-```python3 beatporter.py```
+```make beatporter```
 
 ## Future Features / ToDo
 This project was born out of a personal desire for this functionality.  As such, my original design decisions were not to support a community release.   There is a lot that can be done to clean this up if there is any outside interest.

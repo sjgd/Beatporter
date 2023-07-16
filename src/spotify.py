@@ -29,12 +29,13 @@ from config import (
     playlist_prefix,
     redirect_uri,
     refresh_token_n_tracks,
+    root_path,
     scope,
     silent_search,
     username,
 )
 
-logFile = "../logs/runtime-beatporter.log"
+logFile = root_path + "logs/runtime-beatporter.log"
 logging.getLogger().setLevel(logging.NOTSET)
 logging.getLogger().handlers.clear()
 
@@ -58,7 +59,7 @@ fileh.setLevel(logging.INFO)
 logging.getLogger().addHandler(fileh)
 
 fileh = RotatingFileHandler(
-    "../logs/runtime-beatporter-debug.log",
+    root_path + "logs/runtime-beatporter-debug.log",
     "w",
     maxBytes=50 * 1024 * 1024,
     backupCount=1,
@@ -125,7 +126,7 @@ async def async_get_auth_code():
 
 
 def do_spotify_oauth():
-    TOKEN_PATH = "../data/token.json"
+    TOKEN_PATH = root_path + "data/token.json"
     try:
         with open(TOKEN_PATH, "r") as fh:
             token = fh.read()

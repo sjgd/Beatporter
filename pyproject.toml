@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "beatporter"
+version = "0.1.0"
+description = ""
+authors = ["sjgd"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+datetime = "^5.1"
+pandas = "^2.0.3"
+requests = "^2.31.0"
+bs4 = "^0.0.1"
+lxml = "^4.9.3"
+spotipy = "^2.23.0"
+openpyxl = "^3.1.2"
+
+[tool.poetry.extras]
+development = ["jupyter", "ipython"]
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -14,6 +14,7 @@ from config import (
     folder_path,
     genres,
     labels,
+    root_path,
     shuffle_label,
     spotify_bkp,
     username,
@@ -22,7 +23,7 @@ from spotify import logger
 
 # import argparse
 
-file_name_hist = "../data/hist_playlists_tracks.pkl"
+file_name_hist = root_path + "data/hist_playlists_tracks.pkl"
 curr_date = datetime.today().strftime("%Y-%m-%d")
 option_parse = ["backup", "chart", "genre", "label"]
 
@@ -172,6 +173,7 @@ def main(
     # Parse lists
     if "chart" in args:
         for chart, chart_bp_url_code in charts.items():
+            # TODO check if chart are working, otherwise do as genre and label
             # TODO handle return None, handle chart_bp_url_code has ID already or not
             logger.info(
                 "\n-Getting chart : ***** {} : {} *****".format(chart, chart_bp_url_code)
@@ -180,13 +182,13 @@ def main(
 
             if chart_url:
                 try:
-                    tracks_dict = beatport.get_chart(chart_url)
-                    logger.debug(chart_bp_url_code + ":" + str(tracks_dict))
+                    tracks_dicts = beatport.get_chart(chart_url)
+                    logger.debug(chart_bp_url_code + ":" + str(tracks_dicts))
                     logger.info(
-                        "\t[+] Found {} tracks for {}".format(len(tracks_dict), chart)
+                        "\t[+] Found {} tracks for {}".format(len(tracks_dicts), chart)
                     )
                     df_hist_pl_tracks = spotify.add_new_tracks_to_playlist_chart_label(
-                        chart, tracks_dict, df_hist_pl_tracks
+                        chart, tracks_dicts, df_hist_pl_tracks
                     )
                 except Exception as e:
                     logger.warning(
@@ -195,7 +197,7 @@ def main(
                         f"with error: {e}"
                     )
             else:
-                logger.info("\t[+] Chart not found")
+                logger.info(f"\t[+] Chart {chart} not found")
 
     if "genre" in args:
         for genre, genre_bp_url_code in genres.items():
@@ -248,7 +250,7 @@ def main(
     )
     # Save bkp
     df_hist_pl_tracks.to_excel(
-        "../data/hist_playlists_tracks_{}.xlsx".format(curr_date), index=False
+        root_path + "data/hist_playlists_tracks_{}.xlsx".format(curr_date), index=False
     )
     end_time = datetime.now()
     logger.info("[!] Done @ {}\n (Ran for: {})".format(end_time, end_time - start_time))

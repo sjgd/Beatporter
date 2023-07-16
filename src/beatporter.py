@@ -182,13 +182,13 @@ def main(
 
             if chart_url:
                 try:
-                    tracks_dict = beatport.get_chart(chart_url)
-                    logger.debug(chart_bp_url_code + ":" + str(tracks_dict))
+                    tracks_dicts = beatport.get_chart(chart_url)
+                    logger.debug(chart_bp_url_code + ":" + str(tracks_dicts))
                     logger.info(
-                        "\t[+] Found {} tracks for {}".format(len(tracks_dict), chart)
+                        "\t[+] Found {} tracks for {}".format(len(tracks_dicts), chart)
                     )
                     df_hist_pl_tracks = spotify.add_new_tracks_to_playlist_chart_label(
-                        chart, tracks_dict, df_hist_pl_tracks
+                        chart, tracks_dicts, df_hist_pl_tracks
                     )
                 except Exception as e:
                     logger.warning(
@@ -197,7 +197,7 @@ def main(
                         f"with error: {e}"
                     )
             else:
-                logger.info("\t[+] Chart not found")
+                logger.info(f"\t[+] Chart {chart} not found")
 
     if "genre" in args:
         for genre, genre_bp_url_code in genres.items():

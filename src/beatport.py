@@ -105,19 +105,32 @@ def find_chart(chart, chart_bp_url_code):
     :param chart_bp_url_code: Beatport chart URL code
     :return: Beatport chart URL
     """
-
-    # Check if got chart number in name already:
+    # Check if have chart number in name already
+    # Otherwise need to find the chart ID
     if re.match(r".*(\/[0-9]{6})", chart_bp_url_code) is None:
         # If not, search for chart code
-        r = requests.get("https://www.beatport.com/search?q=" + chart_bp_url_code)
-        soup = BeautifulSoup(r.text, features="lxml")
-        chart_urls = soup.find_all(class_="chart-url")
-        chart_urls = [
-            "https://www.beatport.com" + url.attrs["href"] for url in chart_urls
-        ]
-        reg = re.compile(".*" + chart_bp_url_code + ".*")  # .replace("-", " ")
-        chart_urls = list(filter(reg.match, chart_urls))
+        url = (
+            "https://www.beatport.com/search/charts"
+            f"?q={chart_bp_url_code}&page=1&per_page=150"
+        )
+        results_data = get_beatport_page_script_queries(url)
+
+        charts = results_data = results_data[0]["state"]["data"]["data"]
+
+        for i in range(len(charts)):
+            charts[i]["url_tentative"] = (
+                "https://www.beatport.com/chart/"
+                + re.sub(
+                    "[^a-zA-Z0-9 \n\.]", "", charts[i]["chart_name"].lower()
+                ).replace(" ", "-")
+                + "/"
+                + str(charts[i]["chart_id"])
+            )
+            charts[i]["url_tentative"] = charts[i]["url_tentative"].replace("--", "-")
+
+        chart_urls = [chart["url_tentative"] for chart in charts]
         chart_urls.sort(reverse=True)  # That way larger ID is on top = newest chart
+        # TODO reverse above not necessary charts have release date now
     else:
         chart_urls = ["https://www.beatport.com/chart/" + chart_bp_url_code]
 
@@ -133,18 +146,19 @@ def find_chart(chart, chart_bp_url_code):
                     match_year_name
                 )
             )
-            r = requests.get(chart_urls[0])
-            soup = BeautifulSoup(r.text, features="lxml")
+            results_data = get_beatport_page_script_queries(chart_urls[0])
+
+            change_date_chart = results_data[0]["state"]["data"]["change_date"]
+
             # TODO: better match release year
-            release_date = soup.find("span", {"class": "value"}).text
-            is_year = bool(re.search(r"2[0-9]{3}-[0-9]{2}-[0-9]{2}", release_date))
+            is_year = bool(re.search(r"2[0-9]{3}-[0-9]{2}-[0-9]{2}", change_date_chart))
             if not is_year:
                 logger.warn(
                     "ERROR - Release date: {},"
-                    " does not seem to be a date, aborting".format(release_date)
+                    " does not seem to be a date, aborting".format(change_date_chart)
                 )
             else:
-                release_year = re.match(r"2[0-9]{3}", release_date).group(0)
+                release_year = re.match(r"2[0-9]{3}", change_date_chart).group(0)
                 if f"({release_year})" == match_year_name:
                     logger.info(
                         "Years match ({}), returning chart {}".format(
@@ -154,7 +168,8 @@ def find_chart(chart, chart_bp_url_code):
                     return chart_urls[0]
                 else:
                     logger.warn(
-                        f"ERROR - Release date: {release_date}, does not match,"
+                        f"ERROR - Release date: {change_date_chart}, "
+                        f"does not match requeried date: {match_year_name},"
                         f" aborting chart: {chart_urls[0]}"
                     )
                     return None
@@ -166,15 +181,18 @@ def find_chart(chart, chart_bp_url_code):
 
 
 def get_chart(url):
+    """Get chart tracks from URL
+
+    :param url: Chart full url, including beatport.com, chart name and chart ID
+    :return tracks_dicts: List of dicts of tracks
     """
-    :param url: label full url, including beatport.com
-    :return: dict of tracks
-    """
-    r = requests.get(url)
-    blob_start = r.text.find("window.Playables") + 19
-    blob_end = r.text.find("};", blob_start) + 1
-    blob = r.text[blob_start:blob_end].replace("\n", "")
-    return parse_tracks(json.loads(blob))
+    results_data = get_beatport_page_script_queries(url)
+    raw_tracks_dicts = results_data[1]["state"]["data"]["results"]
+    assert len(raw_tracks_dicts) > 0, f"No tracks found on the genre page: {url}"
+
+    tracks_dicts = parse_tracks(raw_tracks_dicts)
+
+    return tracks_dicts
 
 
 def parse_chart_url_datetime(str):

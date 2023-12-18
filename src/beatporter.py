@@ -1,6 +1,7 @@
 """Main module to run Beatporter."""
 import random
 import sys
+import traceback
 from datetime import datetime
 from os import path
 from time import sleep
@@ -164,6 +165,7 @@ def main(
                     playlist_name, org_playlist_id, df_hist_pl_tracks
                 )
             except Exception as e:
+                traceback.format_exc()
                 logger.warning(
                     "FAILED backing up playlist: "
                     f"***** {playlist_name} : {org_playlist_id} ***** "
@@ -191,6 +193,7 @@ def main(
                         chart, tracks_dicts, df_hist_pl_tracks
                     )
                 except Exception as e:
+                    traceback.format_exc()
                     logger.warning(
                         "FAILED getting chart: "
                         f"***** {chart} : {chart_bp_url_code} ***** "
@@ -209,6 +212,7 @@ def main(
                     genre, top_100_chart, df_hist_pl_tracks
                 )
             except Exception as e:
+                traceback.format_exc()
                 logger.warning(
                     f"FAILED getting genre: ***** {genre} ***** with error: {e}"
                 )
@@ -231,6 +235,7 @@ def main(
                     label, tracks_dict, df_hist_pl_tracks
                 )
             except Exception as e:
+                traceback.format_exc()
                 logger.warning(
                     "FAILED getting label: "
                     f"***** {label} : {label_bp_url_code} ***** "

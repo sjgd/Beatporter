@@ -53,7 +53,7 @@ fileh = RotatingFileHandler(
     encoding=None,
     delay=False,
 )
-formatter = logging.Formatter("%(asctime)s - %(message)s")
+formatter = logging.Formatter("%(asctime)s - %(message)s [%(filename)s:%(lineno)d]")
 fileh.setFormatter(formatter)
 fileh.setLevel(logging.INFO)
 logging.getLogger().addHandler(fileh)
@@ -66,7 +66,7 @@ fileh = RotatingFileHandler(
     encoding=None,
     delay=False,
 )
-formatter = logging.Formatter("%(asctime)s - %(message)s")
+formatter = logging.Formatter("%(asctime)s - %(message)s [%(filename)s:%(lineno)d]")
 fileh.setFormatter(formatter)
 fileh.setLevel(logging.DEBUG)
 logging.getLogger().addHandler(fileh)
@@ -160,7 +160,7 @@ def do_spotify_oauth():
 
 
 def get_all_playlists():
-    playlists_pager = spotify_ins.user_playlists(username)
+    playlists_pager = spotify_ins.current_user_playlists()
     playlists = playlists_pager["items"]
     while playlists_pager["next"]:
         playlists_pager = spotify_ins.next(playlists_pager)
@@ -1725,8 +1725,25 @@ def spotify_auth(verbose_aut=False):
     global spotify_ins
     token_info = do_spotify_oauth()
     spotify_ins = spotipy.Spotify(
-        auth=token_info["access_token"], requests_timeout=10, retries=10
+        auth=token_info["access_token"], requests_timeout=15, retries=3, backoff_factor=15
     )
+
+    try:
+        _ = spotify_ins.current_user_playlists()
+    except Exception as e:
+        logger.warning(
+            f"Error during spotify Auth, testing of playlist fetch, with error {e}"
+        )
+        logger.warning("Going to sleep for 2 minutes")
+        sleep(2 * 60)
+        logger.warning("Sleep done")
+        token_info = do_spotify_oauth()
+        spotify_ins = spotipy.Spotify(
+            auth=token_info["access_token"],
+            requests_timeout=15,
+            retries=3,
+            backoff_factor=15,
+        )
 
 
 sp_oauth = oauth2.SpotifyOAuth(

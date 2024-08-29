@@ -212,7 +212,7 @@ def main(
                     genre, top_100_chart, df_hist_pl_tracks
                 )
             except Exception as e:
-                traceback.format_exc()
+                traceback.print_exc()
                 logger.warning(
                     f"FAILED getting genre: ***** {genre} ***** with error: {e}"
                 )

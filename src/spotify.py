@@ -252,7 +252,10 @@ def tracks_similarity(source_track, found_tracks, debug_comp=False):
 
         duration_s = source_track["duration_ms"]
         duration_r = track["duration_ms"]
-        sim_duration = duration_r / duration_s
+        try:
+            sim_duration = duration_r / duration_s
+        except Exception as e:
+            logger.warning(f"track {str(source_track)} has duration error {e}")
         sim_duration = 1  # TODO: remove this
         # if debug_comp:
         #     logger.info(
@@ -1552,10 +1555,18 @@ def add_new_tracks_to_playlist_genre(
             try:
                 track_id = search_track_function(track)
             except ReadTimeout:
-                track_id = search_track_function(track)
+                try:
+                    track_id = search_track_function(track)
+                except Exception as e:
+                    logger.warning(f"Track {track_artist_name} failed with error {e}")
+                    track_id = None
             except spotipy.exceptions.SpotifyException:
                 spotify_auth()
-                track_id = search_track_function(track)
+                try:
+                    track_id = search_track_function(track)
+                except Exception as e:
+                    logger.warning(f"Track {track_artist_name} failed with error {e}")
+                    track_id = None
 
             if track_id:
                 if (

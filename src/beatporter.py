@@ -53,8 +53,9 @@ def load_hist_file() -> pd.DataFrame:
     # TODO arguments for file path / type ?
     if path.exists(folder_path + "hist_playlists_tracks.xlsx"):
         df_hist_pl_tracks = pd.read_excel(folder_path + "hist_playlists_tracks.xlsx")
+        logger.info(" ")
         logger.info(
-            f"\n-Successfully loaded hist file with {df_hist_pl_tracks.shape[0]} records"
+            f"Successfully loaded hist file with {df_hist_pl_tracks.shape[0]} records"
         )
     else:
         df_hist_pl_tracks = pd.DataFrame(
@@ -126,7 +127,8 @@ def main(
     """
     # Init
     start_time = datetime.now()
-    logger.info("\n[!] Starting @ {}".format(start_time))
+    logger.info(" ")
+    logger.info("[!] Starting @ {}".format(start_time))
     df_hist_pl_tracks = load_hist_file()
     charts = {
         beatport.parse_chart_url_datetime(k): beatport.parse_chart_url_datetime(v)
@@ -155,8 +157,9 @@ def main(
 
     if "backup" in args:
         for playlist_name, org_playlist_id in spotify_bkp.items():
+            logger.info(" ")
             logger.info(
-                "\n-Backing up playlist : ***** {} : {} *****".format(
+                "-Backing up playlist : ***** {} : {} *****".format(
                     playlist_name, org_playlist_id
                 )
             )
@@ -177,8 +180,9 @@ def main(
         for chart, chart_bp_url_code in charts.items():
             # TODO check if chart are working, otherwise do as genre and label
             # TODO handle return None, handle chart_bp_url_code has ID already or not
+            logger.info(" ")
             logger.info(
-                "\n-Getting chart : ***** {} : {} *****".format(chart, chart_bp_url_code)
+                " Getting chart : ***** {} : {} *****".format(chart, chart_bp_url_code)
             )
             chart_url = beatport.find_chart(chart, chart_bp_url_code)
 
@@ -204,7 +208,8 @@ def main(
 
     if "genre" in args:
         for genre, genre_bp_url_code in genres.items():
-            logger.info("\n-Getting genre : ***** {} *****".format(genre))
+            logger.info(" ")
+            logger.info(" Getting genre : ***** {} *****".format(genre))
             top_100_chart = beatport.get_top_100_tracks(genre)
             logger.debug(genre + ":" + str(top_100_chart))
             try:
@@ -221,8 +226,9 @@ def main(
         for label, label_bp_url_code in labels.items():
             # TODO avoid looping through all pages if already parsed before ?
             # TODO Add tracks per EP rather than track by track ?
+            logger.info(" ")
             logger.info(
-                "\n-Getting label : ***** {} : {} *****".format(label, label_bp_url_code)
+                "Getting label : ***** {} : {} *****".format(label, label_bp_url_code)
             )
             try:
                 tracks_dict = beatport.get_label_tracks(
@@ -243,22 +249,22 @@ def main(
                 )
 
     # Output
-    logger.info("\n-Saving file")
+    logger.info(" ")
+    logger.info("Saving file")
     sleep(5)  # try to avoid read-write errors if running too quickly
     df_hist_pl_tracks = df_hist_pl_tracks.loc[
         :, ["playlist_id", "playlist_name", "track_id", "datetime_added", "artist_name"]
     ]
     df_hist_pl_tracks.to_pickle(file_name_hist)
     df_hist_pl_tracks.to_excel(folder_path + "hist_playlists_tracks.xlsx", index=False)
-    logger.info(
-        f"\n-Successfully saved hist file with {df_hist_pl_tracks.shape[0]} records"
-    )
+    logger.info(" ")
+    logger.info(f"Successfully saved hist file with {df_hist_pl_tracks.shape[0]} records")
     # Save bkp
     df_hist_pl_tracks.to_excel(
         root_path + "data/hist_playlists_tracks_{}.xlsx".format(curr_date), index=False
     )
     end_time = datetime.now()
-    logger.info("[!] Done @ {}\n (Ran for: {})".format(end_time, end_time - start_time))
+    logger.info("[!] Done @ {} (Ran for: {})".format(end_time, end_time - start_time))
 
 
 if __name__ == "__main__":

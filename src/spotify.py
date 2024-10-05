@@ -10,6 +10,7 @@ from difflib import SequenceMatcher
 from logging.handlers import RotatingFileHandler
 from time import sleep, time
 
+import coloredlogs
 import numpy as np
 import pandas as pd
 import spotipy
@@ -72,6 +73,12 @@ fileh.setLevel(logging.DEBUG)
 logging.getLogger().addHandler(fileh)
 
 logger = logging.getLogger()
+
+coloredlogs.install(
+    level="INFO",
+    logger=logger,
+    fmt="%(asctime)s %(levelname)s %(message)s",
+)
 
 tracks_dict_names = ["id", "duration_ms", "href", "name", "popularity", "uri", "artists"]
 
@@ -1019,7 +1026,7 @@ def add_new_tracks_to_playlist(genre, tracks_dict):
 
     for playlist in playlists:
         if not playlist["id"]:
-            logger.info(
+            logger.warning(
                 '\t[!] Playlist "{}" does not exist, creating it.'.format(
                     playlist["name"]
                 )
@@ -1183,7 +1190,7 @@ def add_new_tracks_to_playlist_chart_label(
     }
 
     if not playlist["id"]:
-        logger.info(
+        logger.warning(
             '\t[!] Playlist "{}" does not exist, creating it.'.format(playlist["name"])
         )
         playlist["id"] = create_playlist(playlist["name"])
@@ -1256,7 +1263,7 @@ def add_new_tracks_to_playlist_chart_label(
                 persistent_track_ids.append(track_id)
                 track_count += 1
             if track_count >= 99:  # Have limit of 100 trakcks per import
-                logger.info(
+                logger.warning(
                     '[+] Adding {} new tracks to the playlist: "{}"'.format(
                         len(persistent_track_ids), persistent_playlist_name
                     )
@@ -1277,14 +1284,18 @@ def add_new_tracks_to_playlist_chart_label(
         if track_count_tot % refresh_token_n_tracks == 0:  # Avoid time out
             spotify_auth()
 
-    logger.info(
-        '[+] Adding {} new tracks to the playlist: "{}"'.format(
-            len(persistent_track_ids), persistent_playlist_name
-        )
-    )
     if len(persistent_track_ids) > 0:
+        logger.warning(
+            '[+] Adding {} new tracks to the playlist: "{}"'.format(
+                len(persistent_track_ids), persistent_playlist_name
+            )
+        )
         add_tracks_to_playlist(playlist["id"], persistent_track_ids)
         update_playlist_description_with_date(playlist)
+    else:
+        logger.info(
+            f'[+] No new tracks to add to the playlist: "{persistent_playlist_name}"'
+        )
 
     df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
 
@@ -1319,7 +1330,7 @@ def add_new_tracks_to_playlist_id(
     }
 
     if not playlist["id"]:
-        logger.info(
+        logger.warning(
             '\t[!] Playlist "{}" does not exist, creating it.'.format(playlist["name"])
         )
         playlist["id"] = create_playlist(playlist["name"])
@@ -1376,7 +1387,7 @@ def add_new_tracks_to_playlist_id(
                             )
                         )
                 if track_count >= 99:  # Have limit of 100 trakcks per import
-                    logger.info(
+                    logger.warning(
                         '[+] Adding {} new tracks to the playlist: "{}"'.format(
                             len(persistent_track_ids), persistent_playlist_name
                         )
@@ -1397,14 +1408,18 @@ def add_new_tracks_to_playlist_id(
             if track_count_tot % refresh_token_n_tracks == 0:  # Avoid time out
                 spotify_auth()
 
-    logger.info(
-        '[+] Adding {} new tracks to the playlist: "{}"'.format(
-            len(persistent_track_ids), persistent_playlist_name
-        )
-    )
     if len(persistent_track_ids) > 0:
+        logger.warning(
+            '[+] Adding {} new tracks to the playlist: "{}"'.format(
+                len(persistent_track_ids), persistent_playlist_name
+            )
+        )
         add_tracks_to_playlist(playlist["id"], persistent_track_ids)
         update_playlist_description_with_date(playlist)
+    else:
+        logger.info(
+            f'[+] No new tracks to add to the playlist: "{persistent_playlist_name}"'
+        )
 
     df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
 
@@ -1460,7 +1475,7 @@ def add_new_tracks_to_playlist_genre(
 
     for playlist in playlists:
         if not playlist["id"]:
-            logger.info(
+            logger.warning(
                 '\t[!] Playlist "{}" does not exist, creating it.'.format(
                     playlist["name"]
                 )
@@ -1597,7 +1612,7 @@ def add_new_tracks_to_playlist_genre(
                     n_daily_tracks += 1
 
                 if track_count >= 99:  # Have limit of 100 tracks per import
-                    logger.info(
+                    logger.warning(
                         '[+] Adding {} new tracks to the playlist: "{}"'.format(
                             len(persistent_track_ids), persistent_top_100_playlist_name
                         )
@@ -1619,23 +1634,32 @@ def add_new_tracks_to_playlist_genre(
         if track_count_tot % refresh_token_n_tracks == 0:  # Avoid time out
             spotify_auth()
 
-    logger.info(
-        '[+] Adding {} new tracks to the playlist: "{}"'.format(
-            len(persistent_track_ids), persistent_top_100_playlist_name
-        )
-    )
-    logger.info(
-        '[+] Adding {} new tracks to the playlist: "{}"'.format(
-            len(daily_top_n_track_ids), daily_top_n_playlist_name
-        )
-    )
     if len(persistent_track_ids) > 0:
+        logger.warning(
+            '[+] Adding {} new tracks to the playlist: "{}"'.format(
+                len(persistent_track_ids), persistent_top_100_playlist_name
+            )
+        )
         add_tracks_to_playlist(playlists[0]["id"], persistent_track_ids)
         update_playlist_description_with_date(playlists[0])
+    else:
+        logger.info(
+            "[+] No new tracks to add to the playlist"
+            f': "{persistent_top_100_playlist_name}"'
+        )
 
-    if len(daily_top_n_track_ids) > 0 & daily_mode:
+    if len(daily_top_n_track_ids) > 0:
+        logger.warning(
+            '[+] Adding {} new tracks to the playlist: "{}"'.format(
+                len(daily_top_n_track_ids), daily_top_n_playlist_name
+            )
+        )
         add_tracks_to_playlist(playlists[1]["id"], daily_top_n_track_ids)
         update_playlist_description_with_date(playlists[1])
+    else:
+        logger.info(
+            "[+] No new tracks to add to the playlist: " f'"{daily_top_n_playlist_name}"'
+        )
 
     # Add more to daily playlist if not full
     if daily_mode:

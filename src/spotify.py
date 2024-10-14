@@ -1680,7 +1680,7 @@ def add_new_tracks_to_playlist_genre(
                         extra_daily_top_n_track_ids.append(track_id)
                         n_daily_tracks += 1
 
-            logger.info(
+            logger.warning(
                 '[+] Adding {} extra new tracks to the playlist: "{}"'.format(
                     len(extra_daily_top_n_track_ids), daily_top_n_playlist_name
                 )

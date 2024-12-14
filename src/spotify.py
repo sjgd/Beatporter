@@ -16,6 +16,7 @@ import pandas as pd
 import spotipy
 from requests.exceptions import ReadTimeout
 from spotipy import SpotifyException, oauth2
+from spotipy.oauth2 import CacheFileHandler
 
 from config import (
     add_at_top_playlist,
@@ -971,7 +972,9 @@ def add_tracks_to_playlist(playlist_id, track_ids):
 
 def get_all_tracks_in_playlist(playlist_id):
     spotify_auth()
-    playlist_tracks_pager = spotify_ins.user_playlist_tracks(username, playlist_id)
+    playlist_tracks_pager = spotify_ins.playlist_items(
+        playlist_id=playlist_id, additional_types=("track",)
+    )
     playlist_tracks = playlist_tracks_pager["items"]
     while playlist_tracks_pager["next"]:
         playlist_tracks_pager = spotify_ins.next(playlist_tracks_pager)
@@ -1781,8 +1784,9 @@ def spotify_auth(verbose_aut=False):
         )
 
 
+handler = CacheFileHandler(username=username)
 sp_oauth = oauth2.SpotifyOAuth(
-    client_id, client_secret, redirect_uri, username=username, scope=scope
+    client_id, client_secret, redirect_uri, cache_handler=handler, scope=scope
 )
 spotify_auth()
 

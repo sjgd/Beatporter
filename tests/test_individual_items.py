@@ -10,6 +10,7 @@ from spotify import logger
 from src.beatporter import load_hist_file
 
 # RUN in debug for logs output in debug console
+# Or logs are in the Output / Python Test Log
 
 
 @pytest.mark.parametrize("genre", genres)

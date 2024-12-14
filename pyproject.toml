@@ -15,6 +15,7 @@ lxml = "^4.9.3"
 spotipy = "^2.23.0"
 openpyxl = "^3.1.2"
 coloredlogs = "^15.0.1"
+pytest = "^8.3.4"
 
 [tool.poetry.extras]
 development = ["jupyter", "ipython"]
@@ -23,3 +24,6 @@ development = ["jupyter", "ipython"]
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[pytest]
+log_cli = true

@@ -1,11 +1,7 @@
-import os
+"""Test individual items"""
 from datetime import datetime
 
 import pytest
-
-# Assuming you're currently in '/home/user/projects'
-# Change to a subdirectory 'src' (i.e., '/home/user/projects/src')
-os.chdir("src")
 
 import beatport
 import spotify
@@ -13,14 +9,13 @@ from config import genres, spotify_bkp
 from spotify import logger
 from src.beatporter import load_hist_file
 
-# RUN in debug for output
+# RUN in debug for logs output in debug console
 
 
 @pytest.mark.parametrize("genre", genres)
 def test_genre(genre):
     # Init
     start_time = datetime.now()
-    print("TEST")
     logger.info("\n[!] Starting @ {}".format(start_time))
     # charts = {
     #     beatport.parse_chart_url_datetime(k): beatport.parse_chart_url_datetime(v)

@@ -11,6 +11,9 @@ client_id = "CHANGE_ME"
 client_secret = "CHANGE_ME"
 redirect_uri = "http://localhost:65000"
 
+# Use gcp?
+use_gcp = False
+
 # Folder path where to save the history
 folder_path = "./"
 

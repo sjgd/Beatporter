@@ -3,10 +3,7 @@ import random
 import sys
 import traceback
 from datetime import datetime
-from os import path
 from time import sleep
-
-import pandas as pd
 
 import beatport
 import spotify
@@ -18,13 +15,17 @@ from config import (
     root_path,
     shuffle_label,
     spotify_bkp,
+    use_gcp,
     username,
 )
+from gcp import upload_file_to_gcs
 from spotify import logger
+from utils import load_hist_file
 
 # import argparse
 
-file_name_hist = root_path + "data/hist_playlists_tracks.pkl"
+path_hist_local = root_path + "data/"
+file_name_hist = "hist_playlists_tracks.pkl.gz"
 curr_date = datetime.today().strftime("%Y-%m-%d")
 option_parse = ["backup", "chart", "genre", "label"]
 
@@ -43,32 +44,6 @@ def dump_tracks(tracks: dict) -> None:
             )
         )
         i += 1
-
-
-def load_hist_file() -> pd.DataFrame:
-    """Function to load the hist file according to folder path in configs.
-
-    :return: Returns existing history file of track ID per playlist
-    """
-    # TODO arguments for file path / type ?
-    if path.exists(folder_path + "hist_playlists_tracks.xlsx"):
-        df_hist_pl_tracks = pd.read_excel(folder_path + "hist_playlists_tracks.xlsx")
-        logger.info(" ")
-        logger.info(
-            f"Successfully loaded hist file with {df_hist_pl_tracks.shape[0]} records"
-        )
-    else:
-        df_hist_pl_tracks = pd.DataFrame(
-            columns=[
-                "playlist_id",
-                "playlist_name",
-                "track_id",
-                "datetime_added",
-                "artist_name",
-            ]
-        )
-
-    return df_hist_pl_tracks
 
 
 def update_hist(master_refresh: bool = False) -> None:
@@ -107,7 +82,7 @@ def update_hist(master_refresh: bool = False) -> None:
     df_hist_pl_tracks = df_hist_pl_tracks.loc[
         :, ["playlist_id", "playlist_name", "track_id", "datetime_added", "artist_name"]
     ]
-    df_hist_pl_tracks.to_pickle(folder_path + file_name_hist)
+    # df_hist_pl_tracks.to_pickle(folder_path + file_name_hist)
     df_hist_pl_tracks.to_excel(folder_path + "hist_playlists_tracks.xlsx", index=False)
 
 
@@ -255,7 +230,9 @@ def main(
     df_hist_pl_tracks = df_hist_pl_tracks.loc[
         :, ["playlist_id", "playlist_name", "track_id", "datetime_added", "artist_name"]
     ]
-    df_hist_pl_tracks.to_pickle(file_name_hist)
+    df_hist_pl_tracks.to_pickle(path_hist_local + file_name_hist)
+    if use_gcp:
+        upload_file_to_gcs(output_file_name=file_name_hist, source_folder=path_hist_local)
     df_hist_pl_tracks.to_excel(folder_path + "hist_playlists_tracks.xlsx", index=False)
     logger.info(" ")
     logger.info(f"Successfully saved hist file with {df_hist_pl_tracks.shape[0]} records")

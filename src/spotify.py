@@ -7,10 +7,8 @@ import sys
 import webbrowser
 from datetime import datetime
 from difflib import SequenceMatcher
-from logging.handlers import RotatingFileHandler
 from time import sleep, time
 
-import coloredlogs
 import numpy as np
 import pandas as pd
 import spotipy
@@ -36,50 +34,10 @@ from config import (
     silent_search,
     username,
 )
+from utils import configure_logging
 
-logFile = root_path + "logs/runtime-beatporter.log"
-logging.getLogger().setLevel(logging.NOTSET)
-logging.getLogger().handlers.clear()
-
-console = logging.StreamHandler(sys.stdout)
-console.setLevel(logging.INFO)
-formatter = logging.Formatter("%(message)s")
-console.setFormatter(formatter)
-logging.getLogger().addHandler(console)
-
-fileh = RotatingFileHandler(
-    logFile,
-    mode="w",
-    maxBytes=50 * 1024 * 1024,
-    backupCount=1,
-    encoding=None,
-    delay=False,
-)
-formatter = logging.Formatter("%(asctime)s - %(message)s [%(filename)s:%(lineno)d]")
-fileh.setFormatter(formatter)
-fileh.setLevel(logging.INFO)
-logging.getLogger().addHandler(fileh)
-
-fileh = RotatingFileHandler(
-    root_path + "logs/runtime-beatporter-debug.log",
-    "w",
-    maxBytes=50 * 1024 * 1024,
-    backupCount=1,
-    encoding=None,
-    delay=False,
-)
-formatter = logging.Formatter("%(asctime)s - %(message)s [%(filename)s:%(lineno)d]")
-fileh.setFormatter(formatter)
-fileh.setLevel(logging.DEBUG)
-logging.getLogger().addHandler(fileh)
-
-logger = logging.getLogger()
-
-coloredlogs.install(
-    level="INFO",
-    logger=logger,
-    fmt="%(asctime)s %(levelname)s %(message)s",
-)
+configure_logging()
+logger = logging.getLogger("spotify")
 
 tracks_dict_names = ["id", "duration_ms", "href", "name", "popularity", "uri", "artists"]
 

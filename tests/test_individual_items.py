@@ -7,7 +7,7 @@ import beatport
 import spotify
 from config import genres, spotify_bkp
 from spotify import logger
-from src.beatporter import load_hist_file
+from src.utils import load_hist_file
 
 # RUN in debug for logs output in debug console
 # Or logs are in the Output / Python Test Log

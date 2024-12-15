@@ -2,8 +2,8 @@
 import json
 from datetime import datetime
 
-from src.beatporter import load_hist_file
 from src.spotify import logger, search_for_track_v2
+from src.utils import load_hist_file
 
 file_name_hist = "hist_playlists_tracks.pkl"
 curr_date = datetime.today().strftime("%Y-%m-%d")

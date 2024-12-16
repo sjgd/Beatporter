@@ -120,3 +120,4 @@ token.json
 #History files
 *.xlsx
 .DS_Store
+hist_playlists_tracks.pkl.gz

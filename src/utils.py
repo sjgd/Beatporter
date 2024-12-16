@@ -1,12 +1,20 @@
+"""Utils module."""
 import logging
 import sys
+from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from os import path
+from time import sleep
 
 import coloredlogs
 import pandas as pd
 
-from config import folder_path, root_path
+from config import folder_path, root_path, use_gcp
+from gcp import upload_file_to_gcs
+
+path_hist_local = root_path + "data/"
+file_name_hist = "hist_playlists_tracks.pkl.gz"
+curr_date = datetime.today().strftime("%Y-%m-%d")
 
 
 def configure_logging():
@@ -55,7 +63,8 @@ def configure_logging():
 def load_hist_file(allow_empty: bool = False) -> pd.DataFrame:
     """Function to load the hist file according to folder path in configs.
 
-    :return: Returns existing history file of track ID per playlist
+    Returns:
+        Returns existing history file of track ID per playlist
     """
     logger = logging.getLogger()
     # TODO arguments for file path / type ?
@@ -79,3 +88,21 @@ def load_hist_file(allow_empty: bool = False) -> pd.DataFrame:
         raise ValueError("File does not exist and create empty is not allowed")
 
     return df_hist_pl_tracks
+
+
+def save_hist_dataframe(df_hist_pl_tracks) -> None:
+    """Function to save the history dataframe according to configs."""
+    logger = logging.getLogger()
+    sleep(1)  # try to avoid read-write errors if running too quickly
+    logger.debug("Saving file")
+    df_hist_pl_tracks = df_hist_pl_tracks.loc[
+        :, ["playlist_id", "playlist_name", "track_id", "datetime_added", "artist_name"]
+    ]
+    df_hist_pl_tracks.to_pickle(path_hist_local + file_name_hist)
+    if use_gcp:
+        upload_file_to_gcs(file_name=file_name_hist, source_folder=path_hist_local)
+    df_hist_pl_tracks.to_excel(folder_path + "hist_playlists_tracks.xlsx", index=False)
+    logger.info(f"Successfully saved hist file with {df_hist_pl_tracks.shape[0]} records")
+
+
+configure_logging()

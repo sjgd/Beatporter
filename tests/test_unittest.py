@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 
 from src.spotify import logger, search_for_track_v2
-from src.utils import load_hist_file
+from src.utils import load_hist_file, save_hist_dataframe
 
 file_name_hist = "hist_playlists_tracks.pkl"
 curr_date = datetime.today().strftime("%Y-%m-%d")
@@ -14,9 +14,11 @@ function_search = search_for_track_v2
 logger.info("[START] Testing")
 
 
-def test_load_hist_file():
+def test_load_and_save_hist_file():
+    """Load and save hist file."""
     df_hist_pl_tracks = load_hist_file()
     logger.info(f"{len(df_hist_pl_tracks)=}")
+    save_hist_dataframe(df_hist_pl_tracks)
     assert "df_hist_pl_tracks" in locals()
 
 

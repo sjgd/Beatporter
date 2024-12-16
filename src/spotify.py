@@ -1,3 +1,5 @@
+"""Module to manage Spotify queries."""
+
 import asyncio
 import json
 import logging
@@ -23,7 +25,6 @@ from config import (
     daily_mode,
     daily_n_track,
     digging_mode,
-    folder_path,
     parse_track,
     playlist_description,
     playlist_prefix,
@@ -34,7 +35,7 @@ from config import (
     silent_search,
     username,
 )
-from utils import configure_logging
+from utils import configure_logging, save_hist_dataframe
 
 configure_logging()
 logger = logging.getLogger("spotify")
@@ -44,24 +45,6 @@ tracks_dict_names = ["id", "duration_ms", "href", "name", "popularity", "uri", "
 
 def similar(a, b):
     return SequenceMatcher(None, str(a), str(b)).ratio()
-
-
-def save_hist_file(
-    df_hist_pl_tracks: pd.DataFrame, folder_path: str = folder_path
-) -> None:
-    """Function to save the playlist history in a Excel file.
-
-    :param df_hist_pl_tracks: dataframe of the history of playlist tracks to save
-    :folder_path: Path where to save the dataframe as Excel file
-    """
-    sleep(1)  # try to avoid read-write errors if running too quickly
-    df_hist_pl_tracks_out = df_hist_pl_tracks.loc[
-        :, ["playlist_id", "playlist_name", "track_id", "datetime_added", "artist_name"]
-    ]
-    df_hist_pl_tracks_out.to_excel(
-        folder_path + "hist_playlists_tracks.xlsx", index=False
-    )
-    logger.info(f"[+] Done saving file with {df_hist_pl_tracks_out.shape[0]} records")
 
 
 def listen_for_callback_code():
@@ -1261,7 +1244,7 @@ def add_new_tracks_to_playlist_chart_label(
     df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
 
     if len(persistent_track_ids) > 0:
-        save_hist_file(df_hist_pl_tracks, folder_path=folder_path)
+        save_hist_dataframe(df_hist_pl_tracks)
 
     return df_hist_pl_tracks
 
@@ -1385,7 +1368,7 @@ def add_new_tracks_to_playlist_id(
     df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
 
     if len(persistent_track_ids) > 0:
-        save_hist_file(df_hist_pl_tracks, folder_path=folder_path)
+        save_hist_dataframe(df_hist_pl_tracks)
 
     return df_hist_pl_tracks
 
@@ -1653,7 +1636,7 @@ def add_new_tracks_to_playlist_genre(
         df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
 
     if (len(persistent_track_ids) > 0) or (len(daily_top_n_track_ids) > 0):
-        save_hist_file(df_hist_pl_tracks, folder_path=folder_path)
+        save_hist_dataframe(df_hist_pl_tracks)
 
     return df_hist_pl_tracks
 

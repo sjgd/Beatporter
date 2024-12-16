@@ -7,25 +7,12 @@ from time import sleep
 
 import beatport
 import spotify
-from config import (
-    charts,
-    folder_path,
-    genres,
-    labels,
-    root_path,
-    shuffle_label,
-    spotify_bkp,
-    use_gcp,
-    username,
-)
-from gcp import upload_file_to_gcs
+from config import charts, genres, labels, root_path, shuffle_label, spotify_bkp, username
 from spotify import logger
-from utils import load_hist_file
+from utils import load_hist_file, save_hist_dataframe
 
 # import argparse
 
-path_hist_local = root_path + "data/"
-file_name_hist = "hist_playlists_tracks.pkl.gz"
 curr_date = datetime.today().strftime("%Y-%m-%d")
 option_parse = ["backup", "chart", "genre", "label"]
 
@@ -79,11 +66,7 @@ def update_hist(master_refresh: bool = False) -> None:
                     df_hist_pl_tracks, playlist
                 )
 
-    df_hist_pl_tracks = df_hist_pl_tracks.loc[
-        :, ["playlist_id", "playlist_name", "track_id", "datetime_added", "artist_name"]
-    ]
-    # df_hist_pl_tracks.to_pickle(folder_path + file_name_hist)
-    df_hist_pl_tracks.to_excel(folder_path + "hist_playlists_tracks.xlsx", index=False)
+    save_hist_dataframe(df_hist_pl_tracks)
 
 
 def main(
@@ -224,18 +207,8 @@ def main(
                 )
 
     # Output
-    logger.info(" ")
-    logger.info("Saving file")
-    sleep(5)  # try to avoid read-write errors if running too quickly
-    df_hist_pl_tracks = df_hist_pl_tracks.loc[
-        :, ["playlist_id", "playlist_name", "track_id", "datetime_added", "artist_name"]
-    ]
-    df_hist_pl_tracks.to_pickle(path_hist_local + file_name_hist)
-    if use_gcp:
-        upload_file_to_gcs(output_file_name=file_name_hist, source_folder=path_hist_local)
-    df_hist_pl_tracks.to_excel(folder_path + "hist_playlists_tracks.xlsx", index=False)
-    logger.info(" ")
-    logger.info(f"Successfully saved hist file with {df_hist_pl_tracks.shape[0]} records")
+    sleep(5)
+    save_hist_dataframe(df_hist_pl_tracks)
     # Save bkp
     df_hist_pl_tracks.to_excel(
         root_path + "data/hist_playlists_tracks_{}.xlsx".format(curr_date), index=False

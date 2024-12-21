@@ -27,7 +27,44 @@ def get_gcp_client_info():
     return storage_client
 
 
-def upload_file_to_gcs(file_name: str, source_folder: str, destination_folder=""):
+def get_gcs_blob(file_name: str, bucket_folder=""):
+    """Get blob from GCS.
+
+    Uses PROJECT_ID and BUCKET_NAME set in the module.
+
+    Args:
+        file_name: Local filename
+        source_folder: Local source folder
+        destination_folder: Destination folder in the bucket
+
+    """
+    bucket = get_gcp_client_info().bucket(BUCKET_NAME)
+    destination_blob_name = bucket_folder + file_name
+    blob = bucket.blob(destination_blob_name)
+
+    return blob
+
+
+def download_file_to_gcs(file_name: str, local_folder: str, gcs_folder=""):
+    """Download local file from GCS.
+
+    Uses PROJECT_ID and BUCKET_NAME set in the module.
+
+    Args:
+        file_name: Local filename
+        source_folder: Local source folder
+        destination_folder: Destination folder in the bucket
+
+    """
+    blob = get_gcs_blob(file_name=file_name, bucket_folder=gcs_folder)
+    blob.download_to_filename(filename=local_folder + file_name)
+
+    logger.info(
+        f"Done downloading file {file_name} from blob {BUCKET_NAME+'/'+gcs_folder}"
+    )
+
+
+def upload_file_to_gcs(file_name: str, local_folder: str, gcs_folder=""):
     """Upload local file to GCS.
 
     Use PROJECT_ID and BUCKET_NAME set in the module.
@@ -38,12 +75,7 @@ def upload_file_to_gcs(file_name: str, source_folder: str, destination_folder=""
         destination_folder: Destination folder in the bucket
 
     """
-    bucket = get_gcp_client_info().bucket(BUCKET_NAME)
-    destination_blob_name = destination_folder + file_name
-    blob = bucket.blob(destination_blob_name)
-    blob.upload_from_filename(source_folder + file_name, if_generation_match=None)
+    blob = get_gcs_blob(file_name=file_name, bucket_folder=gcs_folder)
+    blob.upload_from_filename(filename=local_folder + file_name, if_generation_match=None)
 
-    logger.info(
-        f"Done uploading file {file_name} "
-        f"to blob {BUCKET_NAME+'/' +destination_folder}"
-    )
+    logger.info(f"Done uploading file {file_name} to blob {BUCKET_NAME+'/'+gcs_folder}")

@@ -14,7 +14,7 @@ function_search = search_for_track_v2
 logger.info("[START] Testing")
 
 
-def test_load_and_save_hist_file():
+def test_load_and_save_hist_file() -> None:
     """Load and save hist file."""
     df_hist_pl_tracks = load_hist_file()
     logger.info(f"{len(df_hist_pl_tracks)=}")
@@ -22,11 +22,11 @@ def test_load_and_save_hist_file():
     assert "df_hist_pl_tracks" in locals()
 
 
-def test_track_matching():
+def test_track_matching() -> None:
     assert True
 
 
-def test_track_blondish():
+def test_track_blondish() -> None:
     # Tests start in /src/
     tracks = json.load(open("../tests/test_tracks.json"))
     track_search = tracks[1]
@@ -35,7 +35,7 @@ def test_track_blondish():
     assert track_id == "4u3XiAwJ2U9Kxgy57gcAPB"
 
 
-def test_track_toma():
+def test_track_toma() -> None:
     tracks = json.load(open("../tests/test_tracks.json"))
     track_search = tracks[3]
     track_id = function_search(track_search)
@@ -43,7 +43,7 @@ def test_track_toma():
     assert track_id == "3plaSBlILmcUoVBAHDca5c"
 
 
-def test_track_10():
+def test_track_10() -> None:
     tracks = json.load(open("../tests/chart_tracks.json"))
     track_search = tracks[1]
     track_id = function_search(track_search)
@@ -51,7 +51,7 @@ def test_track_10():
     assert track_id == "3jqEqTgf4gxvJfDsvRcOlC"
 
 
-def test_track_mumble():
+def test_track_mumble() -> None:
     tracks = json.load(open("../tests/chart_tracks.json"))
     track_search = tracks[2]
     track_id = function_search(track_search)
@@ -61,7 +61,7 @@ def test_track_mumble():
     assert track_id == "7gznOBAlfJYgOBGdMM3Pas"
 
 
-def test_track_so_bad():
+def test_track_so_bad() -> None:
     tracks = json.load(open("../tests/chart_tracks.json"))
     track_search = tracks[4]
     track_id = function_search(track_search)
@@ -69,7 +69,7 @@ def test_track_so_bad():
     assert track_id == "490QKNw0N4EItGZJPt0tqm"
 
 
-def test_track_eelke():
+def test_track_eelke() -> None:
     tracks = json.load(open("../tests/chart_tracks.json"))
     track_search = tracks[16]
     track_id = function_search(track_search)
@@ -79,7 +79,7 @@ def test_track_eelke():
     assert track_id == "4zC9MjbIIHJoBpny7Sh35s"
 
 
-def test_track_paul():
+def test_track_paul() -> None:
     tracks = json.load(open("../tests/chart_tracks.json"))
     track_search = tracks[17]
     track_id = function_search(track_search)
@@ -87,7 +87,7 @@ def test_track_paul():
     assert track_id is None
 
 
-def test_track_glances():
+def test_track_glances() -> None:
     tracks = json.load(open("../tests/chart_tracks.json"))
     track_search = tracks[25]
     track_id = function_search(track_search)
@@ -95,7 +95,7 @@ def test_track_glances():
     assert track_id == "1rlmw9jPyDnYv9lnYKI1IO"
 
 
-def test_track_skantia():
+def test_track_skantia() -> None:
     tracks = json.load(open("../tests/chart_tracks.json"))
     track_search = tracks[29]
     track_id = function_search(track_search)

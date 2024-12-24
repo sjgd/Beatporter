@@ -1,12 +1,11 @@
-"""Test individual items"""
+"""Test individual items."""
 from datetime import datetime
 
 import pytest
 
 import beatport
-import spotify
 from config import genres, spotify_bkp
-from spotify import logger
+from spotify import add_new_tracks_to_playlist_genre, back_up_spotify_playlist, logger
 from src.utils import load_hist_file
 
 # RUN in debug for logs output in debug console
@@ -32,7 +31,7 @@ def test_genre(genre: dict[str, str]) -> None:
     logger.info(f"\n-Getting genre : ***** {genre} *****")
     top_100_chart = beatport.get_top_100_tracks(genre)
     logger.debug(genre + ":" + str(top_100_chart))
-    df_hist_pl_tracks = spotify.add_new_tracks_to_playlist_genre(
+    df_hist_pl_tracks = add_new_tracks_to_playlist_genre(
         genre, top_100_chart, df_hist_pl_tracks
     )
 
@@ -57,7 +56,7 @@ def test_backup(playlist_name: dict[str, str]) -> None:
 
     org_playlist_id = spotify_bkp[playlist_name]
     logger.info(f"-Backing up playlist : ***** {playlist_name} : {org_playlist_id} *****")
-    df_hist_pl_tracks = spotify.back_up_spotify_playlist(
+    df_hist_pl_tracks = back_up_spotify_playlist(
         playlist_name, org_playlist_id, df_hist_pl_tracks
     )
 

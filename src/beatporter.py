@@ -1,17 +1,30 @@
 """Main module to run Beatporter."""
+import logging
 import random
 import sys
 import traceback
 from datetime import datetime
 from time import sleep
 
-import beatport
-import spotify
+from beatport import (
+    find_chart,
+    get_chart,
+    get_label_tracks,
+    get_top_100_tracks,
+    parse_chart_url_datetime,
+)
 from config import charts, genres, labels, root_path, shuffle_label, spotify_bkp, username
-from spotify import logger
+from spotify import (
+    add_new_tracks_to_playlist_chart_label,
+    add_new_tracks_to_playlist_genre,
+    back_up_spotify_playlist,
+    get_all_playlists,
+    update_hist_from_playlist,
+    update_hist_pl_tracks,
+)
 from utils import load_hist_file, save_hist_dataframe
 
-# import argparse
+logger = logging.getLogger(__name__)
 
 curr_date = datetime.today().strftime("%Y-%m-%d")
 option_parse = ["backup", "chart", "genre", "label"]
@@ -38,33 +51,32 @@ def update_hist(master_refresh: bool = False) -> None:
 
     Args:
         master_refresh: Refresh hist for all playlist of user?
+
     """
     # TODO: testing, to refine usage, include in first init ?
 
     df_hist_pl_tracks = load_hist_file()
 
     charts = {
-        beatport.parse_chart_url_datetime(k): beatport.parse_chart_url_datetime(v)
+        parse_chart_url_datetime(k): parse_chart_url_datetime(v)
         for k, v in charts.items()
     }
 
     for chart, chart_bp_url_code in charts.items():
-        df_hist_pl_tracks = spotify.update_hist_from_playlist(chart, df_hist_pl_tracks)
+        df_hist_pl_tracks = update_hist_from_playlist(chart, df_hist_pl_tracks)
 
     for label, label_bp_url_code in labels.items():
-        df_hist_pl_tracks = spotify.update_hist_from_playlist(label, df_hist_pl_tracks)
+        df_hist_pl_tracks = update_hist_from_playlist(label, df_hist_pl_tracks)
 
     if master_refresh:
         # Get track ids from all playlists from username from config
-        all_playlists = spotify.get_all_playlists()
+        all_playlists = get_all_playlists()
         for playlist in all_playlists:
             # logger.info(playlist['name'])
             if playlist["owner"]["id"] == username:
                 logger.info(playlist["name"])
                 playlist = {"name": playlist["name"], "id": playlist["id"]}
-                df_hist_pl_tracks = spotify.update_hist_pl_tracks(
-                    df_hist_pl_tracks, playlist
-                )
+                df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
 
     save_hist_dataframe(df_hist_pl_tracks)
 
@@ -75,21 +87,22 @@ def main(
     genres: dict[str, str] = genres,
     labels: dict[str, str] = labels,
 ) -> None:
-    """Main function to run Beatporter.
+    """Run Beatporter.
 
     Args:
         spotify_bkp: List of Spotify playlist to backup
         charts: List of Beatport charts to add to Spotify playlists
         genres: List of Beatport genres to add to Spotify playlists
         labels: List of Beatport labels to add to Spotify playlists
+
     """
     # Init
     start_time = datetime.now()
     logger.info(" ")
-    logger.info("[!] Starting @ {}".format(start_time))
+    logger.info(f"[!] Starting @ {start_time}")
     df_hist_pl_tracks = load_hist_file()
     charts = {
-        beatport.parse_chart_url_datetime(k): beatport.parse_chart_url_datetime(v)
+        parse_chart_url_datetime(k): parse_chart_url_datetime(v)
         for k, v in charts.items()
     }
 
@@ -100,29 +113,14 @@ def main(
         # If not argument passed then parse all
         args = option_parse
 
-    # if path.exists(folder_path + file_name_hist):
-    #     df_hist_pl_tracks = pd.read_pickle(folder_path + file_name_hist)
-    # else:
-    #     df_hist_pl_tracks = pd.DataFrame(
-    #         columns=[
-    #             "playlist_id",
-    #             "playlist_name",
-    #             "track_id",
-    #             "datetime_added",
-    #             "artist_name",
-    #         ]
-    #     )
-
     if "backup" in args:
         for playlist_name, org_playlist_id in spotify_bkp.items():
             logger.info(" ")
             logger.info(
-                "-Backing up playlist : ***** {} : {} *****".format(
-                    playlist_name, org_playlist_id
-                )
+                f"-Backing up playlist : ***** {playlist_name} : {org_playlist_id} *****"
             )
             try:
-                df_hist_pl_tracks = spotify.back_up_spotify_playlist(
+                df_hist_pl_tracks = back_up_spotify_playlist(
                     playlist_name, org_playlist_id, df_hist_pl_tracks
                 )
             except Exception as e:
@@ -139,19 +137,15 @@ def main(
             # TODO check if chart are working, otherwise do as genre and label
             # TODO handle return None, handle chart_bp_url_code has ID already or not
             logger.info(" ")
-            logger.info(
-                " Getting chart : ***** {} : {} *****".format(chart, chart_bp_url_code)
-            )
-            chart_url = beatport.find_chart(chart, chart_bp_url_code)
+            logger.info(f" Getting chart : ***** {chart} : {chart_bp_url_code} *****")
+            chart_url = find_chart(chart, chart_bp_url_code)
 
             if chart_url:
                 try:
-                    tracks_dicts = beatport.get_chart(chart_url)
+                    tracks_dicts = get_chart(chart_url)
                     logger.debug(chart_bp_url_code + ":" + str(tracks_dicts))
-                    logger.info(
-                        "\t[+] Found {} tracks for {}".format(len(tracks_dicts), chart)
-                    )
-                    df_hist_pl_tracks = spotify.add_new_tracks_to_playlist_chart_label(
+                    logger.info(f"\t[+] Found {len(tracks_dicts)} tracks for {chart}")
+                    df_hist_pl_tracks = add_new_tracks_to_playlist_chart_label(
                         chart, tracks_dicts, df_hist_pl_tracks
                     )
                 except Exception as e:
@@ -167,11 +161,11 @@ def main(
     if "genre" in args:
         for genre, genre_bp_url_code in genres.items():
             logger.info(" ")
-            logger.info(" Getting genre : ***** {} *****".format(genre))
-            top_100_chart = beatport.get_top_100_tracks(genre)
+            logger.info(f" Getting genre : ***** {genre} *****")
+            top_100_chart = get_top_100_tracks(genre)
             logger.debug(genre + ":" + str(top_100_chart))
             try:
-                df_hist_pl_tracks = spotify.add_new_tracks_to_playlist_genre(
+                df_hist_pl_tracks = add_new_tracks_to_playlist_genre(
                     genre, top_100_chart, df_hist_pl_tracks
                 )
             except Exception as e:
@@ -185,17 +179,15 @@ def main(
             # TODO avoid looping through all pages if already parsed before ?
             # TODO Add tracks per EP rather than track by track ?
             logger.info(" ")
-            logger.info(
-                "Getting label : ***** {} : {} *****".format(label, label_bp_url_code)
-            )
+            logger.info(f"Getting label : ***** {label} : {label_bp_url_code} *****")
             try:
-                tracks_dict = beatport.get_label_tracks(
+                tracks_dict = get_label_tracks(
                     label, label_bp_url_code, df_hist_pl_tracks
                 )
-                logger.info("Found {} tracks for {}".format(len(tracks_dict), label))
+                logger.info(f"Found {len(tracks_dict)} tracks for {label}")
                 if shuffle_label:
                     random.shuffle(tracks_dict)
-                df_hist_pl_tracks = spotify.add_new_tracks_to_playlist_chart_label(
+                df_hist_pl_tracks = add_new_tracks_to_playlist_chart_label(
                     label, tracks_dict, df_hist_pl_tracks
                 )
             except Exception as e:
@@ -211,10 +203,10 @@ def main(
     save_hist_dataframe(df_hist_pl_tracks)
     # Save bkp
     df_hist_pl_tracks.to_excel(
-        root_path + "data/hist_playlists_tracks_{}.xlsx".format(curr_date), index=False
+        root_path + f"data/hist_playlists_tracks_{curr_date}.xlsx", index=False
     )
     end_time = datetime.now()
-    logger.info("[!] Done @ {} (Ran for: {})".format(end_time, end_time - start_time))
+    logger.info(f"[!] Done @ {end_time} (Ran for: {end_time - start_time})")
 
 
 if __name__ == "__main__":
@@ -226,9 +218,12 @@ if __name__ == "__main__":
 # Log could not find track
 # Regex out feat. artist2 remove brackets on (extended mix)
 # Check to include original mix then remove
-# TODO check error on pickle
 # TODO review imports
 # TODO modify read me
+# TODO shuffle playlist option
+# TODO add config to create playlist private per default
+# TODO improve search with parsing names contains brackets, commas or special characters :
+#  (feat. Aliz Smith) and feat. Griz-O and Feat. Denzel Curry, Pell
 # TODO shuffle playlist option
 # TODO add config to create playlist private per default
 # TODO improve search with parsing names contains brackets, commas or special characters :

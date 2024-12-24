@@ -1,7 +1,10 @@
+"""Module to manage Beatport."""
 import json
 import re
 from datetime import datetime, timedelta
+from typing import Any
 
+import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from pandas import to_datetime
@@ -16,12 +19,16 @@ HEADERS = {
 }
 
 
-def get_beatport_page_script_queries(url):
-    """Extract script queries results from the Beatport URL
+def get_beatport_page_script_queries(url: str) -> dict:
+    """Extract script queries results from the Beatport URL.
 
-    :param url: Url to query
-    :return results_data: JSON of the script queries"""
+    Args:
+        url: URL to query.
 
+    Returns:
+        JSON of the script queries.
+
+    """
     r = requests.get(url, headers=HEADERS)
     soup = BeautifulSoup(r.text, features="html.parser")
     all_scripts = soup.find_all("script", type="application/json")
@@ -36,11 +43,15 @@ def get_beatport_page_script_queries(url):
     return results_data_queries
 
 
-def get_top_100_playables(genre):
-    """
-    Get top 100 tracks for a genre
-    :param genre: Genre name
-    :return raw_tracks_dicts: Beatport list of tracks as dict
+def get_top_100_playables(genre: str) -> list[dict]:
+    """Get top 100 tracks for a given genre.
+
+    Args:
+        genre: Genre name
+
+    Returns:
+        raw_tracks_dicts: Beatport list of tracks as dict
+
     """
     url = "https://www.beatport.com/{}/{}/top-100".format(
         "genre" if genres[genre] else "", genres[genre]
@@ -53,11 +64,15 @@ def get_top_100_playables(genre):
     return raw_tracks_dicts
 
 
-def parse_tracks(raw_tracks_dicts):
-    """
-    Parse tracks from Beatport JSON response
-    :param raw_tracks_dicts: Beatport list of tracks as dict
-    :return: List of tracks
+def parse_tracks(raw_tracks_dicts: list[dict]) -> list:
+    """Parse tracks from Beatport JSON response.
+
+    Args:
+        raw_tracks_dicts: Beatport list of tracks as dict.
+
+    Returns:
+        List of tracks.
+
     """
     tracks = list()
     for track in raw_tracks_dicts:
@@ -84,26 +99,35 @@ def parse_tracks(raw_tracks_dicts):
     return tracks
 
 
-def get_top_100_tracks(genre):
-    """
-    Get top 100 tracks from Beatport
-    :param genre: Beatport genre
-    :return: List of tracks
+def get_top_100_tracks(genre: str) -> list[dict]:
+    """Get top 100 tracks from Beatport for a given genre.
+
+    Args:
+        genre: Beatport genre.
+
+    Returns:
+        List of tracks.
+
     """
     # logger.info("[+] Fetching Top 100 {} Tracks".format(genre))
     raw_tracks_dicts = get_top_100_playables(genre)
     return parse_tracks(raw_tracks_dicts)
 
 
-def find_chart(chart, chart_bp_url_code):
-    """ "
-    Find chart URL from Beatport chart name or URL code.
+def find_chart(chart: str, chart_bp_url_code: str) -> Any | str | None:
+    """Find Beatport chart URL from chart name or URL code.
+
+    Finds Beatport chart URL from Beatport chart name or URL code.
     If chart 6 digits number is given, will return the URL directly.
     If chart contains a year,
       will only return the URL of the chart if the publication year matches.
-    :param chart: Beatport chart name
-    :param chart_bp_url_code: Beatport chart URL code
-    :return: Beatport chart URL
+
+    Args:
+        chart: Beatport chart name or URL code.
+        chart_bp_url_code: Beatport chart URL code (optional).
+
+    Returns: Beatport chart URL.
+
     """
     # Check if have chart number in name already
     # Otherwise need to find the chart ID
@@ -121,7 +145,7 @@ def find_chart(chart, chart_bp_url_code):
             charts[i]["url_tentative"] = (
                 "https://www.beatport.com/chart/"
                 + re.sub(
-                    "[^a-zA-Z0-9 \n\.]", "", charts[i]["chart_name"].lower()
+                    "[^a-zA-Z0-9 \n\\.]", "", charts[i]["chart_name"].lower()
                 ).replace(" ", "-")
                 + "/"
                 + str(charts[i]["chart_id"])
@@ -142,9 +166,8 @@ def find_chart(chart, chart_bp_url_code):
         if match_year_name is not None:
             match_year_name = match_year_name.group(1)
             logger.info(
-                "Found year {} in chart name, checking if release is matching".format(
-                    match_year_name
-                )
+                f"Found year {match_year_name} in chart name,"
+                " checking if release is matching"
             )
             results_data = get_beatport_page_script_queries(chart_urls[0])
 
@@ -153,38 +176,40 @@ def find_chart(chart, chart_bp_url_code):
             # TODO: better match release year
             is_year = bool(re.search(r"2[0-9]{3}-[0-9]{2}-[0-9]{2}", change_date_chart))
             if not is_year:
-                logger.warn(
-                    "ERROR - Release date: {},"
-                    " does not seem to be a date, aborting".format(change_date_chart)
+                logger.warning(
+                    f"ERROR - Release date: {change_date_chart},"
+                    " does not seem to be a date, aborting"
                 )
             else:
                 release_year = re.match(r"2[0-9]{3}", change_date_chart).group(0)
                 if f"({release_year})" == match_year_name:
                     logger.info(
-                        "Years match ({}), returning chart {}".format(
-                            release_year, chart_urls[0]
-                        )
+                        f"Years match ({release_year}), returning chart {chart_urls[0]}"
                     )
                     return chart_urls[0]
                 else:
-                    logger.warn(
+                    logger.warning(
                         f"ERROR - Release date: {change_date_chart}, "
                         f"does not match requeried date: {match_year_name},"
                         f" aborting chart: {chart_urls[0]}"
                     )
                     return None
         else:
-            logger.info("No year found in chart name, returning {}".format(chart_urls[0]))
+            logger.info(f"No year found in chart name, returning {chart_urls[0]}")
             return chart_urls[0]
-    else:
-        return None
+
+    return None
 
 
-def get_chart(url):
-    """Get chart tracks from URL
+def get_chart(url: str) -> list[dict]:
+    """Get chart tracks from a given URL.
 
-    :param url: Chart full url, including beatport.com, chart name and chart ID
-    :return tracks_dicts: List of dicts of tracks
+    Args:
+        url: Chart full url, including beatport.com, chart name and chart ID.
+
+    Returns:
+        tracks_dicts: List of dicts of tracks.
+
     """
     results_data = get_beatport_page_script_queries(url)
     raw_tracks_dicts = results_data[1]["state"]["data"]["results"]
@@ -195,11 +220,15 @@ def get_chart(url):
     return tracks_dicts
 
 
-def parse_chart_url_datetime(str):
-    """
-    Format string, if Sunday returns previous week.
-    :param str: string to format
-    :return: datetime object
+def parse_chart_url_datetime(str: str) -> str:
+    """Format date string; if Sunday, return previous week.
+
+    Args:
+        str: string to format.
+
+    Returns:
+        datetime object.
+
     """
     if datetime.today().weekday() > 5:
         return (datetime.today() - timedelta(days=6)).strftime(str)
@@ -208,23 +237,28 @@ def parse_chart_url_datetime(str):
 
 
 def get_label_tracks(
-    label,
-    label_bp_url_code,
-    df_hist_pl_tracks,
-    overwrite=overwrite_label,
-    silent=silent_search,
-):
-    """
-    Get all tracks from a label
-    :param label: label name
-    :param label_bp_url_code: label url code
-    :param df_hist_pl_tracks: dataframe of historic track
-    :param overwrite: if set to true will reload all tracks anyway,
-    otherwise stops once the date of the last playlist refresh is reached
-    :return: dict of tracks from oldest (first) to newest (last)
+    label: str,
+    label_bp_url_code: str,
+    df_hist_pl_tracks: pd.DataFrame,
+    overwrite: bool = overwrite_label,
+    silent: bool = silent_search,
+) -> list[dict]:
+    """Get all tracks from a given label.
+
+    Args:
+        label: label name.
+        label_bp_url_code: label url code.
+        df_hist_pl_tracks: dataframe of historic track.
+        overwrite: If True, reload all tracks; otherwise, stop once the date
+                     of the last playlist refresh is reached.
+        silent: If True, suppress logging messages.
+
+    Returns:
+        List of dict of tracks from oldest (first) to newest (last).
+
     """
     # Get max number of pages for label
-    url = "https://www.beatport.com/label/{}/tracks?per-page=50".format(label_bp_url_code)
+    url = f"https://www.beatport.com/label/{label_bp_url_code}/tracks?per-page=50"
     results_data = get_beatport_page_script_queries(url)
     page_numbers_string = results_data[1]["state"]["data"]["page"]
     max_page_number = page_numbers_string.split("/")[1]
@@ -242,28 +276,28 @@ def get_label_tracks(
         ]
         if len(df_loc_hist.index) > 0:
             last_update = max(df_loc_hist.loc[:, "datetime_added"])
-            if type(last_update) == str:
+            if last_update is str:
                 last_update = datetime.strptime(last_update, "%Y-%m-%dT%H:%M:%SZ")
             else:
                 last_update = last_update.tz_localize(None)
             logger.info(
-                "Label {} has {} pages. Last playlist update found {}(UTC): ".format(
-                    label, max_page_number, last_update
-                )
+                f"Label {label} has {max_page_number} pages. "
+                f"Last playlist update found {last_update}(UTC): "
             )
         else:
             last_update = datetime.min
-            logger.info("Label {} has {} pages".format(label, max_page_number))
+            logger.info(f"Label {label} has {max_page_number} pages")
     else:
         last_update = datetime.min
-        logger.info("Label {} has {} pages".format(label, max_page_number))
+        logger.info(f"Label {label} has {max_page_number} pages")
 
     # Parse label pages
     for i in range(1, int(max_page_number)):
         if not silent:
-            logger.info("\t[+] Getting label {}, page {}".format(label_bp_url_code, i))
-        url = "https://www.beatport.com/label/{}/tracks?page={}&per-page=50".format(
-            label_bp_url_code, i
+            logger.info(f"\t[+] Getting label {label_bp_url_code}, page {i}")
+        url = (
+            "https://www.beatport.com/label"
+            f"/{label_bp_url_code}/tracks?page={i}&per-page=50"
         )
         results_data = get_beatport_page_script_queries(url)
         raw_tracks_dicts = results_data[1]["state"]["data"]["results"]

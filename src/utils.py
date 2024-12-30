@@ -85,13 +85,13 @@ def load_hist_file(allow_empty: bool = False) -> pd.DataFrame:
             "Trying loading from local saved file."
             f"Error {e}"
         )
-        if path.exists(folder_path + "hist_playlists_tracks.xlsx"):
-            df_hist_pl_tracks = pd.read_excel(folder_path + "hist_playlists_tracks.xlsx")
-            logger.info(" ")
-            logger.info(
-                f"Successfully loaded hist file with {df_hist_pl_tracks.shape[0]} records"
-            )
-            return df_hist_pl_tracks
+    if path.exists(folder_path + "hist_playlists_tracks.xlsx"):
+        df_hist_pl_tracks = pd.read_excel(folder_path + "hist_playlists_tracks.xlsx")
+        logger.info(" ")
+        logger.info(
+            f"Successfully loaded hist file with {df_hist_pl_tracks.shape[0]} records"
+        )
+        return df_hist_pl_tracks
     if allow_empty:
         df_hist_pl_tracks = pd.DataFrame(
             columns=[

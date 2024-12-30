@@ -276,7 +276,7 @@ def get_label_tracks(
         ]
         if len(df_loc_hist.index) > 0:
             last_update = max(df_loc_hist.loc[:, "datetime_added"])
-            if last_update is str:
+            if isinstance(last_update, str):
                 last_update = datetime.strptime(last_update, "%Y-%m-%dT%H:%M:%SZ")
             else:
                 last_update = last_update.tz_localize(None)

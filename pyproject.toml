@@ -18,10 +18,22 @@ coloredlogs = "^15.0.1"
 pytest = "^8.3.4"
 google-cloud-storage = "^2.19.0"
 ruff = "^0.8.4"
+ipython = "^8.31.0"
+guppy3 = "^3.1.4.post1"
+pympler = "^1.1"
+psutil = "^6.1.1"
+objgraph = "^3.6.2"
 
 [tool.poetry.extras]
 development = ["jupyter", "ipython"]
 
+
+[tool.poetry.group.dev.dependencies]
+notebook = "^7.3.2"
+guppy3 = "^3.1.4.post1"
+pympler = "^1.1"
+psutil = "^6.1.1"
+objgraph = "^3.6.2"
 
 [build-system]
 requires = ["poetry-core"]

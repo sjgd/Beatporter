@@ -15,7 +15,7 @@ redirect_uri = "http://localhost:65000"
 use_gcp = False
 
 # Save as well at the folder_path below?
-use_local = False
+use_local = True
 
 # Folder path where to save the history
 folder_path = "../data"

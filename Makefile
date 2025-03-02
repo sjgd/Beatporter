@@ -3,3 +3,9 @@ ipython:
 
 beatporter:
 	cd ./src && poetry run python beatporter.py
+
+build:
+	docker buildx build --platform linux/amd64 -t beatporter:latest .
+
+start:
+	./bin/dev/docker-start.sh

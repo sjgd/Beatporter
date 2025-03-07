@@ -1,4 +1,5 @@
 """Main module to run Beatporter."""
+
 import logging
 import random
 import sys

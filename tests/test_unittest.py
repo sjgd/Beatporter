@@ -101,3 +101,25 @@ def test_track_skantia() -> None:
     track_id = function_search(track_search)
     logger.info(track_search)
     assert track_id == "3FXk5VM9d9ix0Xem3KSywt"
+
+
+def test_track_kolter() -> None:
+    """Test track Kolter."""
+    track_search = {
+        "name": "15 Seconds of Fame",
+        "mix": "Original Mix",
+        "artists": ["Kolter"],
+        "remixers": [],
+        "release": "15 Seconds of Fame",
+        "label": "Koltrax",
+        "published_date": "2024-10-11",
+        "duration": "6:14",
+        "duration_ms": 374769,
+        "genres": "Minimal / Deep Tech",
+        "bpm": 130,
+        "key": "Db Major",
+    }
+    track_id = function_search(track_search)
+    logger.info(track_search)
+
+    assert track_id == "1Q8WZ2aN87ld2vcb9UmrTB"

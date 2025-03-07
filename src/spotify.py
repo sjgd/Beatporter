@@ -722,6 +722,24 @@ def parse_track_regex_beatport(track: dict) -> list:
         # TODO add track duration check in similarity
         track_out["mix"] = "Radio Edit"
 
+    # Method 7
+    # Remove feat, special char and replace mixes with radio edit
+    # as often exists on Spotify only
+    track_out = track.copy()  # Otherwise modifies the dict
+    track_out["name"] = re.sub(
+        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
+    )  # Remove feat info, mostly not present in spotify
+    track_out["mix"] = "Edit"
+
+    # Method 8
+    # Remove feat, special char and replace mixes with radio edit
+    # as often exists on Spotify only
+    track_out = track.copy()  # Otherwise modifies the dict
+    track_out["name"] = re.sub(
+        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
+    )  # Remove feat info, mostly not present in spotify
+    track_out["mix"] = "Radio-Edit"
+
     tracks_out.append(track_out)
 
     return tracks_out

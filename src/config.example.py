@@ -1,3 +1,7 @@
+"""Config module."""
+
+from pathlib import Path
+
 # Copy this to config.py and update necessary values
 
 # Spotify Username
@@ -17,11 +21,13 @@ use_gcp = False
 # Save as well at the folder_path below?
 use_local = False
 
-# Folder path where to save the history
-folder_path = "../data"
-
 # Root path
-root_path = "../"
+ROOT_PATH = str(Path(__file__).parent.parent)
+
+# Save as well at the folder_path below?
+use_local = True
+# Folder path where to save the history
+folder_path = ROOT_PATH + "/data"
 
 # Add at top of playlist, if True will add at top, otherwise append
 add_at_top_playlist = True

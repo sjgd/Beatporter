@@ -14,7 +14,7 @@ from beatport import (
     get_top_100_tracks,
     parse_chart_url_datetime,
 )
-from config import charts, genres, labels, root_path, shuffle_label, spotify_bkp, username
+from config import ROOT_PATH, charts, genres, labels, shuffle_label, spotify_bkp, username
 from spotify import (
     add_new_tracks_to_playlist_chart_label,
     add_new_tracks_to_playlist_genre,
@@ -204,7 +204,7 @@ def main(
     save_hist_dataframe(df_hist_pl_tracks)
     # Save bkp
     df_hist_pl_tracks.to_excel(
-        root_path + f"data/hist_playlists_tracks_{curr_date}.xlsx", index=False
+        ROOT_PATH + f"data/hist_playlists_tracks_{curr_date}.xlsx", index=False
     )
     end_time = datetime.now()
     logger.info(f"[!] Done @ {end_time} (Ran for: {end_time - start_time})")

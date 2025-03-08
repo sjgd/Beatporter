@@ -20,6 +20,7 @@ from spotipy import SpotifyException, oauth2
 from spotipy.oauth2 import CacheFileHandler
 
 from config import (
+    ROOT_PATH,
     add_at_top_playlist,
     client_id,
     client_secret,
@@ -31,7 +32,6 @@ from config import (
     playlist_prefix,
     redirect_uri,
     refresh_token_n_tracks,
-    root_path,
     scope,
     silent_search,
     username,
@@ -106,7 +106,7 @@ def do_spotify_oauth() -> dict:
         dict: The Spotify token information.
 
     """
-    TOKEN_PATH = root_path + "data/token.json"
+    TOKEN_PATH = ROOT_PATH + "data/token.json"
     try:
         with open(TOKEN_PATH) as fh:
             token = fh.read()

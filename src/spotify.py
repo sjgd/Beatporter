@@ -36,6 +36,7 @@ from config import (
     silent_search,
     username,
 )
+from src.search_utils import clean_track_name
 from utils import configure_logging, save_hist_dataframe
 
 configure_logging()
@@ -730,6 +731,7 @@ def parse_track_regex_beatport(track: dict) -> list:
         r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
     )  # Remove feat info, mostly not present in spotify
     track_out["mix"] = "Edit"
+    tracks_out.append(track_out)
 
     # Method 8
     # Remove feat, special char and replace mixes with radio edit
@@ -739,7 +741,14 @@ def parse_track_regex_beatport(track: dict) -> list:
         r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
     )  # Remove feat info, mostly not present in spotify
     track_out["mix"] = "Radio-Edit"
+    tracks_out.append(track_out)
 
+    # Method 9
+    # Remove feat, special char and replace mixes with radio edit
+    # as often exists on Spotify only
+    track_out = track.copy()  # Otherwise modifies the dict
+    track_out["name"] = clean_track_name(track_out["name"])
+    track_out["mix"] = ""
     tracks_out.append(track_out)
 
     return tracks_out

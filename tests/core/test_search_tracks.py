@@ -3,6 +3,7 @@
 import json
 from datetime import datetime
 
+from config import ROOT_PATH
 from src.spotify import logger, search_track_function
 
 file_name_hist = "hist_playlists_tracks.pkl"
@@ -12,10 +13,17 @@ option_parse = ["backup", "chart", "genre", "label"]
 # Use https://open.spotify.com/track/4zC9MjbIIHJoBpny7Sh35s to explore a track
 
 
+def load_test_tracks(file: str) -> dict:
+    """Load test tracks."""
+    with open(ROOT_PATH + f"tests/core/{file}") as json_file:
+        tracks = json.load(json_file)
+        return tracks
+
+
 def test_track_blondish() -> None:
     """Test trackblondish."""
     # Tests start in /src/
-    tracks = json.load(open("../tests/test_tracks.json"))
+    tracks = load_test_tracks("test_tracks.json")
     track_search = tracks[1]
     track_id = search_track_function(track_search)
     logger.info(track_search)
@@ -24,7 +32,7 @@ def test_track_blondish() -> None:
 
 def test_track_toma() -> None:
     """Test track Toma."""
-    tracks = json.load(open("../tests/test_tracks.json"))
+    tracks = load_test_tracks("test_tracks.json")
     track_search = tracks[3]
     track_id = search_track_function(track_search)
     logger.info(track_search)
@@ -33,7 +41,7 @@ def test_track_toma() -> None:
 
 def test_track_10() -> None:
     """Test track 10."""
-    tracks = json.load(open("../tests/chart_tracks.json"))
+    tracks = load_test_tracks("chart_tracks.json")
     track_search = tracks[1]
     track_id = search_track_function(track_search)
     logger.info(track_search)
@@ -42,7 +50,7 @@ def test_track_10() -> None:
 
 def test_track_mumble() -> None:
     """Test track Mumble."""
-    tracks = json.load(open("../tests/chart_tracks.json"))
+    tracks = load_test_tracks("chart_tracks.json")
     track_search = tracks[2]
     track_id = search_track_function(track_search)
     logger.info(track_search)
@@ -53,7 +61,7 @@ def test_track_mumble() -> None:
 
 def test_track_so_bad() -> None:
     """Test track So Bad."""
-    tracks = json.load(open("../tests/chart_tracks.json"))
+    tracks = load_test_tracks("chart_tracks.json")
     track_search = tracks[4]
     track_id = search_track_function(track_search)
     logger.info(track_search)
@@ -62,7 +70,7 @@ def test_track_so_bad() -> None:
 
 def test_track_eelke() -> None:
     """Test track Eelke."""
-    tracks = json.load(open("../tests/chart_tracks.json"))
+    tracks = load_test_tracks("chart_tracks.json")
     track_search = tracks[16]
     track_id = search_track_function(track_search)
     logger.info(track_search)
@@ -73,7 +81,7 @@ def test_track_eelke() -> None:
 
 def test_track_paul() -> None:
     """Test track Paul."""
-    tracks = json.load(open("../tests/chart_tracks.json"))
+    tracks = load_test_tracks("chart_tracks.json")
     track_search = tracks[17]
     track_id = search_track_function(track_search)
     logger.info(track_search)
@@ -82,7 +90,7 @@ def test_track_paul() -> None:
 
 def test_track_glances() -> None:
     """Test track Glances."""
-    tracks = json.load(open("../tests/chart_tracks.json"))
+    tracks = load_test_tracks("chart_tracks.json")
     track_search = tracks[25]
     track_id = search_track_function(track_search)
     logger.info(track_search)
@@ -91,7 +99,7 @@ def test_track_glances() -> None:
 
 def test_track_skantia() -> None:
     """Test track Skantia."""
-    tracks = json.load(open("../tests/chart_tracks.json"))
+    tracks = load_test_tracks("chart_tracks.json")
     track_search = tracks[29]
     track_id = search_track_function(track_search)
     logger.info(track_search)

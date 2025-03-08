@@ -36,7 +36,7 @@ from config import (
     silent_search,
     username,
 )
-from src.search_utils import clean_track_name
+from search_utils import clean_track_name
 from utils import configure_logging, save_hist_dataframe
 
 configure_logging()
@@ -749,7 +749,7 @@ def parse_track_regex_beatport(track: dict) -> list:
     track_out = track.copy()  # Otherwise modifies the dict
     track_out["name"] = clean_track_name(track_out["name"])
     track_out["mix"] = ""
-    tracks_out.append(track_out)
+    # tracks_out.append(track_out)
 
     return tracks_out
 

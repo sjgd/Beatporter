@@ -22,26 +22,38 @@ def clean_track_name(track_name: str) -> str:
 
     """
     # Remove feat info (including variations in casing and parentheses)
-    track_name = re.sub(r"\s*\(?(?:Feat|feat|Ft|ft)\.\s+[\w\s&]+\)?", "", track_name)
-
+    track_name = re.sub(
+        r"\s*-\s*?(?:Feat|feat|Ft|ft)\.\s+[\w\s&]+\)?",
+        "",
+        track_name,
+        flags=re.IGNORECASE,
+    )
+    # Remove feat info (including variations in casing and parentheses)
+    track_name = re.sub(
+        r"\s*\(?(?:Feat|feat|Ft|ft)\.\s+[\w\s&]+\)?", "", track_name, flags=re.IGNORECASE
+    )
+    # Remove feat info (after -)
+    track_name = re.sub(
+        r"\s*-\s*(?:Feat|feat|Ft|ft)\.\s+[\w\s&]+", "", track_name, flags=re.IGNORECASE
+    )
+    # Remove " - Radio Edit" (case-insensitive)
+    track_name = re.sub(r"\s*-\s*Radio Edit", "", track_name, flags=re.IGNORECASE)
     # Remove "Radio Edit" (case-insensitive)
     track_name = re.sub(r"\s*\(?Radio Edit\)?", "", track_name, flags=re.IGNORECASE)
-
-    # Remove "(Extended Mix)"
+    # Remove " - Extended Mix" (case-insensitive)
+    track_name = re.sub(r"\s*-\s*Extended Mix", "", track_name, flags=re.IGNORECASE)
+    # Remove "(Extended Mix)" (case-insensitive)
     track_name = re.sub(r"\s*\(?Extended Mix\)?", "", track_name, flags=re.IGNORECASE)
-
-    # Remove "- Original Mix"
-    track_name = re.sub(r"\s*-?\s*[Oo]riginal [Mm]ix", "", track_name)
-
-    # Remove "Extended Vox Mix"
+    # Remove "- Original Mix" (case-insensitive)
+    track_name = re.sub(
+        r"\s*-?\s*[Oo]riginal [Mm]ix", "", track_name, flags=re.IGNORECASE
+    )
+    # Remove "Extended Vox Mix" (case-insensitive)
     track_name = re.sub(r"\s*\(?Extended Vox Mix\)?", "", track_name, flags=re.IGNORECASE)
-
-    # Remove "- Extended"
-    track_name = re.sub(r"\s*-?\s*[Ee]xtended", "", track_name)
-
+    # Remove "- Extended" (case-insensitive)
+    track_name = re.sub(r"\s*-?\s*[Ee]xtended", "", track_name, flags=re.IGNORECASE)
     # Remove double spaces
     track_name = re.sub(r"\s+", " ", track_name)
-
     # Remove leading/trailing spaces
     track_name = track_name.strip()
 
@@ -57,8 +69,9 @@ def clean_track_name(track_name: str) -> str:
         ("Another Track (Extended Mix)", "Another Track"),
         ("My Song - Original Mix", "My Song"),
         ("Some Track Extended Vox Mix", "Some Track"),
-        ("Another Song (feat. bbyclose) - feat. bbyclose", "Another Song"),
-        ("Another Song feat. bbyclose - feat. bbyclose", "Another Song"),
+        ("Another Song (feat. bbyclose)", "Another Song"),
+        ("Another Song feat. bbyclose", "Another Song"),
+        ("Another Song - feat. bbyclose", "Another Song"),
         ("Another Song - Extended", "Another Song"),
         ("Song   with    extra   spaces", "Song with extra spaces"),
         (

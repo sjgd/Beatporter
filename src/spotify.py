@@ -1135,10 +1135,7 @@ def add_tracks_to_playlist(playlist_id: str, track_ids: list) -> None:
     """
     if track_ids:
         spotify_auth()
-        if add_at_top_playlist:
-            position = 0
-        else:
-            position = None
+        position = 0 if add_at_top_playlist else None
         spotify_ins.user_playlist_add_tracks(
             user=username, playlist_id=playlist_id, tracks=track_ids, position=position
         )
@@ -1409,10 +1406,7 @@ def add_new_tracks_to_playlist_chart_label(
     spotify_auth()
 
     # TODO export playlist anterior name to config
-    if use_prefix:
-        persistent_playlist_name = f"{playlist_prefix}{title}"
-    else:
-        persistent_playlist_name = title
+    persistent_playlist_name = f"{playlist_prefix}{title}" if use_prefix else title
     logger.info(f'[+] Identifying new tracks for playlist: "{persistent_playlist_name}"')
 
     playlist = {
@@ -1895,13 +1889,12 @@ def add_new_tracks_to_playlist_genre(
                 if (
                     n_daily_tracks < daily_n_track
                     and track_id not in playlist_track_ids_daily.values
+                ) and (
+                    track_id not in df_local_hist_daily.values
+                    and track_id not in daily_top_n_track_ids
                 ):
-                    if (
-                        track_id not in df_local_hist_daily.values
-                        and track_id not in daily_top_n_track_ids
-                    ):
-                        extra_daily_top_n_track_ids.append(track_id)
-                        n_daily_tracks += 1
+                    extra_daily_top_n_track_ids.append(track_id)
+                    n_daily_tracks += 1
 
             logger.warning(
                 f"[+] Adding {len(extra_daily_top_n_track_ids)} extra new "

@@ -9,3 +9,6 @@ build:
 
 start:
 	./bin/dev/docker-start.sh
+
+ruff:
+	poetry run ruff check --fix 

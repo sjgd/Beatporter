@@ -38,10 +38,10 @@ def dump_tracks(tracks: dict) -> None:
         logger.info(
             "{}: {} ({}) - {} ({})".format(
                 i,
-                track["name"],
-                track["mix"],
-                ", ".join(track["artists"]),
-                track["duration"],
+                track.name,
+                track.mix,
+                ", ".join(track.artists),
+                track.duration,
             )
         )
         i += 1

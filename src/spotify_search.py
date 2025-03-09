@@ -177,9 +177,9 @@ def search_for_track_v2(
 
     logger.info(
         " [Done] No exact matches on name and artists v2 : {} - {}{}".format(
-            track["artists"][0],
-            track["name"],
-            "" if not track["mix"] else " - {}".format(track["mix"]),
+            track.artists[0],
+            track.name,
+            "" if not track.mix else " - {}".format(track.mix),
         )
     )
 
@@ -223,32 +223,29 @@ def search_for_track_v3(
         # Add parsed artist if not in list already
         artist_search.extend(
             x
-            for x in [
-                re.sub(r"\s*\([^)]*\)", "", artist_) for artist_ in track["artists"]
-            ]
+            for x in [re.sub(r"\s*\([^)]*\)", "", artist_) for artist_ in track.artists]
             if x not in artist_search
         )  # Remove (UK) for example
         artist_search.extend(
             x
-            for x in [re.sub(r"\W+", " ", artist_) for artist_ in track["artists"]]
+            for x in [re.sub(r"\W+", " ", artist_) for artist_ in track.artists]
             if x not in artist_search
         )  # Remove special characters, in case it is not handled by Spotify API
         artist_search.extend(
             x
-            for x in [re.sub(r"[^\w\s]", "", artist_) for artist_ in track["artists"]]
+            for x in [re.sub(r"[^\w\s]", "", artist_) for artist_ in track.artists]
             if x not in artist_search
         )  # Remove special characters, in case it is not handled by Spotify API
         artist_search.extend(
             x
             for x in [
-                re.sub(r"(?<=\w)[A-Z]", add_space, artist_)
-                for artist_ in track["artists"]
+                re.sub(r"(?<=\w)[A-Z]", add_space, artist_) for artist_ in track.artists
             ]
             if x not in artist_search
         )  # Splitting artist name with a space after a capital letter
         artist_search.extend(
             x
-            for x in [re.sub(r"\s&.*$", "", artist_) for artist_ in track["artists"]]
+            for x in [re.sub(r"\s&.*$", "", artist_) for artist_ in track.artists]
             if x not in artist_search
         )  # Removing second part after &
 
@@ -274,9 +271,9 @@ def search_for_track_v3(
 
     logger.info(
         " [Done] No exact matches on name and artists v2 : {} - {}{}".format(
-            track["artists"][0],
-            track["name"],
-            "" if not track["mix"] else " - {}".format(track["mix"]),
+            track.artists[0],
+            track.name,
+            "" if not track.mix else " - {}".format(track.mix),
         )
     )
 
@@ -369,7 +366,7 @@ def add_new_tracks_to_playlist(genre: str, tracks_dict: list) -> None:
 
 def add_new_tracks_to_playlist_chart_label(
     title: str,
-    tracks_dict: list,
+    tracks_dict: list[BeatportTrack],
     df_hist_pl_tracks: pd.DataFrame,
     use_prefix: bool = True,
     silent: bool = silent_search,
@@ -435,9 +432,7 @@ def add_new_tracks_to_playlist_chart_label(
 
     for track in tracks_dict:
         track_count_tot += 1
-        track_artist_name = (
-            track["artists"][0] + " - " + track["name"] + " - " + track["mix"]
-        )
+        track_artist_name = track.artists[0] + " - " + track.name + " - " + track.mix
         if not silent:
             logger.info(
                 f"  [Start] {round(track_count_tot / len(tracks_dict) * 100, 2)!s}% "
@@ -508,7 +503,7 @@ def add_new_tracks_to_playlist_chart_label(
 
 def add_new_tracks_to_playlist_genre(
     genre: str,
-    top_100_chart: list,
+    top_100_chart: list[BeatportTrack],
     df_hist_pl_tracks: pd.DataFrame,
     silent: bool = silent_search,
 ) -> pd.DataFrame:
@@ -630,18 +625,16 @@ def add_new_tracks_to_playlist_genre(
 
     for track in top_100_chart:
         track_count_tot += 1
-        track_artist_name = (
-            track["artists"][0] + " - " + track["name"] + " - " + track["mix"]
-        )
+        track_artist_name = track.artists[0] + " - " + track.name + " - " + track.mix
         if not silent:
             logger.info(
                 "  [Start] {}% : {} : nb {} out of {}".format(
                     str(round(track_count_tot / len(top_100_chart) * 100, 2)),
-                    track["name"]
+                    track.name
                     + " - "
-                    + track["mix"]
+                    + track.mix
                     + " by "
-                    + track["artists"][0],  # track_artist_name,
+                    + track.artists[0],  # track_artist_name,
                     track_count_tot,
                     len(top_100_chart),
                 )

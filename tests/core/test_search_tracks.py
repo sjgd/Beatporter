@@ -1,10 +1,14 @@
 """Test single tracks search module."""
 
 import json
+import logging
 from datetime import datetime
 
 from config import ROOT_PATH
-from src.spotify import logger, search_track_function
+from spotify_utils import search_track_function
+
+logger = logging.getLogger("test_search_tracks")
+
 
 file_name_hist = "hist_playlists_tracks.pkl"
 curr_date = datetime.today().strftime("%Y-%m-%d")

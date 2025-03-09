@@ -281,7 +281,83 @@ def search_for_track_v3(
     return None
 
 
-search_track_function = search_for_track_v2
+def search_for_track_v4(
+    track: BeatportTrack, silent: bool = silent_search, parse_track: bool = parse_track
+) -> str:
+    """Search for a track on Spotify using various search strategies.
+
+    Args:
+        track (BeatportTrack): Track dictionary.
+        silent (bool): Whether to suppress logging output.
+        parse_track (bool): Whether to parse the track name and mix.
+
+    Returns:
+        str: Spotify track ID if found, otherwise None.
+
+    """
+
+    query = " ".join(
+        [
+            track.name,
+            " ".join(track.artists),
+            " ".join(track.remixers),
+            # track.mix,
+            # track.release,
+            # track.label,
+        ]
+    )
+    if not silent:
+        logger.info(f"\t\t[+] Search Query: {query}")
+    search_results = search_wrapper(query)
+    track_id = parse_search_results_spotify(search_results, track)
+    if track_id:
+        return track_id
+
+    query = " ".join(
+        [
+            track.name,
+            " ".join(track.artists),
+            " ".join(track.remixers),
+            track.mix,
+            # track.release,
+            # track.label,
+        ]
+    )
+    if not silent:
+        logger.info(f"\t\t[+] Search Query: {query}")
+    search_results = search_wrapper(query)
+    track_id = parse_search_results_spotify(search_results, track)
+    if track_id:
+        return track_id
+
+    logger.info(
+        " [Done] No exact matches on name and artists v2 : {} - {}{}".format(
+            track.artists[0],
+            track.name,
+            "" if not track.mix else " - {}".format(track.mix),
+        )
+    )
+
+    # Possible to use return search_for_track(track) but do not improve search results
+    return None
+
+
+def search_track_function(
+    track: BeatportTrack, silent: bool = silent_search, parse_track: bool = parse_track
+) -> str:
+    """Search for a track on Spotify using various search strategies.
+
+    Args:
+        track (BeatportTrack): Track dictionary.
+        silent (bool): Whether to suppress logging output.
+        parse_track (bool): Whether to parse the track name and mix.
+
+    Returns:
+        str: Spotify track ID if found, otherwise None.
+
+    """
+    return search_for_track_v2(track=track, silent=silent, parse_track=parse_track)
+
 
 #
 

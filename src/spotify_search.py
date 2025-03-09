@@ -16,6 +16,7 @@ from config import (
     refresh_token_n_tracks,
     silent_search,
 )
+from models import BeatportTrack
 from spotify_utils import (
     add_space,
     add_tracks_to_playlist,
@@ -45,12 +46,12 @@ tracks_dict_names = ["id", "duration_ms", "href", "name", "popularity", "uri", "
 
 
 def search_for_track_v2(
-    track: dict, silent: bool = silent_search, parse_track: bool = parse_track
+    track: BeatportTrack, silent: bool = silent_search, parse_track: bool = parse_track
 ) -> str:
     """Search for a track on Spotify using various search strategies.
 
     Args:
-        track (dict): Track dictionary.
+        track (BeatportTrack): Track dictionary.
         silent (bool): Whether to suppress logging output.
         parse_track (bool): Whether to parse the track name and mix.
 
@@ -60,7 +61,7 @@ def search_for_track_v2(
     """
     if parse_track:
         track_parsed = [
-            track.copy(),
+            track.model_copy(),
             *parse_track_regex_beatport(track),
         ]
     else:
@@ -68,60 +69,58 @@ def search_for_track_v2(
 
     for track_ in track_parsed:
         # Create a field name mix according to Spotify formatting
-        track_["name_mix"] = "{}{}".format(
-            track_["name"], "" if not track_["mix"] else " - {}".format(track_["mix"])
+        track_.name_mix = "{}{}".format(
+            track_.name, "" if not track_.mix else " - {}".format(track_.mix)
         )
 
         # Create a parsed artist and try both
-        artist_search = [*track_["artists"]]
+        artist_search = [*track_.artists]
         if parse_track:
             # Add parsed artist if not in list already
             artist_search.extend(
                 x
                 for x in [
-                    re.sub(r"\s*\([^)]*\)", "", artist_) for artist_ in track_["artists"]
+                    re.sub(r"\s*\([^)]*\)", "", artist_) for artist_ in track_.artists
                 ]
                 if x not in artist_search
             )  # Remove (UK) for example
             artist_search.extend(
                 x
-                for x in [re.sub(r"\W+", " ", artist_) for artist_ in track_["artists"]]
+                for x in [re.sub(r"\W+", " ", artist_) for artist_ in track_.artists]
                 if x not in artist_search
             )  # Remove special characters, in case it is not handled by Spotify API
             artist_search.extend(
                 x
-                for x in [
-                    re.sub(r"[^\w\s]", "", artist_) for artist_ in track_["artists"]
-                ]
+                for x in [re.sub(r"[^\w\s]", "", artist_) for artist_ in track_.artists]
                 if x not in artist_search
             )  # Remove special characters, in case it is not handled by Spotify API
             artist_search.extend(
                 x
                 for x in [
                     re.sub(r"(?<=\w)[A-Z]", add_space, artist_)
-                    for artist_ in track_["artists"]
+                    for artist_ in track_.artists
                 ]
                 if x not in artist_search
             )  # Splitting artist name with a space after a capital letter
             artist_search.extend(
                 x
-                for x in [re.sub(r"\s&.*$", "", artist_) for artist_ in track_["artists"]]
+                for x in [re.sub(r"\s&.*$", "", artist_) for artist_ in track_.artists]
                 if x not in artist_search
             )  # Removing second part after &
 
         # Search artist and artist parsed if parsed is on
         for artist in artist_search:
             # Search track name and track name without mix (even if parsed is off)
-            for track_name in [track_["name_mix"]]:  # , track_["name"]]:
+            for track_name in [track_.name_mix]:  # , track_. name]:
                 # # Search with Title, Mix, Artist, Release / Album and Label
                 # if not silent:
                 #     logger.info(
                 #         "\t[+] Searching for track: {} by {} on {} on {} label".format(
-                #             track_name, artist, track_["release"], track_["label"]
+                #             track_name, artist, track_.release, track_.label
                 #         )
                 #     )
                 # query = 'track:"{}" artist:"{}" album:"{}" label:"{}"'.format(
-                #     track_name, artist, track_["release"], track_["label"]
+                #     track_name, artist, track_.release, track_.label
                 # )
                 # if not silent:
                 #     logger.info("\t\t[+] Search Query: {}".format(query))
@@ -134,11 +133,11 @@ def search_for_track_v2(
                 # if not silent:
                 #     logger.info(
                 #         "[+]\tSearching for track: {} by {} on {} label".format(
-                #             track_name, artist, track_["label"]
+                #             track_name, artist, track_.label
                 #         )
                 #     )
                 # query = 'track:"{}" artist:"{}" label:"{}"'.format(
-                #     track_name, artist, track_["label"]
+                #     track_name, artist, track_.label
                 # )
                 # if not silent:
                 #     logger.info("\t\t[+] Search Query: {}".format(query))
@@ -151,11 +150,11 @@ def search_for_track_v2(
                 if not silent:
                     logger.info(
                         "[+]\tSearching for track: {} by {} on {} album".format(
-                            track_name, artist, track_["release"]
+                            track_name, artist, track_.release
                         )
                     )
                 query = 'track:"{}" artist:"{}" album:"{}"'.format(
-                    track_name, artist, track_["release"]
+                    track_name, artist, track_.release
                 )
                 if not silent:
                     logger.info(f"\t\t[+] Search Query: {query}")
@@ -189,12 +188,12 @@ def search_for_track_v2(
 
 
 def search_for_track_v3(
-    track: dict, silent: bool = silent_search, parse_track: bool = parse_track
+    track: BeatportTrack, silent: bool = silent_search, parse_track: bool = parse_track
 ) -> str:
     """Search for a track on Spotify using various search strategies.
 
     Args:
-        track (dict): Track dictionary.
+        track (BeatportTrack): Track dictionary.
         silent (bool): Whether to suppress logging output.
         parse_track (bool): Whether to parse the track name and mix.
 
@@ -204,7 +203,7 @@ def search_for_track_v3(
     """
     if parse_track:
         track_parsed = [
-            track.copy(),
+            track.model_copy(),
             *parse_track_regex_beatport(track),
         ]
     else:
@@ -219,7 +218,7 @@ def search_for_track_v3(
 
     # Create a parsed artist and try both
     # TODO: Export to function
-    artist_search = [*track["artists"]]
+    artist_search = [*track.artists]
     if parse_track:
         # Add parsed artist if not in list already
         artist_search.extend(
@@ -260,11 +259,11 @@ def search_for_track_v3(
         for query_function in queries_functions:
             for track_ in track_parsed:
                 # Create a field name mix according to Spotify formatting
-                track_["name_mix"] = "{}{}".format(
-                    track_["name"],
-                    "" if not track_["mix"] else " - {}".format(track_["mix"]),
+                track_.name_mix = "{}{}".format(
+                    track_.name,
+                    "" if not track_.mix else " - {}".format(track_.mix),
                 )
-                for track_name in [track_["name_mix"]]:  # , track_["name"]]:
+                for track_name in [track_.name_mix]:  # , track_. name]:
                     query = query_function(track_name, artist, track_, silent)
                     if not silent:
                         logger.info(f"\t\t[+] Search Query: {query}")
@@ -735,7 +734,7 @@ def add_new_tracks_to_playlist_genre(
         update_playlist_description_with_date(playlists[1])
     else:
         logger.info(
-            "[+] No new tracks to add to the playlist: " f'"{daily_top_n_playlist_name}"'
+            f'[+] No new tracks to add to the playlist: "{daily_top_n_playlist_name}"'
         )
 
     # Add more to daily playlist if not full

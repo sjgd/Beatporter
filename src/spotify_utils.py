@@ -32,6 +32,7 @@ from config import (
     silent_search,
     username,
 )
+from models import BeatportTrack
 from search_utils import clean_track_name
 from utils import configure_logging, save_hist_dataframe
 
@@ -236,7 +237,9 @@ def most_popular_track(tracks: list) -> str:
 
 
 def tracks_similarity(
-    source_track: dict, found_tracks: list, debug_comp: bool = False
+    source_track: BeatportTrack,
+    found_tracks: list[BeatportTrack],
+    debug_comp: bool = False,
 ) -> list:
     """Compute similarity between tracks.
 
@@ -258,7 +261,7 @@ def tracks_similarity(
         #     "name"
         # ]  # ", ".join([artist["name"] for artist in track["artists"]])
         artist_match = []
-        for artist_s in source_track["artists"]:  # ", ".join(source_track["artists"])
+        for artist_s in source_track.artists:  # ", ".join(source_track.artists)
             for artist_r in track["artists"]:
                 artist_match.append(similar(artist_s.lower(), artist_r["name"].lower()))
                 if debug_comp:
@@ -271,8 +274,8 @@ def tracks_similarity(
 
         artist_similar.append(sim_artists)
 
-        track_n_s = source_track["name"] + (
-            "" if not source_track["mix"] else " - {}".format(source_track["mix"])
+        track_n_s = source_track.name + (
+            "" if not source_track.mix else " - {}".format(source_track.mix)
         )
         track_n_r = track["name"]
         sim_name = similar(track_n_s, track_n_r)
@@ -282,7 +285,7 @@ def tracks_similarity(
             )
         track_n_similar.append(sim_name)
 
-        duration_s = source_track["duration_ms"]
+        duration_s = source_track.duration_ms
         duration_r = track["duration_ms"]
         try:
             sim_duration = duration_r / duration_s
@@ -306,7 +309,9 @@ def tracks_similarity(
 
 
 def best_of_multiple_matches(
-    source_track: dict, found_tracks: list, silent: bool = silent_search
+    source_track: BeatportTrack,
+    found_tracks: list[BeatportTrack],
+    silent: bool = silent_search,
 ) -> str:
     """Find the best match among multiple tracks.
 
@@ -332,7 +337,7 @@ def best_of_multiple_matches(
         if not silent and debug_duration:
             logger.info("\t\t\t[+] Match {}: {}".format(counter, track["id"]))
         if do_durations_match(
-            source_track["duration_ms"],
+            source_track.duration_ms,
             track["duration_ms"],
             debug_duration=debug_duration,
         ):
@@ -619,7 +624,7 @@ def parse_search_results_spotify(
     return track_id
 
 
-def parse_track_regex_beatport(track: dict) -> list:
+def parse_track_regex_beatport(track: BeatportTrack) -> list:
     """Parse track name and mix using regular expressions.
 
     Args:
@@ -632,12 +637,12 @@ def parse_track_regex_beatport(track: dict) -> list:
     tracks_out = []
 
     # Method 1
-    track_out = track.copy()  # Otherwise modifies the dict
-    track_out["name"] = re.sub(
-        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
+    track_out = track.model_copy()  # Otherwise modifies the dict
+    track_out.name = re.sub(
+        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out.name
     )  # Remove feat info, mostly not present in spotify
-    track_out["name"] = re.sub(
-        r"\W", " ", track_out["name"]
+    track_out.name = re.sub(
+        r"\W", " ", track_out.name
     )  # Remove special characters as they are not handled by Spotify API
 
     tracks_out.append(track_out)
@@ -645,57 +650,57 @@ def parse_track_regex_beatport(track: dict) -> list:
     # Method 2
     # Remove feat, special char and mixes
     track_out = track.copy()  # Otherwise modifies the dict
-    track_out["name"] = re.sub(
-        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
+    track_out.name = re.sub(
+        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out.name
     )  # Remove feat info, mostly not present in spotify
-    # track_out["name"] = re.sub(
-    #     r"[^\w\s]", "", track_out["name"]
+    # track_out.name = re.sub(
+    #     r"[^\w\s]", "", track_out.name
     # )  # Remove special characters as they are not handled by Spotify API
-    if re.search("[O|o]riginal [M|m]ix", track_out["mix"]):
+    if re.search("[O|o]riginal [M|m]ix", track_out.mix):
         # Remove original mix as not used in Spotify
         # TODO add track duration check in similarity
-        track_out["mix"] = None
-    if track_out["mix"] == "Extended Mix":
+        track_out.mix = None
+    if track_out.mix == "Extended Mix":
         # Remove Extended Mix as not used in Spotify
         # TODO add track duration check in similarity
-        track_out["mix"] = None
+        track_out.mix = None
 
     tracks_out.append(track_out)
 
     # Method 3
     track_out = track.copy()  # Otherwise modifies the dict
-    track_out["name"] = re.sub(
-        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
+    track_out.name = re.sub(
+        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out.name
     )  # Remove feat info, mostly not present in spotify
-    track_out["name"] = re.sub(
-        r"[^\w\s]", "", track_out["name"]
+    track_out.name = re.sub(
+        r"[^\w\s]", "", track_out.name
     )  # Remove special characters as they are not handled by Spotify API
 
     tracks_out.append(track_out)
 
     # Method 4
     track_out = track.copy()  # Otherwise modifies the dict
-    track_out["name"] = re.sub(
-        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
+    track_out.name = re.sub(
+        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out.name
     )  # Remove feat info, mostly not present in spotify
-    track_out["name"] = re.sub(
-        r"[^\w\s]", "", track_out["name"]
+    track_out.name = re.sub(
+        r"[^\w\s]", "", track_out.name
     )  # Remove special characters as they are not handled by Spotify API
-    track_out["mix"] = re.sub("[R|r]emix", "mix", track_out["mix"])  # Change remix
-    track_out["mix"] = re.sub("[M|m]ix", "Remix", track_out["mix"])  # Change to remix
+    track_out.mix = re.sub("[R|r]emix", "mix", track_out.mix)  # Change remix
+    track_out.mix = re.sub("[M|m]ix", "Remix", track_out.mix)  # Change to remix
 
     tracks_out.append(track_out)
 
     # Method 5
     track_out = track.copy()  # Otherwise modifies the dict
-    track_out["name"] = re.sub(
-        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
+    track_out.name = re.sub(
+        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out.name
     )  # Remove feat info, mostly not present in spotify
-    track_out["name"] = re.sub(
-        r"[^\w\s]", "", track_out["name"]
+    track_out.name = re.sub(
+        r"[^\w\s]", "", track_out.name
     )  # Remove special characters as they are not handled by Spotify API
-    track_out["mix"] = re.sub(
-        "[M|m]ix", "", track_out["mix"]
+    track_out.mix = re.sub(
+        "[M|m]ix", "", track_out.mix
     )  # Remove special characters as they are not handled by Spotify API
 
     tracks_out.append(track_out)
@@ -704,47 +709,47 @@ def parse_track_regex_beatport(track: dict) -> list:
     # Remove feat, special char and replace mixes with radio edit
     # as often exists on Spotify only
     track_out = track.copy()  # Otherwise modifies the dict
-    track_out["name"] = re.sub(
-        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
+    track_out.name = re.sub(
+        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out.name
     )  # Remove feat info, mostly not present in spotify
-    # track_out["name"] = re.sub(
-    #     r"[^\w\s]", "", track_out["name"]
+    # track_out.name = re.sub(
+    #     r"[^\w\s]", "", track_out.name
     # )  # Remove special characters as they are not handled by Spotify API
-    if re.search("[O|o]riginal [M|m]ix", track_out["mix"]):
+    if re.search("[O|o]riginal [M|m]ix", track_out.mix):
         # Remove original mix as not used in Spotify
         # TODO add track duration check in similarity
-        track_out["mix"] = "Radio Edit"
-    if track_out["mix"] == "Extended Mix":
+        track_out.mix = "Radio Edit"
+    if track_out.mix == "Extended Mix":
         # Remove Extended Mix as not used in Spotify
         # TODO add track duration check in similarity
-        track_out["mix"] = "Radio Edit"
+        track_out.mix = "Radio Edit"
 
     # Method 7
     # Remove feat, special char and replace mixes with radio edit
     # as often exists on Spotify only
     track_out = track.copy()  # Otherwise modifies the dict
-    track_out["name"] = re.sub(
-        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
+    track_out.name = re.sub(
+        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out.name
     )  # Remove feat info, mostly not present in spotify
-    track_out["mix"] = "Edit"
+    track_out.mix = "Edit"
     tracks_out.append(track_out)
 
     # Method 8
     # Remove feat, special char and replace mixes with radio edit
     # as often exists on Spotify only
     track_out = track.copy()  # Otherwise modifies the dict
-    track_out["name"] = re.sub(
-        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out["name"]
+    track_out.name = re.sub(
+        r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out.name
     )  # Remove feat info, mostly not present in spotify
-    track_out["mix"] = "Radio-Edit"
+    track_out.mix = "Radio-Edit"
     tracks_out.append(track_out)
 
     # Method 9
     # Remove feat, special char and replace mixes with radio edit
     # as often exists on Spotify only
     track_out = track.copy()  # Otherwise modifies the dict
-    track_out["name"] = clean_track_name(track_out["name"])
-    track_out["mix"] = ""
+    track_out.name = clean_track_name(track_out.name)
+    track_out.mix = ""
     # tracks_out.append(track_out)
 
     return tracks_out
@@ -782,11 +787,11 @@ def query_track_album_label(
     if not silent:
         logger.info(
             "\t[+] Searching for track: {} by {} on {} on {} label".format(
-                track_name, artist, track_["release"], track_["label"]
+                track_name, artist, track_.release, track_.label
             )
         )
     return 'track:"{}" artist:"{}" album:"{}" label:"{}"'.format(
-        track_name, artist, track_["release"], track_["label"]
+        track_name, artist, track_.release, track_.label
     )
 
 
@@ -809,14 +814,14 @@ def query_track_label(
     if not silent:
         logger.info(
             "[+]\tSearching for track: {} by {} on {} label".format(
-                track_name, artist, track_["label"]
+                track_name, artist, track_.label
             )
         )
-    return 'track:"{}" artist:"{}" label:"{}"'.format(track_name, artist, track_["label"])
+    return 'track:"{}" artist:"{}" label:"{}"'.format(track_name, artist, track_.label)
 
 
 def query_track_album(
-    track_name: str, artist: str, track_: dict, silent: bool = silent_search
+    track_name: str, artist: str, track_: BeatportTrack, silent: bool = silent_search
 ) -> str:
     """Generate a Spotify search query with track name, artist, and album.
 
@@ -834,12 +839,10 @@ def query_track_album(
     if not silent:
         logger.info(
             "[+]\tSearching for track: {} by {} on {} album".format(
-                track_name, artist, track_["release"]
+                track_name, artist, track_.release
             )
         )
-    return 'track:"{}" artist:"{}" album:"{}"'.format(
-        track_name, artist, track_["release"]
-    )
+    return 'track:"{}" artist:"{}" album:"{}"'.format(track_name, artist, track_.release)
 
 
 def query_track(

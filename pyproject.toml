@@ -1,31 +1,26 @@
-[tool.poetry]
+[project]
+authors = [
+    {name = "sjgd"},
+]
+requires-python = "==3.11.9"
+dependencies = [
+    "datetime<6.0,>=5.1",
+    "pandas<3.0.0,>=2.0.3",
+    "requests<3.0.0,>=2.31.0",
+    "bs4<1.0.0,>=0.0.1",
+    "lxml<5.0.0,>=4.9.3",
+    "spotipy<3.0.0,>=2.23.0",
+    "openpyxl<4.0.0,>=3.1.2",
+    "coloredlogs<16.0.0,>=15.0.1",
+    "pytest<9.0.0,>=8.3.4",
+    "google-cloud-storage<3.0.0,>=2.19.0",
+    "ruff<1.0.0,>=0.8.4",
+    "pydantic<3.0.0,>=2.10.6",
+]
 name = "beatporter"
-version = "0.1.0"
+version = "1.0.0"
 description = ""
-authors = ["sjgd"]
 readme = "README.md"
-
-[tool.poetry.dependencies]
-python = "^3.10"
-datetime = "^5.1"
-pandas = "^2.0.3"
-requests = "^2.31.0"
-bs4 = "^0.0.1"
-lxml = "^4.9.3"
-spotipy = "^2.23.0"
-openpyxl = "^3.1.2"
-coloredlogs = "^15.0.1"
-pytest = "^8.3.4"
-google-cloud-storage = "^2.19.0"
-ruff = "^0.8.4"
-
-[tool.poetry.extras]
-development = ["jupyter", "ipython"]
-
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
 
 [pytest]
 log_cli = true
@@ -52,3 +47,5 @@ disallow_untyped_defs = true
 follow_imports = "skip"
 disable_error_code = "import-untyped"
 no_implicit_optional = true
+
+

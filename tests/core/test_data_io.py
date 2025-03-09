@@ -2,8 +2,8 @@
 
 from datetime import datetime
 
-from src.spotify import logger
-from src.utils import load_hist_file, save_hist_dataframe
+from spotify_search import logger
+from utils import load_hist_file, save_hist_dataframe
 
 file_name_hist = "hist_playlists_tracks.pkl"
 curr_date = datetime.today().strftime("%Y-%m-%d")

@@ -10,11 +10,11 @@ import pytest
 import beatport
 from beatport import find_chart, get_chart, get_label_tracks
 from config import charts, genres, labels, shuffle_label, spotify_bkp
-from spotify_utils import (
+from spotify_search import (
     add_new_tracks_to_playlist_chart_label,
     add_new_tracks_to_playlist_genre,
-    back_up_spotify_playlist,
 )
+from spotify_utils import back_up_spotify_playlist
 from src.utils import load_hist_file
 
 # RUN in debug for logs output in debug console

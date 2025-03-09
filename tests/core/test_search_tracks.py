@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 
 from config import ROOT_PATH
-from spotify_utils import search_track_function
+from spotify_search import search_track_function
 
 logger = logging.getLogger("test_search_tracks")
 

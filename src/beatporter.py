@@ -15,7 +15,7 @@ from beatport import (
     parse_chart_url_datetime,
 )
 from config import ROOT_PATH, charts, genres, labels, shuffle_label, spotify_bkp, username
-from spotify import (
+from spotify_search import (
     add_new_tracks_to_playlist_chart_label,
     add_new_tracks_to_playlist_genre,
     back_up_spotify_playlist,

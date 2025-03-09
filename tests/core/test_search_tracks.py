@@ -6,7 +6,7 @@ from datetime import datetime
 
 from config import ROOT_PATH
 from models import BeatportTrack
-from spotify_search import search_for_track_v3, search_track_function
+from spotify_search import search_for_track_v4, search_track_function
 
 logger = logging.getLogger("test_search_tracks")
 
@@ -28,8 +28,19 @@ def load_test_tracks(file: str) -> dict:
 def test_track_blondish() -> None:
     """Test trackblondish."""
     # Tests start in /src/
-    tracks = load_test_tracks("test_tracks.json")
-    track_search = tracks[1]
+    track_search = {
+        "title": "",
+        "name": "Sete",
+        "mix": "Original Mix",
+        "artists": ["BLOND:ISH", "Amadou & Mariam", "Francis Mercier"],
+        "remixers": [],
+        "release": "Sete",
+        "label": "Insomniac Records",
+        "published_date": "2022-03-25",
+        "released_date": "2022-03-25",
+        "duration": "6:35",
+        "duration_ms": 395040,
+    }
     track_search = BeatportTrack(**track_search)
     track_id = search_track_function(track_search)
     logger.info(track_search)
@@ -38,8 +49,19 @@ def test_track_blondish() -> None:
 
 def test_track_toma() -> None:
     """Test track Toma."""
-    tracks = load_test_tracks("test_tracks.json")
-    track_search = tracks[3]
+    track_search = {
+        "title": "",
+        "name": "Toma Dale",
+        "mix": "Original Mix",
+        "artists": ["Classmatic"],
+        "remixers": [],
+        "release": "Toma Dale",
+        "label": "Hot Creations",
+        "published_date": "2022-04-22",
+        "released_date": "2022-04-22",
+        "duration": "5:23",
+        "duration_ms": 323720,
+    }
     track_search = BeatportTrack(**track_search)
     track_id = search_track_function(track_search)
     logger.info(track_search)
@@ -48,8 +70,19 @@ def test_track_toma() -> None:
 
 def test_track_10() -> None:
     """Test track 10."""
-    tracks = load_test_tracks("chart_tracks.json")
-    track_search = tracks[1]
+    track_search = {
+        "title": "",
+        "name": "God Made Me Phunky",
+        "mix": "10 Years Of Eats Everything Extended Remix",
+        "artists": ["MD X-Spress"],
+        "remixers": ["Eats Everything"],
+        "release": "God Made Me Phunky - Remixes",
+        "label": "Defected",
+        "published_date": "2021-05-14",
+        "released_date": "2021-05-14",
+        "duration": "6:37",
+        "duration_ms": 397755,
+    }
     track_search = BeatportTrack(**track_search)
     track_id = search_track_function(track_search)
     logger.info(track_search)
@@ -58,8 +91,19 @@ def test_track_10() -> None:
 
 def test_track_mumble() -> None:
     """Test track Mumble."""
-    tracks = load_test_tracks("chart_tracks.json")
-    track_search = tracks[2]
+    track_search = {
+        "title": "",
+        "name": "Mumble",
+        "mix": "Extended Mix",
+        "artists": ["Kormak"],
+        "remixers": [],
+        "release": "Mumble (Extended Mix)",
+        "label": "REALM Records",
+        "published_date": "2021-05-14",
+        "released_date": "2021-05-14",
+        "duration": "6:37",
+        "duration_ms": 397500,
+    }
     track_search = BeatportTrack(**track_search)
     track_id = search_track_function(track_search)
     logger.info(track_search)
@@ -70,8 +114,19 @@ def test_track_mumble() -> None:
 
 def test_track_so_bad() -> None:
     """Test track So Bad."""
-    tracks = load_test_tracks("chart_tracks.json")
-    track_search = tracks[4]
+    track_search = {
+        "title": "",
+        "name": "So Bad",
+        "mix": "Original Mix",
+        "artists": ["MADVILLA"],
+        "remixers": [],
+        "release": "Old Flame EP",
+        "label": "Locus",
+        "published_date": "2021-05-14",
+        "released_date": "2021-05-14",
+        "duration": "6:04",
+        "duration_ms": 364651,
+    }
     track_search = BeatportTrack(**track_search)
     track_id = search_track_function(track_search)
     logger.info(track_search)
@@ -80,8 +135,19 @@ def test_track_so_bad() -> None:
 
 def test_track_eelke() -> None:
     """Test track Eelke."""
-    tracks = load_test_tracks("chart_tracks.json")
-    track_search = tracks[16]
+    track_search = {
+        "title": "",
+        "name": "Taking Flight feat. Nathan Nicholson",
+        "mix": "Colyn Extended Remix",
+        "artists": ["Eelke Kleijn", "Nathan Nicholson"],
+        "remixers": ["Colyn"],
+        "release": "Taking Flight - Colyn Remix",
+        "label": "DAYS like NIGHTS",
+        "published_date": "2021-05-14",
+        "released_date": "2021-05-14",
+        "duration": "6:56",
+        "duration_ms": 416553,
+    }
     track_search = BeatportTrack(**track_search)
     track_id = search_track_function(track_search)
     logger.info(track_search)
@@ -92,8 +158,19 @@ def test_track_eelke() -> None:
 
 def test_track_paul() -> None:
     """Test track Paul."""
-    tracks = load_test_tracks("chart_tracks.json")
-    track_search = tracks[17]
+    track_search = {
+        "title": "",
+        "name": "Filthy Music",
+        "mix": "Original Mix",
+        "artists": ["Paul Najera", "Junior Quidija"],
+        "remixers": [],
+        "release": "Filthy Music",
+        "label": "Purveyor Underground",
+        "published_date": "2021-05-14",
+        "released_date": "2021-05-14",
+        "duration": "6:14",
+        "duration_ms": 374452,
+    }
     track_search = BeatportTrack(**track_search)
     track_id = search_track_function(track_search)
     logger.info(track_search)
@@ -102,8 +179,19 @@ def test_track_paul() -> None:
 
 def test_track_glances() -> None:
     """Test track Glances."""
-    tracks = load_test_tracks("chart_tracks.json")
-    track_search = tracks[25]
+    track_search = {
+        "title": "",
+        "name": "Parting Glances",
+        "mix": "Original Mix",
+        "artists": ["S-file"],
+        "remixers": [],
+        "release": "Work it",
+        "label": "UNCAGE",
+        "published_date": "2021-05-14",
+        "released_date": "2021-05-14",
+        "duration": "5:55",
+        "duration_ms": 355555,
+    }
     track_search = BeatportTrack(**track_search)
     track_id = search_track_function(track_search)
     logger.info(track_search)
@@ -112,8 +200,19 @@ def test_track_glances() -> None:
 
 def test_track_skantia() -> None:
     """Test track Skantia."""
-    tracks = load_test_tracks("chart_tracks.json")
-    track_search = tracks[29]
+    track_search = {
+        "title": "",
+        "name": "Providence",
+        "mix": "Original Mix",
+        "artists": ["Skantia", "Nectax"],
+        "remixers": [],
+        "release": "Providence",
+        "label": "RAM Records",
+        "published_date": "2021-05-14",
+        "released_date": "2021-05-14",
+        "duration": "4:12",
+        "duration_ms": 252558,
+    }
     track_search = BeatportTrack(**track_search)
     track_id = search_track_function(track_search)
     logger.info(track_search)
@@ -159,7 +258,8 @@ def test_9oases_extended_remix() -> None:
         "bpm": 128,
         "key": "Bb Minor",
     }
-    track_id = search_for_track_v3(track_search)
+    track_search = BeatportTrack(**track_search)
+    track_id = search_for_track_v4(track_search)
     logger.info(track_search)
 
     assert track_id == "74HzDkCaSgCIeAPi06uxAv"

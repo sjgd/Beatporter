@@ -126,3 +126,25 @@ def test_track_kolter() -> None:
     logger.info(track_search)
 
     assert track_id == "1Q8WZ2aN87ld2vcb9UmrTB"
+
+
+def test_9oases_extended_remix() -> None:
+    """Test track 9OASES Extended Remix."""
+    track_search = {
+        "name": "Tremble (ft. Kim English)",
+        "mix": "9OASES Extended Remix",
+        "artists": ["Yolanda Be Cool", "9OASES"],
+        "remixers": [],
+        "release": "Tremble (ft. Kim English)",
+        "label": "Black Book Records",
+        "published_date": "2025-02-21",
+        "duration": "5:17",
+        "duration_ms": 317492,
+        "genres": "Tech House",
+        "bpm": 128,
+        "key": "Bb Minor",
+    }
+    track_id = search_track_function(track_search)
+    logger.info(track_search)
+
+    assert track_id == "74HzDkCaSgCIeAPi06uxAv"

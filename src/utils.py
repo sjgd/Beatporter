@@ -1,4 +1,5 @@
 """Utils module."""
+
 import gc
 import logging
 import os
@@ -12,17 +13,17 @@ import coloredlogs
 import pandas as pd
 import psutil
 
-from config import folder_path, root_path, use_gcp, use_local
-from gcp import download_file_to_gcs, upload_file_to_gcs
+from src.config import ROOT_PATH, folder_path, use_gcp
+from src.gcp import download_file_to_gcs, upload_file_to_gcs
 
-PATH_HIST_LOCAL = root_path + "data/"
+PATH_HIST_LOCAL = ROOT_PATH + "data/"
 FILE_NAME_HIST = "hist_playlists_tracks.pkl.gz"
 curr_date = datetime.today().strftime("%Y-%m-%d")
 
 
 def configure_logging() -> None:
     """Configure logging."""
-    logFile = root_path + "logs/runtime-beatporter.log"
+    logFile = ROOT_PATH + "logs/runtime-beatporter.log"
     logging.getLogger().setLevel(logging.NOTSET)
     logging.getLogger().handlers.clear()
 
@@ -46,7 +47,7 @@ def configure_logging() -> None:
     logging.getLogger().addHandler(fileh)
 
     fileh = RotatingFileHandler(
-        root_path + "logs/runtime-beatporter-debug.log",
+        ROOT_PATH + "logs/runtime-beatporter-debug.log",
         "w",
         maxBytes=50 * 1024 * 1024,
         backupCount=1,

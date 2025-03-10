@@ -1,5 +1,5 @@
 """Init module."""
 
-from utils import configure_logging
+from src.utils import configure_logging
 
 configure_logging()

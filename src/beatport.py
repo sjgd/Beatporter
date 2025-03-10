@@ -1,5 +1,7 @@
 """Module to manage Beatport."""
+
 import json
+import logging
 import re
 from datetime import datetime, timedelta
 from typing import Any
@@ -9,8 +11,10 @@ import requests
 from bs4 import BeautifulSoup
 from pandas import to_datetime
 
-from config import genres, overwrite_label, silent_search
-from spotify import find_playlist_chart_label, logger, update_hist_pl_tracks
+from src.config import genres, overwrite_label, silent_search
+from src.spotify_utils import find_playlist_chart_label, update_hist_pl_tracks
+
+logger = logging.getLogger("beatport")
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) "

@@ -108,7 +108,7 @@ def parse_tracks(raw_tracks_dicts: list[dict]) -> list:
     return tracks
 
 
-def get_top_100_tracks(genre: str) -> list[dict]:
+def get_top_100_tracks(genre: str) -> list[BeatportTrack]:
     """Get top 100 tracks from Beatport for a given genre.
 
     Args:
@@ -210,7 +210,7 @@ def find_chart(chart: str, chart_bp_url_code: str) -> Any | str | None:
     return None
 
 
-def get_chart(url: str) -> list[dict]:
+def get_chart(url: str) -> list[BeatportTrack]:
     """Get chart tracks from a given URL.
 
     Args:
@@ -251,7 +251,7 @@ def get_label_tracks(
     df_hist_pl_tracks: pd.DataFrame,
     overwrite: bool = overwrite_label,
     silent: bool = silent_search,
-) -> list[dict]:
+) -> list[BeatportTrack]:
     """Get all tracks from a given label.
 
     Args:

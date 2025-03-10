@@ -934,7 +934,7 @@ def clear_playlist(playlist_id: str) -> None:
         )
 
 
-def parse_tracks_spotify(tracks_json: dict) -> list:
+def parse_tracks_spotify(tracks_json: dict) -> list[BeatportTrack]:
     """Parse tracks from Spotify JSON.
 
     Args:

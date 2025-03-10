@@ -20,6 +20,8 @@ PATH_HIST_LOCAL = ROOT_PATH + "data/"
 FILE_NAME_HIST = "hist_playlists_tracks.pkl.gz"
 curr_date = datetime.today().strftime("%Y-%m-%d")
 
+logger = logging.getLogger("utils")
+
 
 def configure_logging() -> None:
     """Configure logging."""
@@ -73,7 +75,6 @@ def load_hist_file(allow_empty: bool = False) -> pd.DataFrame:
         Returns existing history file of track ID per playlist
 
     """
-    logger = logging.getLogger(__file__)
     try:
         if use_gcp:
             # TODO arguments for file path / type ?
@@ -84,6 +85,13 @@ def load_hist_file(allow_empty: bool = False) -> pd.DataFrame:
                 f"Successfully loaded hist file with {df_hist_pl_tracks.shape[0]} records"
             )
             gc.collect()
+            for col in df_hist_pl_tracks.columns:
+                try:
+                    df_hist_pl_tracks[col] = df_hist_pl_tracks[col].astype(
+                        pd.StringDtype()
+                    )
+                except Exception as e:
+                    logger.warning(e)
             return df_hist_pl_tracks
     except Exception as e:
         logger.warning(
@@ -92,7 +100,9 @@ def load_hist_file(allow_empty: bool = False) -> pd.DataFrame:
             f"Error {e}"
         )
     if use_local and path.exists(folder_path + "hist_playlists_tracks.xlsx"):
-        df_hist_pl_tracks = pd.read_excel(folder_path + "hist_playlists_tracks.xlsx")
+        df_hist_pl_tracks = pd.read_excel(
+            folder_path + "hist_playlists_tracks.xlsx", dtype=pd.StringDtype()
+        )
         logger.info(" ")
         logger.info(
             f"Successfully loaded hist file with {df_hist_pl_tracks.shape[0]} records"
@@ -110,6 +120,30 @@ def load_hist_file(allow_empty: bool = False) -> pd.DataFrame:
         )
     else:
         raise ValueError("File does not exist and create empty is not allowed")
+
+    # Alternative method
+    # for col in [
+    #     "playlist_id",
+    #     "playlist_name",
+    #     "track_id",
+    #     "artist_name",
+    # ]:
+    #     df_hist_pl_tracks[col] = df_hist_pl_tracks[col].astype(pd.StringDtype())
+
+    # for col in [
+    #     "playlist_id",
+    #     "playlist_name",
+    #     "track_id",
+    #     "artist_name",
+    # ]:
+    #     max_length = int(max(df_hist_pl_tracks[col].apply(lambda x: len(x))) * 1.2)
+    #     print(col, f"|S{max_length}")
+    #     if max_length < 128:
+    #         try:
+    #             df_hist_pl_tracks[col] = (
+    #                   df_hist_pl_tracks[col].astype(f"|S{max_length}"))
+    #         except Exception as e:
+    #             print(e)
 
     return df_hist_pl_tracks
 

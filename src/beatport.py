@@ -84,24 +84,24 @@ def parse_tracks(raw_tracks_dicts: list[dict]) -> list:
         tracks.append(
             BeatportTrack.model_validate(
                 {
-                    # "title": track.title,
-                    "name": track.name,
-                    "mix": track.mix_name,
-                    "artists": [artist["name"] for artist in track.artists],
-                    "remixers": [remixer["name"] for remixer in track.remixers],
-                    "release": track.release["name"],
-                    "label": track.release["label"]["name"],
-                    "published_date": track.publish_date,
-                    # "released_date": track.date["released"],
+                    # "title": track["title"],
+                    "name": track["name"],
+                    "mix": track["mix_name"],
+                    "artists": [artist["name"] for artist in track["artists"]],
+                    "remixers": [remixer["name"] for remixer in track["remixers"]],
+                    "release": track["release"]["name"],
+                    "label": track["release"]["label"]["name"],
+                    "published_date": track["publish_date"],
+                    # "released_date": track["date"]["released"],
                     "duration": track[
                         "length"
                     ],  # TODO was ["duration"]["minutes"] before, to check if the same
-                    "duration_ms": track.length_ms,
-                    "genres": track.genre[
+                    "duration_ms": track["length_ms"],
+                    "genres": track["genre"][
                         "name"
-                    ],  # Used to be track.genres as list
-                    "bpm": track.bpm,
-                    "key": track.key["name"],  # Was only track.key before, but dict
+                    ],  # Used to be track["genres"] as list
+                    "bpm": track["bpm"],
+                    "key": track["key"]["name"],  # Was only track["key"] before, but dict
                 }
             )
         )

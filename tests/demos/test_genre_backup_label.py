@@ -7,14 +7,13 @@ from datetime import datetime
 
 import pytest
 
-import beatport
-from beatport import find_chart, get_chart, get_label_tracks
-from config import charts, genres, labels, shuffle_label, spotify_bkp
-from spotify_search import (
+from src.beatport import find_chart, get_chart, get_label_tracks, get_top_100_tracks
+from src.config import charts, genres, labels, shuffle_label, spotify_bkp
+from src.spotify_search import (
     add_new_tracks_to_playlist_chart_label,
     add_new_tracks_to_playlist_genre,
 )
-from spotify_utils import back_up_spotify_playlist
+from src.spotify_utils import back_up_spotify_playlist
 from src.utils import load_hist_file
 
 # RUN in debug for logs output in debug console
@@ -40,7 +39,7 @@ def test_genre(genre: dict[str, str]) -> None:
     df_hist_pl_tracks = load_hist_file()
 
     logger.info(f"\n-Getting genre : ***** {genre} *****")
-    top_100_chart = beatport.get_top_100_tracks(genre)
+    top_100_chart = get_top_100_tracks(genre)
     logger.debug(genre + ":" + str(top_100_chart))
     df_hist_pl_tracks = add_new_tracks_to_playlist_genre(
         genre, top_100_chart, df_hist_pl_tracks

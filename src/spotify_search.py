@@ -7,7 +7,7 @@ import pandas as pd
 import spotipy
 from requests.exceptions import ReadTimeout
 
-from config import (
+from src.config import (
     daily_mode,
     daily_n_track,
     digging_mode,
@@ -16,8 +16,8 @@ from config import (
     refresh_token_n_tracks,
     silent_search,
 )
-from models import BeatportTrack
-from spotify_utils import (
+from src.models import BeatportTrack
+from src.spotify_utils import (
     add_space,
     add_tracks_to_playlist,
     clear_playlist,
@@ -37,7 +37,7 @@ from spotify_utils import (
     update_hist_pl_tracks,
     update_playlist_description_with_date,
 )
-from utils import configure_logging, save_hist_dataframe
+from src.utils import configure_logging, save_hist_dataframe
 
 configure_logging()
 logger = logging.getLogger("spotify")
@@ -70,7 +70,7 @@ def search_for_track_v2(
     for track_ in track_parsed:
         # Create a field name mix according to Spotify formatting
         track_.name_mix = "{}{}".format(
-            track_.name, "" if not track_.mix else " - {}".format(track_.mix)
+            track_.name, "" if not track_.mix else f" - {track_.mix}"
         )
 
         # Create a parsed artist and try both
@@ -149,13 +149,9 @@ def search_for_track_v2(
                 # Search with Title, Mix, Artist, Release / Album, w/o  Label
                 if not silent:
                     logger.info(
-                        "[+]\tSearching for track: {} by {} on {} album".format(
-                            track_name, artist, track_.release
-                        )
+                        f"[+]\tSearching for track: {track_name} by {artist} on {track_.release} album"
                     )
-                query = 'track:"{}" artist:"{}" album:"{}"'.format(
-                    track_name, artist, track_.release
-                )
+                query = f'track:"{track_name}" artist:"{artist}" album:"{track_.release}"'
                 if not silent:
                     logger.info(f"\t\t[+] Search Query: {query}")
                 search_results = search_wrapper(query)
@@ -179,7 +175,7 @@ def search_for_track_v2(
         " [Done] No exact matches on name and artists v2 : {} - {}{}".format(
             track.artists[0],
             track.name,
-            "" if not track.mix else " - {}".format(track.mix),
+            "" if not track.mix else f" - {track.mix}",
         )
     )
 
@@ -258,7 +254,7 @@ def search_for_track_v3(
                 # Create a field name mix according to Spotify formatting
                 track_.name_mix = "{}{}".format(
                     track_.name,
-                    "" if not track_.mix else " - {}".format(track_.mix),
+                    "" if not track_.mix else f" - {track_.mix}",
                 )
                 for track_name in [track_.name_mix]:  # , track_. name]:
                     query = query_function(track_name, artist, track_, silent)
@@ -273,7 +269,7 @@ def search_for_track_v3(
         " [Done] No exact matches on name and artists v2 : {} - {}{}".format(
             track.artists[0],
             track.name,
-            "" if not track.mix else " - {}".format(track.mix),
+            "" if not track.mix else f" - {track.mix}",
         )
     )
 
@@ -295,7 +291,6 @@ def search_for_track_v4(
         str: Spotify track ID if found, otherwise None.
 
     """
-
     query = " ".join(
         [
             track.name,
@@ -334,7 +329,7 @@ def search_for_track_v4(
         " [Done] No exact matches on name and artists v2 : {} - {}{}".format(
             track.artists[0],
             track.name,
-            "" if not track.mix else " - {}".format(track.mix),
+            "" if not track.mix else f" - {track.mix}",
         )
     )
 

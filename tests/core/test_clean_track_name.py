@@ -4,7 +4,7 @@ import logging
 
 import pytest
 
-from search_utils import clean_track_name
+from src.search_utils import clean_track_name
 
 # RUN in debug for logs output in debug console
 # Or logs are in the Output / Python Test Log

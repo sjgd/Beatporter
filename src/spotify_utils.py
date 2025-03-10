@@ -18,7 +18,7 @@ import spotipy
 from spotipy import SpotifyException, oauth2
 from spotipy.oauth2 import CacheFileHandler
 
-from config import (
+from src.config import (
     ROOT_PATH,
     add_at_top_playlist,
     client_id,
@@ -32,9 +32,9 @@ from config import (
     silent_search,
     username,
 )
-from models import BeatportTrack
-from search_utils import clean_track_name
-from utils import configure_logging, save_hist_dataframe
+from src.models import BeatportTrack
+from src.search_utils import clean_track_name
+from src.utils import configure_logging, save_hist_dataframe
 
 configure_logging()
 logger = logging.getLogger("spotify")
@@ -275,7 +275,7 @@ def tracks_similarity(
         artist_similar.append(sim_artists)
 
         track_n_s = source_track.name + (
-            "" if not source_track.mix else " - {}".format(source_track.mix)
+            "" if not source_track.mix else f" - {source_track.mix}"
         )
         track_n_r = track["name"]
         sim_name = similar(track_n_s, track_n_r)
@@ -786,13 +786,9 @@ def query_track_album_label(
     # Search with Title, Mix, Artist, Release / Album and Label
     if not silent:
         logger.info(
-            "\t[+] Searching for track: {} by {} on {} on {} label".format(
-                track_name, artist, track_.release, track_.label
-            )
+            f"\t[+] Searching for track: {track_name} by {artist} on {track_.release} on {track_.label} label"
         )
-    return 'track:"{}" artist:"{}" album:"{}" label:"{}"'.format(
-        track_name, artist, track_.release, track_.label
-    )
+    return f'track:"{track_name}" artist:"{artist}" album:"{track_.release}" label:"{track_.label}"'
 
 
 def query_track_label(
@@ -813,11 +809,9 @@ def query_track_label(
     # Search with Title, Mix, Artist and Label, w/o Release / Album
     if not silent:
         logger.info(
-            "[+]\tSearching for track: {} by {} on {} label".format(
-                track_name, artist, track_.label
-            )
+            f"[+]\tSearching for track: {track_name} by {artist} on {track_.label} label"
         )
-    return 'track:"{}" artist:"{}" label:"{}"'.format(track_name, artist, track_.label)
+    return f'track:"{track_name}" artist:"{artist}" label:"{track_.label}"'
 
 
 def query_track_album(
@@ -838,11 +832,9 @@ def query_track_album(
     # Search with Title, Mix, Artist, Release / Album, w/o  Label
     if not silent:
         logger.info(
-            "[+]\tSearching for track: {} by {} on {} album".format(
-                track_name, artist, track_.release
-            )
+            f"[+]\tSearching for track: {track_name} by {artist} on {track_.release} album"
         )
-    return 'track:"{}" artist:"{}" album:"{}"'.format(track_name, artist, track_.release)
+    return f'track:"{track_name}" artist:"{artist}" album:"{track_.release}"'
 
 
 def query_track(

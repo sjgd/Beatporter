@@ -4,9 +4,9 @@ import json
 import logging
 from datetime import datetime
 
-from config import ROOT_PATH
-from models import BeatportTrack
-from spotify_search import search_for_track_v4, search_track_function
+from src.config import ROOT_PATH
+from src.models import BeatportTrack
+from src.spotify_search import search_for_track_v4, search_track_function
 
 logger = logging.getLogger("test_search_tracks")
 

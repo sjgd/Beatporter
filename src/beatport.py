@@ -11,8 +11,8 @@ import requests
 from bs4 import BeautifulSoup
 from pandas import to_datetime
 
-from config import genres, overwrite_label, silent_search
-from spotify_utils import find_playlist_chart_label, update_hist_pl_tracks
+from src.config import genres, overwrite_label, silent_search
+from src.spotify_utils import find_playlist_chart_label, update_hist_pl_tracks
 
 logger = logging.getLogger("beatport")
 

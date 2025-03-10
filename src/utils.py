@@ -10,8 +10,8 @@ from time import sleep
 import coloredlogs
 import pandas as pd
 
-from config import ROOT_PATH, folder_path, use_gcp
-from gcp import download_file_to_gcs, upload_file_to_gcs
+from src.config import ROOT_PATH, folder_path, use_gcp
+from src.gcp import download_file_to_gcs, upload_file_to_gcs
 
 PATH_HIST_LOCAL = ROOT_PATH + "data/"
 FILE_NAME_HIST = "hist_playlists_tracks.pkl.gz"

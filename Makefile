@@ -1,8 +1,8 @@
 ipython:
-	cd ./src && poetry run ipython
+	uv run ipython
 
 beatporter:
-	cd ./src && poetry run python beatporter.py
+	uv run ipython src/beatporter.py
 
 build:
 	docker buildx build --platform linux/amd64 -t beatporter:latest .
@@ -11,4 +11,4 @@ start:
 	./bin/dev/docker-start.sh
 
 ruff:
-	poetry run ruff check --fix 
+	uv run ruff check --fix 

@@ -238,7 +238,7 @@ def most_popular_track(tracks: list) -> str:
 
 def tracks_similarity(
     source_track: BeatportTrack,
-    found_tracks: list[BeatportTrack],
+    found_tracks: list[dict],
     debug_comp: bool = False,
 ) -> list:
     """Compute similarity between tracks.
@@ -262,7 +262,7 @@ def tracks_similarity(
         # ]  # ", ".join([artist["name"] for artist in track.artists])
         artist_match = []
         for artist_s in source_track.artists:  # ", ".join(source_track.artists)
-            for artist_r in track.artists:
+            for artist_r in track["artists"]:
                 artist_match.append(similar(artist_s.lower(), artist_r["name"].lower()))
                 if debug_comp:
                     logger.info(
@@ -277,7 +277,7 @@ def tracks_similarity(
         track_n_s = source_track.name + (
             "" if not source_track.mix else f" - {source_track.mix}"
         )
-        track_n_r = track.name
+        track_n_r = track["name"]
         sim_name = similar(track_n_s, track_n_r)
         if debug_comp:
             logger.info(
@@ -286,7 +286,7 @@ def tracks_similarity(
         track_n_similar.append(sim_name)
 
         duration_s = source_track.duration_ms
-        duration_r = track.duration_ms
+        duration_r = track["duration_ms"]
         try:
             sim_duration = duration_r / duration_s
         except Exception as e:
@@ -310,7 +310,7 @@ def tracks_similarity(
 
 def best_of_multiple_matches(
     source_track: BeatportTrack,
-    found_tracks: list[BeatportTrack],
+    found_tracks: list[dict],
     silent: bool = silent_search,
 ) -> str:
     """Find the best match among multiple tracks.
@@ -335,10 +335,10 @@ def best_of_multiple_matches(
     ]
     for track in found_tracks:
         if not silent and debug_duration:
-            logger.info("\t\t\t[+] Match {}: {}".format(counter, track.id))
+            logger.info(f"\t\t\t[+] Match {counter}: {track['id']}")
         if do_durations_match(
             source_track.duration_ms,
-            track.duration_ms,
+            track["duration_ms"],
             debug_duration=debug_duration,
         ):
             duration_matches[0] += 1
@@ -351,16 +351,15 @@ def best_of_multiple_matches(
             if not silent:
                 logger.info(
                     "\t\t\t[+] Only one exact match with matching duration, "
-                    "going with that one: {}".format(best_track.id)
+                    f"going with that one: {best_track['id']}"
                 )
-            return best_track.id
+            return best_track["id"]
         else:
             if not silent:
                 logger.info(
                     "\t\t\t[+] Only one exact match with matching duration, "
-                    "but similarity is too low {}: {}".format(
-                        tracks_sim[0], get_track_detail(best_track.id)
-                    )
+                    f"but similarity is too low {tracks_sim[0]}:"
+                    f" {get_track_detail(best_track['id'])}"
                 )
 
     # TODO: Popularity does not always yield the correct result
@@ -599,16 +598,16 @@ def parse_search_results_spotify(
             if not silent:
                 logger.info(
                     "\t\t\t[+] Only one exact match from search: {} - {}".format(
-                        get_track_detail(best_track.id), best_track.id
+                        get_track_detail(best_track["id"]), best_track["id"]
                     )
                 )
-            return best_track.id
+            return best_track["id"]
         else:
             if not silent:
                 logger.info(
                     "\t\t\t[+] Only one exact match with matching duration,"
                     " but similarity is too low {}: {}".format(
-                        tracks_sim[0], get_track_detail(best_track.id)
+                        tracks_sim[0], get_track_detail(best_track["id"])
                     )
                 )
 
@@ -649,7 +648,7 @@ def parse_track_regex_beatport(track: BeatportTrack) -> list:
 
     # Method 2
     # Remove feat, special char and mixes
-    track_out = track.copy()  # Otherwise modifies the dict
+    track_out = track.model_copy()  # Otherwise modifies the dict
     track_out.name = re.sub(
         r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out.name
     )  # Remove feat info, mostly not present in spotify
@@ -668,7 +667,7 @@ def parse_track_regex_beatport(track: BeatportTrack) -> list:
     tracks_out.append(track_out)
 
     # Method 3
-    track_out = track.copy()  # Otherwise modifies the dict
+    track_out = track.model_copy()  # Otherwise modifies the dict
     track_out.name = re.sub(
         r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out.name
     )  # Remove feat info, mostly not present in spotify
@@ -679,7 +678,7 @@ def parse_track_regex_beatport(track: BeatportTrack) -> list:
     tracks_out.append(track_out)
 
     # Method 4
-    track_out = track.copy()  # Otherwise modifies the dict
+    track_out = track.model_copy()  # Otherwise modifies the dict
     track_out.name = re.sub(
         r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out.name
     )  # Remove feat info, mostly not present in spotify
@@ -692,7 +691,7 @@ def parse_track_regex_beatport(track: BeatportTrack) -> list:
     tracks_out.append(track_out)
 
     # Method 5
-    track_out = track.copy()  # Otherwise modifies the dict
+    track_out = track.model_copy()  # Otherwise modifies the dict
     track_out.name = re.sub(
         r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out.name
     )  # Remove feat info, mostly not present in spotify
@@ -708,7 +707,7 @@ def parse_track_regex_beatport(track: BeatportTrack) -> list:
     # Method 6
     # Remove feat, special char and replace mixes with radio edit
     # as often exists on Spotify only
-    track_out = track.copy()  # Otherwise modifies the dict
+    track_out = track.model_copy()  # Otherwise modifies the dict
     track_out.name = re.sub(
         r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out.name
     )  # Remove feat info, mostly not present in spotify
@@ -727,7 +726,7 @@ def parse_track_regex_beatport(track: BeatportTrack) -> list:
     # Method 7
     # Remove feat, special char and replace mixes with radio edit
     # as often exists on Spotify only
-    track_out = track.copy()  # Otherwise modifies the dict
+    track_out = track.model_copy()  # Otherwise modifies the dict
     track_out.name = re.sub(
         r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out.name
     )  # Remove feat info, mostly not present in spotify

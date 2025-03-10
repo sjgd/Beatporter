@@ -13,7 +13,7 @@ import coloredlogs
 import pandas as pd
 import psutil
 
-from src.config import ROOT_PATH, folder_path, use_gcp
+from src.config import ROOT_PATH, folder_path, use_gcp, use_local
 from src.gcp import download_file_to_gcs, upload_file_to_gcs
 
 PATH_HIST_LOCAL = ROOT_PATH + "data/"

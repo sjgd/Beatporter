@@ -230,9 +230,9 @@ def most_popular_track(tracks: list) -> str:
     high_score = 0
     winner = None
     for track in tracks:
-        if track["popularity"] > high_score:
-            winner = track["id"]
-            high_score = track["popularity"]
+        if track.popularity > high_score:
+            winner = track.id
+            high_score = track.popularity
     return winner
 
 
@@ -257,12 +257,12 @@ def tracks_similarity(
     duration_similar = []
 
     for track in found_tracks:
-        # artist_r = track["artists"][0][
+        # artist_r = track.artists[0][
         #     "name"
-        # ]  # ", ".join([artist["name"] for artist in track["artists"]])
+        # ]  # ", ".join([artist["name"] for artist in track.artists])
         artist_match = []
         for artist_s in source_track.artists:  # ", ".join(source_track.artists)
-            for artist_r in track["artists"]:
+            for artist_r in track.artists:
                 artist_match.append(similar(artist_s.lower(), artist_r["name"].lower()))
                 if debug_comp:
                     logger.info(
@@ -277,7 +277,7 @@ def tracks_similarity(
         track_n_s = source_track.name + (
             "" if not source_track.mix else f" - {source_track.mix}"
         )
-        track_n_r = track["name"]
+        track_n_r = track.name
         sim_name = similar(track_n_s, track_n_r)
         if debug_comp:
             logger.info(
@@ -286,7 +286,7 @@ def tracks_similarity(
         track_n_similar.append(sim_name)
 
         duration_s = source_track.duration_ms
-        duration_r = track["duration_ms"]
+        duration_r = track.duration_ms
         try:
             sim_duration = duration_r / duration_s
         except Exception as e:
@@ -335,10 +335,10 @@ def best_of_multiple_matches(
     ]
     for track in found_tracks:
         if not silent and debug_duration:
-            logger.info("\t\t\t[+] Match {}: {}".format(counter, track["id"]))
+            logger.info("\t\t\t[+] Match {}: {}".format(counter, track.id))
         if do_durations_match(
             source_track.duration_ms,
-            track["duration_ms"],
+            track.duration_ms,
             debug_duration=debug_duration,
         ):
             duration_matches[0] += 1
@@ -351,15 +351,15 @@ def best_of_multiple_matches(
             if not silent:
                 logger.info(
                     "\t\t\t[+] Only one exact match with matching duration, "
-                    "going with that one: {}".format(best_track["id"])
+                    "going with that one: {}".format(best_track.id)
                 )
-            return best_track["id"]
+            return best_track.id
         else:
             if not silent:
                 logger.info(
                     "\t\t\t[+] Only one exact match with matching duration, "
                     "but similarity is too low {}: {}".format(
-                        tracks_sim[0], get_track_detail(best_track["id"])
+                        tracks_sim[0], get_track_detail(best_track.id)
                     )
                 )
 
@@ -436,18 +436,18 @@ def search_for_track(track: dict, silent: bool = silent_search) -> str:
     if not silent:
         logger.info(
             "[+] Searching for track: {}{}by {} on {}".format(
-                track["name"],
-                " " if not track["mix"] else " ({}) ".format(track["mix"]),
-                ", ".join(track["artists"]),
-                track["release"],
+                track.name,
+                " " if not track.mix else " ({}) ".format(track.mix),
+                ", ".join(track.artists),
+                track.release,
             )
         )
     # Search with Title, Mix, Artists, and Release / Album
     query = "{}{}{} {}".format(
-        track["name"],
-        " " if not track["mix"] else " {} ".format(track["mix"]),
-        " ".join(track["artists"]),
-        track["release"],
+        track.name,
+        " " if not track.mix else " {} ".format(track.mix),
+        " ".join(track.artists),
+        track.release,
     )
     if not silent:
         logger.info(f"\t[+] Search Query: {query}")
@@ -460,7 +460,7 @@ def search_for_track(track: dict, silent: bool = silent_search) -> str:
                 f" and release: {track_id}"
             )
         do_durations_match(
-            track["duration_ms"], search_results["tracks"]["items"][0]["duration_ms"]
+            track.duration_ms, search_results["tracks"]["items"][0]["duration_ms"]
         )
         return track_id
 
@@ -482,9 +482,9 @@ def search_for_track(track: dict, silent: bool = silent_search) -> str:
         )
     # Search with Title, Mix, and Artists
     query = "{}{}{}".format(
-        track["name"],
-        " " if not track["mix"] else " {} ".format(track["mix"]),
-        " ".join(track["artists"]),
+        track.name,
+        " " if not track.mix else " {} ".format(track.mix),
+        " ".join(track.artists),
     )
     if not silent:
         logger.info(f"\t[+] Search Query: {query}")
@@ -496,7 +496,7 @@ def search_for_track(track: dict, silent: bool = silent_search) -> str:
                 f"\t\t[+] Found an exact match on name, mix, and artists: {track_id}"
             )
         do_durations_match(
-            track["duration_ms"], search_results["tracks"]["items"][0]["duration_ms"]
+            track.duration_ms, search_results["tracks"]["items"][0]["duration_ms"]
         )
         return track_id
 
@@ -514,7 +514,7 @@ def search_for_track(track: dict, silent: bool = silent_search) -> str:
             "\t\t[+] No exact matches on name, mix, and artists."
             " Trying without mix, but with release."
         )
-    query = "{} {} {}".format(track["name"], " ".join(track["artists"]), track["release"])
+    query = "{} {} {}".format(track.name, " ".join(track.artists), track.release)
     if not silent:
         logger.info(f"\t[+] Search Query: {query}")
     search_results = search_wrapper(query)
@@ -525,7 +525,7 @@ def search_for_track(track: dict, silent: bool = silent_search) -> str:
                 f"\t\t[+] Found an exact match on name, artists, and release: {track_id}"
             )
         do_durations_match(
-            track["duration_ms"], search_results["tracks"]["items"][0]["duration_ms"]
+            track.duration_ms, search_results["tracks"]["items"][0]["duration_ms"]
         )
         return track_id
 
@@ -543,7 +543,7 @@ def search_for_track(track: dict, silent: bool = silent_search) -> str:
             "\t\t[+] No exact matches on name, artists, and release."
             " Trying with just name and artists."
         )
-    query = "{} {}".format(track["name"], " ".join(track["artists"]))
+    query = "{} {}".format(track.name, " ".join(track.artists))
     if not silent:
         logger.info(f"\t[+] Search Query: {query}")
     search_results = search_wrapper(query)
@@ -552,7 +552,7 @@ def search_for_track(track: dict, silent: bool = silent_search) -> str:
         if not silent:
             logger.info(f"\t\t[+] Found an exact match on name and artists: {track_id}")
         do_durations_match(
-            track["duration_ms"], search_results["tracks"]["items"][0]["duration_ms"]
+            track.duration_ms, search_results["tracks"]["items"][0]["duration_ms"]
         )
         return track_id
 
@@ -567,9 +567,9 @@ def search_for_track(track: dict, silent: bool = silent_search) -> str:
 
     logger.info(
         "\t\t[+] No exact matches on name and artists v1 : {} - {}{}".format(
-            track["artists"][0],
-            track["name"],
-            "" if not track["mix"] else " - {}".format(track["mix"]),
+            track.artists[0],
+            track.name,
+            "" if not track.mix else " - {}".format(track.mix),
         )
     )
     logger.info("\t[!] Could not find this song on Spotify!")
@@ -599,16 +599,16 @@ def parse_search_results_spotify(
             if not silent:
                 logger.info(
                     "\t\t\t[+] Only one exact match from search: {} - {}".format(
-                        get_track_detail(best_track["id"]), best_track["id"]
+                        get_track_detail(best_track.id), best_track.id
                     )
                 )
-            return best_track["id"]
+            return best_track.id
         else:
             if not silent:
                 logger.info(
                     "\t\t\t[+] Only one exact match with matching duration,"
                     " but similarity is too low {}: {}".format(
-                        tracks_sim[0], get_track_detail(best_track["id"])
+                        tracks_sim[0], get_track_detail(best_track.id)
                     )
                 )
 
@@ -875,7 +875,7 @@ def track_in_playlist(playlist_id: str, track_id: str) -> bool:
 
     """
     for track in get_all_tracks_in_playlist(playlist_id):
-        if track["track"]["id"] == track_id:
+        if track.track["id"] == track_id:
             return True
     return False
 
@@ -929,7 +929,7 @@ def clear_playlist(playlist_id: str) -> None:
             username,
             playlist_id,
             [
-                track["track"]["id"],
+                track.track["id"],
             ],
         )
 
@@ -948,20 +948,20 @@ def parse_tracks_spotify(tracks_json: dict) -> list[BeatportTrack]:
     for track in tracks_json["tracks"]:
         tracks.append(
             {
-                "title": track["title"],
-                "name": track["name"],
-                "mix": track["mix"],
-                "artists": [artist["name"] for artist in track["artists"]],
-                "remixers": [remixer["name"] for remixer in track["remixers"]],
-                "release": track["release"]["name"],
-                "label": track["label"]["name"],
-                "published_date": track["date"]["published"],
-                "released_date": track["date"]["released"],
-                "duration": track["duration"]["minutes"],
-                "duration_ms": track["duration"]["milliseconds"],
-                "genres": [genre["name"] for genre in track["genres"]],
-                "bpm": track["bpm"],
-                "key": track["key"],
+                "title": track.title,
+                "name": track.name,
+                "mix": track.mix,
+                "artists": [artist["name"] for artist in track.artists],
+                "remixers": [remixer["name"] for remixer in track.remixers],
+                "release": track.release["name"],
+                "label": track.label["name"],
+                "published_date": track.date["published"],
+                "released_date": track.date["released"],
+                "duration": track.duration["minutes"],
+                "duration_ms": track.duration["milliseconds"],
+                "genres": [genre["name"] for genre in track.genres],
+                "bpm": track.bpm,
+                "key": track.key,
             }
         )
     return tracks
@@ -1122,8 +1122,8 @@ def add_new_tracks_to_playlist_id(
     spotify_auth()
 
     for track in track_ids:
-        if track["track"] is not None:  # Prevent error of empty track
-            track_id = track["track"]["id"]
+        if track.track is not None:  # Prevent error of empty track
+            track_id = track.track["id"]
             track_count_tot += 1
             if track_id not in df_local_hist.values:
                 if track_id not in playlist_track_ids.values:
@@ -1137,8 +1137,8 @@ def add_new_tracks_to_playlist_id(
                     else:
                         logger.warn(
                             "\t[+]! Trying to add track_id None : {} - {}".format(
-                                track["track"]["artists"][0]["name"],
-                                track["track"]["name"],
+                                track.track["artists"][0]["name"],
+                                track.track["name"],
                             )
                         )
                 if track_count >= 99:  # Have limit of 100 trakcks per import

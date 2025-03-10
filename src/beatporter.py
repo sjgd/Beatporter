@@ -1,4 +1,5 @@
 """Main module to run Beatporter."""
+
 import logging
 import random
 import sys
@@ -6,25 +7,35 @@ import traceback
 from datetime import datetime
 from time import sleep
 
-from beatport import (
+from src.beatport import (
     find_chart,
     get_chart,
     get_label_tracks,
     get_top_100_tracks,
     parse_chart_url_datetime,
 )
-from config import charts, genres, labels, root_path, shuffle_label, spotify_bkp, username
-from spotify import (
+from src.config import (
+    ROOT_PATH,
+    charts,
+    genres,
+    labels,
+    shuffle_label,
+    spotify_bkp,
+    username,
+)
+from src.spotify_search import (
     add_new_tracks_to_playlist_chart_label,
     add_new_tracks_to_playlist_genre,
+    update_hist_pl_tracks,
+)
+from src.spotify_utils import (
     back_up_spotify_playlist,
     get_all_playlists,
     update_hist_from_playlist,
-    update_hist_pl_tracks,
 )
-from utils import load_hist_file, save_hist_dataframe
+from src.utils import load_hist_file, save_hist_dataframe
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("beatporter")
 
 curr_date = datetime.today().strftime("%Y-%m-%d")
 option_parse = ["backup", "chart", "genre", "label"]
@@ -37,10 +48,10 @@ def dump_tracks(tracks: dict) -> None:
         logger.info(
             "{}: {} ({}) - {} ({})".format(
                 i,
-                track["name"],
-                track["mix"],
-                ", ".join(track["artists"]),
-                track["duration"],
+                track.name,
+                track.mix,
+                ", ".join(track.artists),
+                track.duration,
             )
         )
         i += 1
@@ -203,7 +214,7 @@ def main(
     save_hist_dataframe(df_hist_pl_tracks)
     # Save bkp
     df_hist_pl_tracks.to_excel(
-        root_path + f"data/hist_playlists_tracks_{curr_date}.xlsx", index=False
+        ROOT_PATH + f"data/hist_playlists_tracks_{curr_date}.xlsx", index=False
     )
     end_time = datetime.now()
     logger.info(f"[!] Done @ {end_time} (Ran for: {end_time - start_time})")

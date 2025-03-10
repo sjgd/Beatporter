@@ -22,7 +22,7 @@ use_gcp = False
 use_local = False
 
 # Root path
-ROOT_PATH = str(Path(__file__).parent.parent)
+ROOT_PATH = str(Path(__file__).parent.parent) + "/"
 
 # Save as well at the folder_path below?
 use_local = True

@@ -38,14 +38,18 @@ dependencies = [
     { name = "coloredlogs" },
     { name = "datetime" },
     { name = "google-cloud-storage" },
-    { name = "ipykernel" },
     { name = "openpyxl" },
     { name = "pandas" },
     { name = "pydantic" },
     { name = "pytest" },
     { name = "requests" },
-    { name = "ruff" },
     { name = "spotipy" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "ipykernel" },
+    { name = "ruff" },
 ]
 
 [package.metadata]
@@ -54,14 +58,18 @@ requires-dist = [
     { name = "coloredlogs", specifier = ">=15.0.1,<16.0.0" },
     { name = "datetime", specifier = ">=5.1,<6.0" },
     { name = "google-cloud-storage", specifier = ">=3.1.0" },
-    { name = "ipykernel", specifier = ">=6.29.5" },
     { name = "openpyxl", specifier = ">=3.1.2,<4.0.0" },
     { name = "pandas", specifier = ">=2.0.3,<3.0.0" },
     { name = "pydantic", specifier = ">=2.10.6,<3.0.0" },
     { name = "pytest", specifier = ">=8.3.4,<9.0.0" },
     { name = "requests", specifier = ">=2.31.0,<3.0.0" },
-    { name = "ruff", specifier = ">=0.8.4,<1.0.0" },
     { name = "spotipy", specifier = ">=2.23.0,<3.0.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "ipykernel", specifier = ">=6.29.5" },
+    { name = "ruff", specifier = ">=0.9.10" },
 ]
 
 [[package]]

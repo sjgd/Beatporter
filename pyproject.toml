@@ -2,6 +2,10 @@
 authors = [
     {name = "sjgd"},
 ]
+name = "beatporter"
+version = "1.0.0"
+description = ""
+readme = "README.md"
 requires-python = "==3.13.2"
 dependencies = [
     "datetime<6.0,>=5.1",
@@ -12,15 +16,16 @@ dependencies = [
     "openpyxl<4.0.0,>=3.1.2",
     "coloredlogs<16.0.0,>=15.0.1",
     "pytest<9.0.0,>=8.3.4",
-    "ruff<1.0.0,>=0.8.4",
     "pydantic<3.0.0,>=2.10.6",
     "google-cloud-storage>=3.1.0",
-    "ipykernel>=6.29.5",
 ]
-name = "beatporter"
-version = "1.0.0"
-description = ""
-readme = "README.md"
+
+[dependency-groups]
+dev = [
+    "ipykernel>=6.29.5",
+    "ruff>=0.9.10",
+]
+
 
 [pytest]
 log_cli = true
@@ -47,5 +52,7 @@ disallow_untyped_defs = true
 follow_imports = "skip"
 disable_error_code = "import-untyped"
 no_implicit_optional = true
+
+
 
 

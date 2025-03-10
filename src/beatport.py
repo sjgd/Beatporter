@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 from pandas import to_datetime
 
 from src.config import genres, overwrite_label, silent_search
+from src.models import BeatportTrack
 from src.spotify_utils import find_playlist_chart_label, update_hist_pl_tracks
 
 logger = logging.getLogger("beatport")
@@ -81,24 +82,28 @@ def parse_tracks(raw_tracks_dicts: list[dict]) -> list:
     tracks = list()
     for track in raw_tracks_dicts:
         tracks.append(
-            {
-                # "title": track["title"],
-                "name": track["name"],
-                "mix": track["mix_name"],
-                "artists": [artist["name"] for artist in track["artists"]],
-                "remixers": [remixer["name"] for remixer in track["remixers"]],
-                "release": track["release"]["name"],
-                "label": track["release"]["label"]["name"],
-                "published_date": track["publish_date"],
-                # "released_date": track["date"]["released"],
-                "duration": track[
-                    "length"
-                ],  # TODO was ["duration"]["minutes"] before, to check if the same
-                "duration_ms": track["length_ms"],
-                "genres": track["genre"]["name"],  # Used to be track["genres"] as list
-                "bpm": track["bpm"],
-                "key": track["key"]["name"],  # Was only track["key"] before, but dict
-            }
+            BeatportTrack.model_validate(
+                {
+                    # "title": track["title"],
+                    "name": track["name"],
+                    "mix": track["mix_name"],
+                    "artists": [artist["name"] for artist in track["artists"]],
+                    "remixers": [remixer["name"] for remixer in track["remixers"]],
+                    "release": track["release"]["name"],
+                    "label": track["release"]["label"]["name"],
+                    "published_date": track["publish_date"],
+                    # "released_date": track["date"]["released"],
+                    "duration": track[
+                        "length"
+                    ],  # TODO was ["duration"]["minutes"] before, to check if the same
+                    "duration_ms": track["length_ms"],
+                    "genres": track["genre"][
+                        "name"
+                    ],  # Used to be track["genres"] as list
+                    "bpm": track["bpm"],
+                    "key": track["key"]["name"],  # Was only track["key"] before, but dict
+                }
+            )
         )
     return tracks
 

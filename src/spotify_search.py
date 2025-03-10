@@ -149,7 +149,8 @@ def search_for_track_v2(
                 # Search with Title, Mix, Artist, Release / Album, w/o  Label
                 if not silent:
                     logger.info(
-                        f"[+]\tSearching for track: {track_name} by {artist} on {track_.release} album"
+                        f"[+]\tSearching for track: {track_name} by {artist} "
+                        f"on {track_.release} album"
                     )
                 query = f'track:"{track_name}" artist:"{artist}" album:"{track_.release}"'
                 if not silent:

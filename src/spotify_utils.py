@@ -737,7 +737,7 @@ def parse_track_regex_beatport(track: BeatportTrack) -> list:
     # Method 8
     # Remove feat, special char and replace mixes with radio edit
     # as often exists on Spotify only
-    track_out = track.copy()  # Otherwise modifies the dict
+    track_out = track.model_copy()  # Otherwise modifies the dict
     track_out.name = re.sub(
         r"(\s*(Feat|feat|Ft|ft)\. [\w\s]*$)", "", track_out.name
     )  # Remove feat info, mostly not present in spotify
@@ -747,7 +747,7 @@ def parse_track_regex_beatport(track: BeatportTrack) -> list:
     # Method 9
     # Remove feat, special char and replace mixes with radio edit
     # as often exists on Spotify only
-    track_out = track.copy()  # Otherwise modifies the dict
+    track_out = track.model_copy()  # Otherwise modifies the dict
     track_out.name = clean_track_name(track_out.name)
     track_out.mix = ""
     # tracks_out.append(track_out)
@@ -786,9 +786,13 @@ def query_track_album_label(
     # Search with Title, Mix, Artist, Release / Album and Label
     if not silent:
         logger.info(
-            f"\t[+] Searching for track: {track_name} by {artist} on {track_.release} on {track_.label} label"
+            f"\t[+] Searching for track: {track_name} by {artist}"
+            f" on {track_.release} on {track_.label} label"
         )
-    return f'track:"{track_name}" artist:"{artist}" album:"{track_.release}" label:"{track_.label}"'
+    return (
+        f'track:"{track_name}" artist:"{artist}" '
+        f'album:"{track_.release}" label:"{track_.label}"'
+    )
 
 
 def query_track_label(
@@ -832,7 +836,8 @@ def query_track_album(
     # Search with Title, Mix, Artist, Release / Album, w/o  Label
     if not silent:
         logger.info(
-            f"[+]\tSearching for track: {track_name} by {artist} on {track_.release} album"
+            f"[+]\tSearching for track: {track_name}"
+            f" by {artist} on {track_.release} album"
         )
     return f'track:"{track_name}" artist:"{artist}" album:"{track_.release}"'
 

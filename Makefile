@@ -10,5 +10,8 @@ build:
 start:
 	./bin/dev/docker-start.sh
 
+stop:
+	./bin/dev/docker-stop.sh
+
 ruff:
 	uv run ruff check --fix 

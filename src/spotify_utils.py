@@ -437,7 +437,7 @@ def search_for_track(track: dict, silent: bool = silent_search) -> str:
         logger.info(
             "[+] Searching for track: {}{}by {} on {}".format(
                 track.name,
-                " " if not track.mix else " ({}) ".format(track.mix),
+                " " if not track.mix else f" ({track.mix}) ",
                 ", ".join(track.artists),
                 track.release,
             )
@@ -445,7 +445,7 @@ def search_for_track(track: dict, silent: bool = silent_search) -> str:
     # Search with Title, Mix, Artists, and Release / Album
     query = "{}{}{} {}".format(
         track.name,
-        " " if not track.mix else " {} ".format(track.mix),
+        " " if not track.mix else f" {track.mix} ",
         " ".join(track.artists),
         track.release,
     )
@@ -483,7 +483,7 @@ def search_for_track(track: dict, silent: bool = silent_search) -> str:
     # Search with Title, Mix, and Artists
     query = "{}{}{}".format(
         track.name,
-        " " if not track.mix else " {} ".format(track.mix),
+        " " if not track.mix else f" {track.mix} ",
         " ".join(track.artists),
     )
     if not silent:
@@ -569,7 +569,7 @@ def search_for_track(track: dict, silent: bool = silent_search) -> str:
         "\t\t[+] No exact matches on name and artists v1 : {} - {}{}".format(
             track.artists[0],
             track.name,
-            "" if not track.mix else " - {}".format(track.mix),
+            "" if not track.mix else f" - {track.mix}",
         )
     )
     logger.info("\t[!] Could not find this song on Spotify!")

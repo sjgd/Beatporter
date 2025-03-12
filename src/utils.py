@@ -1,65 +1,19 @@
 """Utils module."""
 
 import logging
-import sys
 from datetime import datetime
-from logging.handlers import RotatingFileHandler
 from os import path
 from time import sleep
 
-import coloredlogs
 import pandas as pd
 
 from src.config import ROOT_PATH, folder_path, use_gcp
+from src.configure_logging import configure_logging
 from src.gcp import download_file_to_gcs, upload_file_to_gcs
 
 PATH_HIST_LOCAL = ROOT_PATH + "data/"
 FILE_NAME_HIST = "hist_playlists_tracks.pkl.gz"
 curr_date = datetime.today().strftime("%Y-%m-%d")
-
-
-def configure_logging() -> None:
-    """Configure logging."""
-    logFile = ROOT_PATH + "logs/runtime-beatporter.log"
-    logging.getLogger().setLevel(logging.NOTSET)
-    logging.getLogger().handlers.clear()
-
-    console = logging.StreamHandler(sys.stdout)
-    console.setLevel(logging.INFO)
-    formatter = logging.Formatter("%(message)s")
-    console.setFormatter(formatter)
-    logging.getLogger().addHandler(console)
-
-    fileh = RotatingFileHandler(
-        logFile,
-        mode="w",
-        maxBytes=50 * 1024 * 1024,
-        backupCount=1,
-        encoding=None,
-        delay=False,
-    )
-    formatter = logging.Formatter("%(asctime)s - %(message)s [%(filename)s:%(lineno)d]")
-    fileh.setFormatter(formatter)
-    fileh.setLevel(logging.INFO)
-    logging.getLogger().addHandler(fileh)
-
-    fileh = RotatingFileHandler(
-        ROOT_PATH + "logs/runtime-beatporter-debug.log",
-        "w",
-        maxBytes=50 * 1024 * 1024,
-        backupCount=1,
-        encoding=None,
-        delay=False,
-    )
-    formatter = logging.Formatter("%(asctime)s - %(message)s [%(filename)s:%(lineno)d]")
-    fileh.setFormatter(formatter)
-    fileh.setLevel(logging.DEBUG)
-    logging.getLogger().addHandler(fileh)
-
-    coloredlogs.install(
-        level="INFO",
-        fmt="%(asctime)s %(levelname)s %(message)s",
-    )
 
 
 def load_hist_file(allow_empty: bool = False) -> pd.DataFrame:

@@ -16,6 +16,7 @@ from src.config import (
     refresh_token_n_tracks,
     silent_search,
 )
+from src.configure_logging import configure_logging
 from src.models import BeatportTrack
 from src.spotify_utils import (
     add_space,
@@ -37,10 +38,10 @@ from src.spotify_utils import (
     update_hist_pl_tracks,
     update_playlist_description_with_date,
 )
-from src.utils import configure_logging, save_hist_dataframe
+from src.utils import save_hist_dataframe
 
 configure_logging()
-logger = logging.getLogger("spotify")
+logger = logging.getLogger("spotify_search")
 
 tracks_dict_names = ["id", "duration_ms", "href", "name", "popularity", "uri", "artists"]
 
@@ -687,6 +688,7 @@ def add_new_tracks_to_playlist_genre(
 
     # Get the number of tracks in the daily playlist
     if daily_mode:
+        spotify_auth()
         daily_playlist = spotify_ins.playlist(playlist_id=playlists[1]["id"])
         n_daily_tracks = len(daily_playlist["tracks"]["items"])
     else:

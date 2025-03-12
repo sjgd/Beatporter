@@ -5,15 +5,14 @@ import logging
 import os
 import sys
 from datetime import datetime
-from logging.handlers import RotatingFileHandler
 from os import path
 from time import sleep
 
-import coloredlogs
 import pandas as pd
 import psutil
 
 from src.config import ROOT_PATH, folder_path, use_gcp, use_local
+from src.configure_logging import configure_logging
 from src.gcp import download_file_to_gcs, upload_file_to_gcs
 
 PATH_HIST_LOCAL = ROOT_PATH + "data/"
@@ -64,7 +63,6 @@ def configure_logging() -> None:
     coloredlogs.install(
         level="INFO",
         fmt="%(asctime)s %(levelname)s %(message)s",
-        # fmt="%(asctime)s %(levelname)s %(message)s [%(filename)s:%(lineno)d]",
     )
 
 

@@ -123,6 +123,7 @@ def main(
     if len(args) == 0:
         # If not argument passed then parse all
         args = option_parse
+    logger.info(f"Using arguments: {args}")
 
     if "backup" in args:
         for playlist_name, org_playlist_id in spotify_bkp.items():

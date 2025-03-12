@@ -32,12 +32,13 @@ from src.config import (
     silent_search,
     username,
 )
+from src.configure_logging import configure_logging
 from src.models import BeatportTrack
 from src.search_utils import clean_track_name
-from src.utils import configure_logging, save_hist_dataframe
+from src.utils import save_hist_dataframe
 
 configure_logging()
-logger = logging.getLogger("spotify")
+logger = logging.getLogger("spotify_utils")
 
 tracks_dict_names = ["id", "duration_ms", "href", "name", "popularity", "uri", "artists"]
 
@@ -874,7 +875,7 @@ def track_in_playlist(playlist_id: str, track_id: str) -> bool:
 
     """
     for track in get_all_tracks_in_playlist(playlist_id):
-        if track.track["id"] == track_id:
+        if track["track"]["id"] == track_id:
             return True
     return False
 
@@ -928,7 +929,7 @@ def clear_playlist(playlist_id: str) -> None:
             username,
             playlist_id,
             [
-                track.track["id"],
+                track["track"]["id"],
             ],
         )
 
@@ -1121,8 +1122,8 @@ def add_new_tracks_to_playlist_id(
     spotify_auth()
 
     for track in track_ids:
-        if track.track is not None:  # Prevent error of empty track
-            track_id = track.track["id"]
+        if track["track"] is not None:  # Prevent error of empty track
+            track_id = track["track"]["id"]
             track_count_tot += 1
             if track_id not in df_local_hist.values:
                 if track_id not in playlist_track_ids.values:
@@ -1136,8 +1137,8 @@ def add_new_tracks_to_playlist_id(
                     else:
                         logger.warn(
                             "\t[+]! Trying to add track_id None : {} - {}".format(
-                                track.track["artists"][0]["name"],
-                                track.track["name"],
+                                track["track"]["artists"][0]["name"],
+                                track["track"]["name"],
                             )
                         )
                 if track_count >= 99:  # Have limit of 100 trakcks per import

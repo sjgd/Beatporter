@@ -1,8 +1,8 @@
 ipython:
-	uv run ipython
+	uv run --frozen ipython
 
 beatporter:
-	uv run ipython src/beatporter.py
+	export PYTHONPATH="$(pwd):$(pwd)/src" && uv run --frozen python src/beatporter.py
 
 build:
 	docker buildx build --platform linux/amd64 -t beatporter:latest .

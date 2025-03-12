@@ -33,4 +33,4 @@ EXPOSE 65000
 # Install dependencies using poetry
 RUN uv sync --frozen
 
-CMD exec uv run --frozen python beatporter.py
+CMD exec uv run --frozen python src/beatporter.py

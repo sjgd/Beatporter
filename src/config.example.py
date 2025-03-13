@@ -19,7 +19,7 @@ redirect_uri = "http://localhost:65000"
 use_gcp = False
 
 # Save as well at the folder_path below?
-use_local = False
+use_local = True
 
 # Root path
 ROOT_PATH = str(Path(__file__).parent.parent) + "/"

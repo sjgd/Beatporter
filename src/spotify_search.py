@@ -353,6 +353,7 @@ def search_track_function(
         str: Spotify track ID if found, otherwise None.
 
     """
+    spotify_auth()
     return search_for_track_v2(track=track, silent=silent, parse_track=parse_track)
 
 

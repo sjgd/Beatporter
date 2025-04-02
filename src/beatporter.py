@@ -31,6 +31,7 @@ from src.spotify_search import (
 from src.spotify_utils import (
     back_up_spotify_playlist,
     get_all_playlists,
+    spotify_auth,
     update_hist_from_playlist,
 )
 from src.utils import load_hist_file, save_hist_dataframe
@@ -172,6 +173,7 @@ def main(
 
     if "genre" in args:
         for genre, genre_bp_url_code in genres.items():
+            spotify_auth()
             logger.info(" ")
             logger.info(f" Getting genre : ***** {genre} *****")
             top_100_chart = get_top_100_tracks(genre)

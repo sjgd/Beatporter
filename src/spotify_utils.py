@@ -15,7 +15,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import spotipy
-from spotipy import SpotifyException, oauth2
+from spotipy import Spotify, SpotifyException, oauth2
 from spotipy.oauth2 import CacheFileHandler
 
 from src.config import (
@@ -41,6 +41,96 @@ configure_logging()
 logger = logging.getLogger("spotify_utils")
 
 tracks_dict_names = ["id", "duration_ms", "href", "name", "popularity", "uri", "artists"]
+
+
+def do_spotify_oauth() -> dict:
+    """Authenticate to Spotify.
+
+    Returns:
+        dict: The Spotify token information.
+
+    """
+    TOKEN_PATH = ROOT_PATH + "data/token.json"
+    try:
+        with open(TOKEN_PATH) as fh:
+            token = fh.read()
+        token = json.loads(token)
+    except Exception:
+        token = None
+    if token:
+        if int(time()) > (
+            token["expires_at"] - 50
+        ):  # Take 50s margin to avoid timeout while searching
+            logger.info("[+][+] Refreshing Spotify token")
+            token = sp_oauth.refresh_access_token(token["refresh_token"])
+    else:
+        authorization_code = asyncio.run(async_get_auth_code())
+        logger.info(authorization_code)
+        if not authorization_code:
+            logger.info(
+                "[!] Unable to authenticate to Spotify.  Couldn't get authorization code"
+            )
+            sys.exit(-1)
+        token = sp_oauth.get_access_token(authorization_code)
+    if not token:
+        logger.info("[!] Unable to authenticate to Spotify.  Couldn't get access token.")
+        sys.exit(-1)
+    try:
+        with open(TOKEN_PATH, "w+") as fh:
+            fh.write(json.dumps(token))
+    except Exception:
+        logger.info("[!] Unable to to write token object to disk.  This is non-fatal.")
+    return token
+
+
+token_info = do_spotify_oauth()
+spotify_ins = spotipy.Spotify(
+    auth=token_info["access_token"], requests_timeout=15, retries=3, backoff_factor=15
+)
+
+
+def spotify_auth(verbose_aut: bool = False, spotify_ins: Spotify = spotify_ins) -> None:
+    """Authenticate to Spotify.
+
+    Args:
+        verbose_aut (bool): Whether to enable verbose logging.
+        spotify_ins (Spotify): The Spotify instance.
+
+    Returns:
+        None
+
+    """
+    # Get authenticated to Spotify
+    if verbose_aut:
+        logger.info("[+][+] Refreshing Spotify auth")
+    token_info = do_spotify_oauth()
+    spotify_ins = spotipy.Spotify(
+        auth=token_info["access_token"], requests_timeout=15, retries=3, backoff_factor=15
+    )
+
+    try:
+        _ = spotify_ins.current_user_playlists()
+    except Exception as e:
+        logger.warning(
+            f"Error during spotify Auth, testing of playlist fetch, with error {e}"
+        )
+        logger.warning("Going to sleep for 2 minutes")
+        sleep(2 * 60)
+        logger.warning("Sleep done")
+        token_info = do_spotify_oauth()
+        spotify_ins = spotipy.Spotify(
+            auth=token_info["access_token"],
+            requests_timeout=15,
+            retries=3,
+            backoff_factor=15,
+        )
+
+
+handler = CacheFileHandler(username=username)
+sp_oauth = oauth2.SpotifyOAuth(
+    client_id, client_secret, redirect_uri, cache_handler=handler, scope=scope
+)
+spotify_auth()
 
 
 def similar(a: str, b: str) -> float:
@@ -95,46 +185,6 @@ async def async_get_auth_code() -> str:
     task = asyncio.create_task(get_spotify_auth_code())
     await task
     return listen_for_callback_code()
-
-
-def do_spotify_oauth() -> dict:
-    """Authenticate to Spotify.
-
-    Returns:
-        dict: The Spotify token information.
-
-    """
-    TOKEN_PATH = ROOT_PATH + "data/token.json"
-    try:
-        with open(TOKEN_PATH) as fh:
-            token = fh.read()
-        token = json.loads(token)
-    except Exception:
-        token = None
-    if token:
-        if int(time()) > (
-            token["expires_at"] - 50
-        ):  # Take 50s margin to avoid timeout while searching
-            logger.info("[+][+] Refreshing Spotify token")
-            token = sp_oauth.refresh_access_token(token["refresh_token"])
-    else:
-        authorization_code = asyncio.run(async_get_auth_code())
-        logger.info(authorization_code)
-        if not authorization_code:
-            logger.info(
-                "[!] Unable to authenticate to Spotify.  Couldn't get authorization code"
-            )
-            sys.exit(-1)
-        token = sp_oauth.get_access_token(authorization_code)
-    if not token:
-        logger.info("[!] Unable to authenticate to Spotify.  Couldn't get access token.")
-        sys.exit(-1)
-    try:
-        with open(TOKEN_PATH, "w+") as fh:
-            fh.write(json.dumps(token))
-    except Exception:
-        logger.info("[!] Unable to to write token object to disk.  This is non-fatal.")
-    return token
 
 
 def get_all_playlists() -> list:
@@ -404,6 +454,7 @@ def search_wrapper(query: str, logger: logging.Logger = logger) -> dict:
         dict: Search results.
 
     """
+    spotify_auth()
     logger.setLevel(logging.FATAL)
     try:
         result = spotify_ins.search(query)
@@ -1270,46 +1321,6 @@ def get_track_detail(track_id: str) -> str:
 
     return "{} by {}".format(track_result["name"], artists)
 
-
-def spotify_auth(verbose_aut: bool = False) -> None:
-    """Authenticate to Spotify.
-
-    Args:
-        verbose_aut (bool): Whether to enable verbose logging.
-
-    """
-    # Get authenticated to Spotify
-    if verbose_aut:
-        logger.info("[+][+] Refreshing Spotify auth")
-    global spotify_ins
-    token_info = do_spotify_oauth()
-    spotify_ins = spotipy.Spotify(
-        auth=token_info["access_token"], requests_timeout=15, retries=3, backoff_factor=15
-    )
-
-    try:
-        _ = spotify_ins.current_user_playlists()
-    except Exception as e:
-        logger.warning(
-            f"Error during spotify Auth, testing of playlist fetch, with error {e}"
-        )
-        logger.warning("Going to sleep for 2 minutes")
-        sleep(2 * 60)
-        logger.warning("Sleep done")
-        token_info = do_spotify_oauth()
-        spotify_ins = spotipy.Spotify(
-            auth=token_info["access_token"],
-            requests_timeout=15,
-            retries=3,
-            backoff_factor=15,
-        )
-
-
-handler = CacheFileHandler(username=username)
-sp_oauth = oauth2.SpotifyOAuth(
-    client_id, client_secret, redirect_uri, cache_handler=handler, scope=scope
-)
-spotify_auth()
 
 # Annex testing tracks with known issues
 

@@ -16,9 +16,9 @@ logger = logging.getLogger("gcp")
 
 
 # Get service account info
-def get_gcp_client_info():
+def get_gcp_client_info() -> storage.Client:
     """Get GCP client info from service account."""
-    with open(ROOT_PATH + "/data/beatporter-sa.json") as source:
+    with open(ROOT_PATH + "data/beatporter-sa.json") as source:
         service_account_info = json.load(source)
 
     storage_credentials = service_account.Credentials.from_service_account_info(

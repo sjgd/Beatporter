@@ -41,6 +41,10 @@ configure_logging()
 logger = logging.getLogger("spotify_utils")
 
 tracks_dict_names = ["id", "duration_ms", "href", "name", "popularity", "uri", "artists"]
+handler = CacheFileHandler(username=username)
+sp_oauth = oauth2.SpotifyOAuth(
+    client_id, client_secret, redirect_uri, cache_handler=handler, scope=scope
+)
 
 
 def do_spotify_oauth() -> dict:
@@ -126,10 +130,6 @@ def spotify_auth(verbose_aut: bool = False, spotify_ins: Spotify = spotify_ins) 
         )
 
 
-handler = CacheFileHandler(username=username)
-sp_oauth = oauth2.SpotifyOAuth(
-    client_id, client_secret, redirect_uri, cache_handler=handler, scope=scope
-)
 spotify_auth()
 
 

@@ -214,6 +214,7 @@ def create_playlist(playlist_name: str) -> str:
 
     """
     # TODO export parameter description
+    spotify_auth()
     playlist = spotify_ins.user_playlist_create(
         username, playlist_name, description=playlist_description
     )
@@ -976,6 +977,7 @@ def clear_playlist(playlist_id: str) -> None:
         playlist_id (str): Playlist ID.
 
     """
+    spotify_auth()
     for track in get_all_tracks_in_playlist(playlist_id):
         spotify_ins.user_playlist_remove_all_occurrences_of_tracks(
             username,
@@ -1241,6 +1243,7 @@ def update_playlist_description_with_date(playlist: dict) -> None:
         playlist (dict): Playlist dictionary.
 
     """
+    spotify_auth()
     playlist_desc = spotify_ins.playlist(playlist_id=playlist["id"])
     playlist_desc["description"] = re.sub(
         r"\s*Updated on \d{4}-\d{2}-\d{2}\.*", "", playlist_desc["description"]
@@ -1316,6 +1319,7 @@ def get_track_detail(track_id: str) -> str:
         str: Track details string.
 
     """
+    spotify_auth()
     track_result = spotify_ins.track(f"spotify:track:{track_id}")
     artists = [artist["name"] for artist in track_result["artists"]]
     artists = ", ".join(artists)

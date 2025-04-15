@@ -194,6 +194,7 @@ def get_all_playlists() -> list:
         list: List of playlists.
 
     """
+    spotify_auth()
     playlists_pager = spotify_ins.current_user_playlists()
     playlists = playlists_pager["items"]
     while playlists_pager["next"]:

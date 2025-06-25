@@ -81,30 +81,36 @@ def parse_tracks(raw_tracks_dicts: list[dict]) -> list:
     """
     tracks = list()
     for track in raw_tracks_dicts:
-        tracks.append(
-            BeatportTrack.model_validate(
-                {
-                    # "title": track["title"],
-                    "name": track["name"],
-                    "mix": track["mix_name"],
-                    "artists": [artist["name"] for artist in track["artists"]],
-                    "remixers": [remixer["name"] for remixer in track["remixers"]],
-                    "release": track["release"]["name"],
-                    "label": track["release"]["label"]["name"],
-                    "published_date": track["publish_date"],
-                    # "released_date": track["date"]["released"],
-                    "duration": track[
-                        "length"
-                    ],  # TODO was ["duration"]["minutes"] before, to check if the same
-                    "duration_ms": track["length_ms"],
-                    "genres": track["genre"][
-                        "name"
-                    ],  # Used to be track["genres"] as list
-                    "bpm": track["bpm"],
-                    "key": track["key"]["name"],  # Was only track["key"] before, but dict
-                }
+        try:
+            tracks.append(
+                BeatportTrack.model_validate(
+                    {
+                        # "title": track["title"],
+                        "name": track["name"],
+                        "mix": track["mix_name"],
+                        "artists": [artist["name"] for artist in track["artists"]],
+                        "remixers": [remixer["name"] for remixer in track["remixers"]],
+                        "release": track["release"]["name"],
+                        "label": track["release"]["label"]["name"],
+                        "published_date": track["publish_date"],
+                        # "released_date": track["date"]["released"],
+                        "duration": track[
+                            "length"
+                        ],  # TODO was ["duration"]["minutes"] before,
+                        # to check if the same
+                        "duration_ms": track["length_ms"],
+                        "genres": track["genre"][
+                            "name"
+                        ],  # Used to be track["genres"] as list
+                        "bpm": track["bpm"],
+                        "key": track["key"][
+                            "name"
+                        ],  # Was only track["key"] before, but dict
+                    }
+                )
             )
-        )
+        except Exception as e:
+            logger.warning(f"Failed to parse track {track}: {e}")
     return tracks
 
 
@@ -311,6 +317,8 @@ def get_label_tracks(
         results_data = get_beatport_page_script_queries(url)
         raw_tracks_dicts = results_data[1]["state"]["data"]["results"]
         assert len(raw_tracks_dicts) > 0, f"No tracks found on the label page: {url}"
+        if i == 222:
+            print(raw_tracks_dicts)
         raw_tracks = parse_tracks(raw_tracks_dicts)
 
         label_tracks.extend(raw_tracks)

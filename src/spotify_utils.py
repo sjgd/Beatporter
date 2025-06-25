@@ -113,7 +113,8 @@ def spotify_auth(verbose_aut: bool = False, spotify_ins: Spotify = spotify_ins) 
     #     logger.info("[+][+] Refreshing Spotify auth")
     # token_info = do_spotify_oauth()
     # spotify_ins = spotipy.Spotify(
-    #     auth=token_info["access_token"], requests_timeout=15, retries=3, backoff_factor=15
+    #     auth=token_info["access_token"], requests_timeout=15, retries=3,
+    # backoff_factor=15
     # )
 
     # try:

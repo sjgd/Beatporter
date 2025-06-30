@@ -43,7 +43,7 @@ from src.utils import save_hist_dataframe
 configure_logging()
 logger = logging.getLogger("spotify_search")
 
-tracks_dict_names = ["id", "duration_ms", "href", "name", "popularity", "uri", "artists"]
+TRACKS_DICT_NAMES = ["id", "duration_ms", "href", "name", "popularity", "uri", "artists"]
 
 
 def search_for_track_v2(

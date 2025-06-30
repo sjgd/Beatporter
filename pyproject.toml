@@ -30,11 +30,16 @@ dev = [
 [pytest]
 log_cli = true
 
+[tool.isort]
+profile = "black"
+line_length = 79
+
 [tool.ruff]
 target-version = "py313"
 line-length = 90
 
-select = [
+[tool.ruff.lint]
+extend-select = [
   'D', #pydocstyle
   'E', 'W', # pycodestyle
   'F', #pyflakes
@@ -44,6 +49,9 @@ select = [
   "SIM", # pyflakes simplicity
   "C90", # more complexity rules
 ]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.mypy]
 ignore_missing_imports = true

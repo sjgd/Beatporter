@@ -30,7 +30,8 @@ def configure_logging() -> None:
         delay=False,
     )
     formatter = logging.Formatter(
-        "%(asctime)s - %(message)s [%(filename)s:%(lineno)d] %(name)s: %(pathname)s"
+        "%(asctime)s %(levelname)s %(message)s [%(filename)s:%(lineno)d]",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
     fileh.setFormatter(formatter)
     fileh.setLevel(logging.INFO)
@@ -44,7 +45,9 @@ def configure_logging() -> None:
         encoding=None,
         delay=False,
     )
-    formatter = logging.Formatter("%(asctime)s - %(message)s [%(filename)s:%(lineno)d]")
+    formatter = logging.Formatter(
+        "%(asctime)s - %(message)s [%(filename)s:%(lineno)d]", datefmt="%Y-%m-%d %H:%M:%S"
+    )
     fileh.setFormatter(formatter)
     fileh.setLevel(logging.DEBUG)
     logging.getLogger().addHandler(fileh)

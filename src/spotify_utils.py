@@ -7,7 +7,6 @@ import socket
 import webbrowser
 from datetime import datetime
 from difflib import SequenceMatcher
-from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -15,9 +14,9 @@ import spotipy
 from spotipy import Spotify, SpotifyException, oauth2
 from spotipy.oauth2 import CacheFileHandler
 
-from src.config import client_id  # ROOT_PATH,
 from src.config import (
     add_at_top_playlist,
+    client_id,  # ROOT_PATH,
     client_secret,
     digging_mode,
     playlist_description,
@@ -40,7 +39,7 @@ from src.utils import save_hist_dataframe
 configure_logging()
 logger = logging.getLogger("spotify_utils")
 
-tracks_dict_names = ["id", "duration_ms", "href", "name", "popularity", "uri", "artists"]
+TRACKS_DICT_NAMES = ["id", "duration_ms", "href", "name", "popularity", "uri", "artists"]
 handler = CacheFileHandler(username=username)
 sp_oauth = oauth2.SpotifyOAuth(
     client_id, client_secret, redirect_uri, cache_handler=handler, scope=scope
@@ -1027,26 +1026,6 @@ def parse_tracks_spotify(tracks_json: dict) -> list[BeatportTrack]:
     return tracks
 
 
-def parse_artist(value: Any, key: str) -> any:
-    """Parse artist information.
-
-    Args:
-        value (any): Artist value.
-        key (str): Key.
-
-    Returns:
-        any: Parsed artist information.
-
-    """
-    # TODO find better method
-    if key == "artists":
-        value = value[0]["name"]
-    else:
-        value
-
-    return value
-
-
 def update_hist_pl_tracks(
     df_hist_pl_tracks: pd.DataFrame, playlist: dict
 ) -> pd.DataFrame:
@@ -1063,37 +1042,43 @@ def update_hist_pl_tracks(
     """
     spotify_auth()
 
-    # TODO find better method
     track_list = get_all_tracks_in_playlist(playlist["id"])
-    df_tracks = pd.DataFrame.from_dict(track_list)
+    if not track_list:
+        return df_hist_pl_tracks
 
-    if len(df_tracks.index) > 0:
-        df_tracks["track"] = [
-            {key: value for key, value in track.items() if key in tracks_dict_names}
-            for track in df_tracks["track"]
-        ]
-        df_tracks["track"] = [
-            {key: parse_artist(value, key) for key, value in track.items()}
-            for track in df_tracks["track"]
-        ]
+    df_playlist_tracks = pd.DataFrame.from_records(track_list)
 
-        df_tracks_o = pd.DataFrame()
-        for row in df_tracks.iterrows():
-            df_tracks_o = pd.concat(
-                [df_tracks_o, pd.DataFrame(row[1]["track"], index=[0])]
-            )
-        df_tracks_o = df_tracks_o.loc[:, tracks_dict_names].reset_index(drop=True)
-        df_tracks_o["artist_name"] = df_tracks_o["artists"] + " - " + df_tracks_o["name"]
+    # A track can be None if it has been removed from Spotify
+    df_playlist_tracks.dropna(subset=["track"], inplace=True)
+    df_playlist_tracks.reset_index(drop=True, inplace=True)  # Reset index for alignment
 
-        df_tracks = pd.concat([df_tracks_o, df_tracks.loc[:, "added_at"]], axis=1)
+    if df_playlist_tracks.empty:
+        return df_hist_pl_tracks
 
-        df_temp = df_tracks.loc[:, ["id", "added_at", "artist_name"]]
-        df_temp["playlist_id"] = playlist["id"]
-        df_temp["playlist_name"] = playlist["name"]
-        df_temp = df_temp.rename(columns={"id": "track_id", "added_at": "datetime_added"})
+    # Expand the 'track' column (which contains dicts) into a DataFrame
+    track_details = pd.json_normalize(df_playlist_tracks["track"])
 
-        df_hist_pl_tracks = pd.concat([df_hist_pl_tracks, df_temp])
-        df_hist_pl_tracks = df_hist_pl_tracks.drop_duplicates().reset_index(drop=True)
+    # Create a temporary DataFrame with the new tracks to be added to history
+    df_temp = pd.DataFrame(
+        {
+            "track_id": track_details["id"],
+            "datetime_added": df_playlist_tracks["added_at"],
+            "artist_name": (
+                track_details["artists"].apply(
+                    lambda a: a[0]["name"] if a else "Unknown Artist"
+                )
+                + " - "
+                + track_details["name"]
+            ),
+            "playlist_id": playlist["id"],
+            "playlist_name": playlist["name"],
+        }
+    )
+
+    # Combine with the main history DataFrame, remove duplicates, and reset index
+    df_hist_pl_tracks = pd.concat([df_hist_pl_tracks, df_temp], ignore_index=True)
+    df_hist_pl_tracks.drop_duplicates(inplace=True)
+    df_hist_pl_tracks.reset_index(drop=True, inplace=True)
 
     return df_hist_pl_tracks
 

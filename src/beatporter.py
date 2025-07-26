@@ -39,7 +39,7 @@ from src.utils import load_hist_file, save_hist_dataframe
 logger = logging.getLogger("beatporter")
 
 curr_date = datetime.today().strftime("%Y-%m-%d")
-option_parse = ["backup", "chart", "genre", "label"]
+option_parse = ["backups", "charts", "genres", "labels"]
 
 
 def dump_tracks(tracks: dict) -> None:
@@ -124,9 +124,9 @@ def main(
     if len(args) == 0:
         # If not argument passed then parse all
         args = option_parse
-    logger.info(f"Using arguments: {args}")
+    logger.info(f"Using arguments: {args} of available {option_parse}")
 
-    if "backup" in args:
+    if "backups" in args:
         for playlist_name, org_playlist_id in spotify_bkp.items():
             logger.info(" ")
             logger.info(
@@ -145,7 +145,7 @@ def main(
                 )
 
     # Parse lists
-    if "chart" in args:
+    if "charts" in args:
         for chart, chart_bp_url_code in charts.items():
             # TODO check if chart are working, otherwise do as genre and label
             # TODO handle return None, handle chart_bp_url_code has ID already or not
@@ -171,7 +171,7 @@ def main(
             else:
                 logger.info(f"\t[+] Chart {chart} not found")
 
-    if "genre" in args:
+    if "genres" in args:
         for genre, genre_bp_url_code in genres.items():
             spotify_auth()
             logger.info(" ")
@@ -188,7 +188,7 @@ def main(
                     f"FAILED getting genre: ***** {genre} ***** with error: {e}"
                 )
 
-    if "label" in args:
+    if "labels" in args:
         for label, label_bp_url_code in labels.items():
             # TODO avoid looping through all pages if already parsed before ?
             # TODO Add tracks per EP rather than track by track ?

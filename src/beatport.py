@@ -317,8 +317,6 @@ def get_label_tracks(
         results_data = get_beatport_page_script_queries(url)
         raw_tracks_dicts = results_data[1]["state"]["data"]["results"]
         assert len(raw_tracks_dicts) > 0, f"No tracks found on the label page: {url}"
-        if i == 222:
-            print(raw_tracks_dicts)
         raw_tracks = parse_tracks(raw_tracks_dicts)
 
         label_tracks.extend(raw_tracks)

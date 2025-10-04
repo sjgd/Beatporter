@@ -11,12 +11,12 @@ from difflib import SequenceMatcher
 import numpy as np
 import pandas as pd
 import spotipy
-from spotipy import Spotify, SpotifyException, oauth2
+from spotipy import SpotifyException, oauth2
 from spotipy.oauth2 import CacheFileHandler
 
 from src.config import (
     add_at_top_playlist,
-    client_id,  # ROOT_PATH,
+    client_id,
     client_secret,
     digging_mode,
     playlist_description,
@@ -91,51 +91,18 @@ sp_oauth = oauth2.SpotifyOAuth(
 # spotify_ins = spotipy.Spotify(
 #     auth=token_info["access_token"], requests_timeout=15, retries=3, backoff_factor=15
 # )
-spotify_ins = spotipy.Spotify(
-    auth_manager=sp_oauth, requests_timeout=15, retries=3, backoff_factor=15
-)
-
-
-def spotify_auth(verbose_aut: bool = False, spotify_ins: Spotify = spotify_ins) -> None:
+def spotify_auth(verbose_aut: bool = False) -> spotipy.Spotify:
     """Authenticate to Spotify.
 
     Args:
         verbose_aut (bool): Whether to enable verbose logging.
-        spotify_ins (Spotify): The Spotify instance.
 
     Returns:
-        None
-
+        spotipy.Spotify: The Spotify instance.
     """
-    # # Get authenticated to Spotify
-    # if verbose_aut:
-    #     logger.info("[+][+] Refreshing Spotify auth")
-    # token_info = do_spotify_oauth()
-    # spotify_ins = spotipy.Spotify(
-    #     auth=token_info["access_token"], requests_timeout=15, retries=3,
-    # backoff_factor=15
-    # )
-
-    # try:
-    #     _ = spotify_ins.current_user_playlists()
-    # except Exception as e:
-    #     logger.warning(
-    #         f"Error during spotify Auth, testing of playlist fetch, with error {e}"
-    #     )
-    #     logger.warning("Going to sleep for 2 minutes")
-    #     sleep(2 * 60)
-    #     logger.warning("Sleep done")
-    #     token_info = do_spotify_oauth()
-    #     spotify_ins = spotipy.Spotify(
-    #         auth=token_info["access_token"],
-    #         requests_timeout=15,
-    #         retries=3,
-    #         backoff_factor=15,
-    #     )
-    pass
-
-
-spotify_auth()
+    return spotipy.Spotify(
+        auth_manager=sp_oauth, requests_timeout=15, retries=3, backoff_factor=15
+    )
 
 
 def similar(a: str, b: str) -> float:
@@ -199,7 +166,7 @@ def get_all_playlists() -> list:
         list: List of playlists.
 
     """
-    spotify_auth()
+    spotify_ins = spotify_auth()
     playlists_pager = spotify_ins.current_user_playlists()
     playlists = playlists_pager["items"]
     while playlists_pager["next"]:
@@ -219,7 +186,7 @@ def create_playlist(playlist_name: str) -> str:
 
     """
     # TODO export parameter description
-    spotify_auth()
+    spotify_ins = spotify_auth()
     playlist = spotify_ins.user_playlist_create(
         username, playlist_name, description=playlist_description
     )
@@ -461,7 +428,7 @@ def search_wrapper(query: str, logger: logging.Logger = logger) -> dict:
         dict: Search results.
 
     """
-    spotify_auth()
+    spotify_ins = spotify_auth()
     logger.setLevel(logging.FATAL)
     try:
         result = spotify_ins.search(query)
@@ -947,7 +914,7 @@ def add_tracks_to_playlist(playlist_id: str, track_ids: list) -> None:
 
     """
     if track_ids:
-        spotify_auth()
+        spotify_ins = spotify_auth()
         position = 0 if add_at_top_playlist else None
         spotify_ins.user_playlist_add_tracks(
             user=username, playlist_id=playlist_id, tracks=track_ids, position=position
@@ -964,7 +931,7 @@ def get_all_tracks_in_playlist(playlist_id: str) -> list:
         list: List of tracks.
 
     """
-    spotify_auth()
+    spotify_ins = spotify_auth()
     playlist_tracks_pager = spotify_ins.playlist_items(
         playlist_id=playlist_id, additional_types=("track",)
     )
@@ -982,7 +949,7 @@ def clear_playlist(playlist_id: str) -> None:
         playlist_id (str): Playlist ID.
 
     """
-    spotify_auth()
+    spotify_ins = spotify_auth()
     for track in get_all_tracks_in_playlist(playlist_id):
         spotify_ins.user_playlist_remove_all_occurrences_of_tracks(
             username,
@@ -1040,8 +1007,6 @@ def update_hist_pl_tracks(
         pd.DataFrame: Updated DataFrame.
 
     """
-    spotify_auth()
-
     track_list = get_all_tracks_in_playlist(playlist["id"])
     if not track_list:
         return df_hist_pl_tracks
@@ -1163,9 +1128,6 @@ def add_new_tracks_to_playlist_id(
     track_count = 0
     track_count_tot = 0
 
-    # TODO Refresh oauth to avoid time out
-    spotify_auth()
-
     for track in track_ids:
         if track["track"] is not None:  # Prevent error of empty track
             track_id = track["track"]["id"]
@@ -1205,7 +1167,7 @@ def add_new_tracks_to_playlist_id(
                     logger.info("\tTrack already found in playlist or history")
 
             if track_count_tot % refresh_token_n_tracks == 0:  # Avoid time out
-                spotify_auth()
+                _ = spotify_auth()
 
     if len(persistent_track_ids) > 0:
         logger.warning(
@@ -1234,7 +1196,7 @@ def update_playlist_description_with_date(playlist: dict) -> None:
         playlist (dict): Playlist dictionary.
 
     """
-    spotify_auth()
+    spotify_ins = spotify_auth()
     playlist_desc = spotify_ins.playlist(playlist_id=playlist["id"])
     playlist_desc["description"] = re.sub(
         r"\s*Updated on \d{4}-\d{2}-\d{2}\.*", "", playlist_desc["description"]
@@ -1290,8 +1252,6 @@ def back_up_spotify_playlist(
         pd.DataFrame: Updated DataFrame.
 
     """
-    spotify_auth()
-
     track_ids = get_all_tracks_in_playlist(org_playlist_id)
     df_hist_pl_tracks = add_new_tracks_to_playlist_id(
         playlist_name, track_ids, df_hist_pl_tracks
@@ -1310,7 +1270,7 @@ def get_track_detail(track_id: str) -> str:
         str: Track details string.
 
     """
-    spotify_auth()
+    spotify_ins = spotify_auth()
     track_result = spotify_ins.track(f"spotify:track:{track_id}")
     artists = [artist["name"] for artist in track_result["artists"]]
     artists = ", ".join(artists)

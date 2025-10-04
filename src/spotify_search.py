@@ -33,7 +33,6 @@ from src.spotify_utils import (
     query_track_label,
     search_wrapper,
     spotify_auth,
-    spotify_ins,
     track_in_playlist,
     update_hist_pl_tracks,
     update_playlist_description_with_date,
@@ -689,7 +688,7 @@ def add_new_tracks_to_playlist_genre(
 
     # Get the number of tracks in the daily playlist
     if daily_mode:
-        spotify_auth()
+        spotify_ins = spotify_auth()
         daily_playlist = spotify_ins.playlist(playlist_id=playlists[1]["id"])
         n_daily_tracks = len(daily_playlist["tracks"]["items"])
     else:

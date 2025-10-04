@@ -1,6 +1,7 @@
 """Module to manage Spotify queries."""
 
 import asyncio
+import gc
 import logging
 import re
 import socket
@@ -1042,8 +1043,11 @@ def update_hist_pl_tracks(
 
     # Combine with the main history DataFrame, remove duplicates, and reset index
     df_hist_pl_tracks = pd.concat([df_hist_pl_tracks, df_temp], ignore_index=True)
-    df_hist_pl_tracks.drop_duplicates(inplace=True)
-    df_hist_pl_tracks.reset_index(drop=True, inplace=True)
+    df_hist_pl_tracks = df_hist_pl_tracks.drop_duplicates(inplace=False)
+    df_hist_pl_tracks = df_hist_pl_tracks.reset_index(drop=True, inplace=False)
+    df_hist_pl_tracks = df_hist_pl_tracks.copy(deep=True)
+
+    _ = gc.collect()
 
     return df_hist_pl_tracks
 

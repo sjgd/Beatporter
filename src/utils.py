@@ -119,7 +119,7 @@ def save_hist_dataframe(df_hist_pl_tracks: pd.DataFrame) -> None:
         )
     logger.info(f"Successfully saved hist file with {df_hist_pl_tracks.shape[0]} records")
 
-    gc.collect()
+    _ = gc.collect()
     print_memory_usage_readable()
 
 

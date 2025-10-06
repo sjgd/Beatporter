@@ -7,7 +7,12 @@ from datetime import datetime
 
 import pytest
 
-from src.beatport import find_chart, get_chart, get_label_tracks, get_top_100_tracks
+from src.beatport import (
+    find_chart,
+    get_chart,
+    get_label_tracks,
+    get_top_100_tracks,
+)
 from src.config import charts, genres, labels, shuffle_label, spotify_bkp
 from src.spotify_search import (
     add_new_tracks_to_playlist_chart_label,
@@ -35,10 +40,10 @@ def test_genre(genre: dict[str, str]) -> None:
     """
     # Init
     start_time = datetime.now()
-    logger.info(f"\n[!] Starting @ {start_time}")
+    logger.info(f"[!] Starting @ {start_time}")
     df_hist_pl_tracks = load_hist_file()
 
-    logger.info(f"\n-Getting genre : ***** {genre} *****")
+    logger.info(f"-Getting genre : ***** {genre} *****")
     top_100_chart = get_top_100_tracks(genre)
     logger.debug(genre + ":" + str(top_100_chart))
     df_hist_pl_tracks = add_new_tracks_to_playlist_genre(

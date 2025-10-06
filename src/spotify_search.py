@@ -352,7 +352,6 @@ def search_track_function(
         str: Spotify track ID if found, otherwise None.
 
     """
-    spotify_auth()
     return search_for_track_v2(track=track, silent=silent, parse_track=parse_track)
 
 
@@ -592,8 +591,6 @@ def add_new_tracks_to_playlist_genre(
         pd.DataFrame: Updated DataFrame.
 
     """
-    spotify_auth()
-
     # TODO export playlist anterior name to config
     # persistent_top_100_playlist_name = "{}{} - Top 100".format(playlist_prefix, genre)
     # daily_top_10_playlist_name = "{}{} - Daily Top".format(playlist_prefix, genre)
@@ -694,9 +691,6 @@ def add_new_tracks_to_playlist_genre(
     else:
         n_daily_tracks = 0
 
-    # TODO Refresh oauth to avoid time out
-    spotify_auth()
-
     for track in top_100_chart:
         track_count_tot += 1
         track_artist_name = track.artists[0] + " - " + track.name + " - " + track.mix
@@ -724,7 +718,6 @@ def add_new_tracks_to_playlist_genre(
                     logger.warning(f"Track {track_artist_name} failed with error {e}")
                     track_id = None
             except spotipy.exceptions.SpotifyException:
-                spotify_auth()
                 try:
                     track_id = search_track_function(track)
                 except Exception as e:

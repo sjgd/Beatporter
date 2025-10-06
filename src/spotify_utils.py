@@ -194,23 +194,28 @@ def create_playlist(playlist_name: str) -> str:
     return playlist["id"]
 
 
-def get_playlist_id(playlist_name: str) -> str:
-    """Get playlist ID.
+def get_playlist_id(playlist_name: str) -> str | None:
+    """Get playlist ID by name.
 
     Args:
         playlist_name (str): The name of the playlist.
 
     Returns:
-        str: The ID of the playlist.
+        str: The ID of the playlist or None if not found.
 
     """
-    playlists = get_all_playlists()
-    for playlist in playlists:
-        if (
-            playlist["owner"]["id"] == username
-        ):  # Can only modify playlist that the user owns
-            if playlist["name"] == playlist_name:
+    spotify_ins = spotify_auth()
+    playlists = spotify_ins.current_user_playlists()
+
+    while playlists:
+        for playlist in playlists["items"]:
+            if (playlist["owner"]["id"] == username) and (
+                playlist["name"] == playlist_name
+            ):
                 return playlist["id"]
+        # check if more pages exist
+        playlists = spotify_ins.next(playlists) if playlists["next"] else None
+
     return None
 
 
@@ -937,8 +942,10 @@ def get_all_tracks_in_playlist(playlist_id: str) -> list:
         playlist_id=playlist_id, additional_types=("track",)
     )
     playlist_tracks = playlist_tracks_pager["items"]
-    while playlist_tracks_pager["next"]:
+    while playlist_tracks_pager.get("next"):
         playlist_tracks_pager = spotify_ins.next(playlist_tracks_pager)
+        if playlist_tracks_pager is None:
+            break
         playlist_tracks.extend(playlist_tracks_pager["items"])
     return playlist_tracks
 

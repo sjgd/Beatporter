@@ -24,8 +24,15 @@ logger = logging.getLogger("utils")
 def load_hist_file(allow_empty: bool = False) -> pd.DataFrame:
     """Load the hist file according to folder path in configs.
 
+    Args:
+        allow_empty (bool): If True, returns an empty DataFrame
+         when the file does not exist; otherwise, raises an error.
+
     Returns:
-        Returns existing history file of track ID per playlist
+        pd.DataFrame: Existing history file of track ID per playlist.
+
+    Raises:
+        ValueError: If the file does not exist and allow_empty is False.
 
     """
     try:
@@ -72,7 +79,15 @@ def load_hist_file(allow_empty: bool = False) -> pd.DataFrame:
             ]
         )
     else:
-        raise ValueError("File does not exist and create empty is not allowed")
+        expected_paths = []
+        if use_gcp:
+            expected_paths.append(PATH_HIST_LOCAL + FILE_NAME_HIST)
+        if use_local:
+            expected_paths.append(folder_path + "hist_playlists_tracks.xlsx")
+        raise ValueError(
+            f"File does not exist at the expected path(s): {', '.join(expected_paths)}. "
+            "Creating an empty DataFrame is not allowed (allow_empty=False)."
+        )
 
     # Alternative method
     # for col in [

@@ -15,7 +15,7 @@ from src.configure_logging import configure_logging
 from src.gcp import download_file_to_gcs, upload_file_to_gcs
 
 PATH_HIST_LOCAL = ROOT_PATH + "data/"
-FILE_NAME_HIST = "hist_playlists_tracks.pkl.gz"
+FILE_NAME_HIST = "hist_playlists_tracks.parquet.gz"
 curr_date = datetime.today().strftime("%Y-%m-%d")
 
 logger = logging.getLogger("utils")
@@ -32,7 +32,7 @@ def load_hist_file(allow_empty: bool = False) -> pd.DataFrame:
         if use_gcp:
             # TODO arguments for file path / type ?
             download_file_to_gcs(file_name=FILE_NAME_HIST, local_folder=PATH_HIST_LOCAL)
-            df_hist_pl_tracks = pd.read_pickle(PATH_HIST_LOCAL + FILE_NAME_HIST)
+            df_hist_pl_tracks = pd.read_parquet(PATH_HIST_LOCAL + FILE_NAME_HIST)
             logger.info(" ")
             logger.info(
                 f"Successfully loaded hist file with {df_hist_pl_tracks.shape[0]} records"
@@ -110,7 +110,9 @@ def save_hist_dataframe(df_hist_pl_tracks: pd.DataFrame) -> None:
     df_hist_pl_tracks = df_hist_pl_tracks.loc[
         :, ["playlist_id", "playlist_name", "track_id", "datetime_added", "artist_name"]
     ]
-    df_hist_pl_tracks.to_pickle(PATH_HIST_LOCAL + FILE_NAME_HIST)
+    df_hist_pl_tracks.to_parquet(
+        PATH_HIST_LOCAL + FILE_NAME_HIST, compression="gzip", index=False
+    )
     if use_gcp:
         upload_file_to_gcs(file_name=FILE_NAME_HIST, local_folder=PATH_HIST_LOCAL)
     if use_local:

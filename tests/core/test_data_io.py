@@ -14,7 +14,7 @@ def test_load_and_save_hist_file() -> None:
     df_hist_pl_tracks = load_hist_file()
     df_hist_pl_tracks.memory_usage(deep=True)
     df_hist_pl_tracks.info(memory_usage="deep")
-    logger.info(f"{len(df_hist_pl_tracks)=}")
+    logger.info(f"{len(df_hist_pl_tracks):,} records loaded")
     assert len(df_hist_pl_tracks) > 0
     save_hist_dataframe(df_hist_pl_tracks)
     assert "df_hist_pl_tracks" in locals()

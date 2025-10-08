@@ -56,6 +56,8 @@ def configure_logging() -> None:
         level="INFO",
         fmt="%(asctime)s %(levelname)s %(message)s",
         # fmt="%(asctime)s %(levelname)s %(message)s [%(filename)s:%(lineno)d]",
+        isatty=True,
+        stream=sys.stdout,
     )
 
     # Remove spotify util.py logs

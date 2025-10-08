@@ -19,6 +19,7 @@ dependencies = [
     "pydantic<3.0.0,>=2.10.6",
     "google-cloud-storage>=3.1.0",
     "pyarrow>=21.0.0",
+    "pytest-sugar>=1.1.1",
 ]
 
 [dependency-groups]
@@ -28,8 +29,10 @@ dev = [
 ]
 
 
-[pytest]
+[tool.pytest.ini_options]
 log_cli = true
+log_cli_level = "INFO"
+addopts = "--color=yes"
 
 [tool.isort]
 profile = "black"

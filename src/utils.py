@@ -119,7 +119,9 @@ def save_hist_dataframe(df_hist_pl_tracks: pd.DataFrame) -> None:
         df_hist_pl_tracks.to_excel(
             folder_path + "hist_playlists_tracks.xlsx", index=False
         )
-    logger.info(f"Successfully saved hist file with {df_hist_pl_tracks.shape[0]} records")
+    logger.info(
+        f"Successfully saved hist file with {df_hist_pl_tracks.shape[0]:,} records"
+    )
 
     _ = gc.collect()
     print_memory_usage_readable()

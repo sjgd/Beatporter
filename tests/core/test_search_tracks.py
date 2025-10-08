@@ -42,7 +42,7 @@ def test_track_blondish() -> None:
         "duration_ms": 395040,
     }
     track_search = BeatportTrack(**track_search)
-    track_id = search_track_function(track_search)
+    track_id = search_track_function(track_search, silent=True)
     logger.info(track_search)
     assert track_id == "4u3XiAwJ2U9Kxgy57gcAPB"
 

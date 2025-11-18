@@ -3,7 +3,6 @@
 import json
 import logging
 import re
-import time
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -52,7 +51,33 @@ def get_beatport_page_script_queries(url: str) -> dict:
 def scrape_beatport_charts(
     url: str, max_wait: int = 20, chart_bp_url_code: str = ""
 ) -> list[dict]:
-    """Get Beatport charts from artist page."""
+    """Scrape Beatport artist page for chart links using Selenium.
+
+    This function uses Selenium WebDriver to load the given Beatport artist page URL,
+    waits for the page and dynamic content to load, and extracts chart links
+     from the page.
+    It can optionally filter for a specific chart code.
+
+    Args:
+        url (str): The Beatport artist page URL to scrape for charts.
+        max_wait (int, optional): Maximum number of seconds to wait for
+        the page to load. Defaults to 20.
+        chart_bp_url_code (str, optional): If provided, only chart links
+        containing this code will be returned. Defaults to "" (all charts).
+
+    Returns:
+        list[dict]: A list of chart URLs (as strings) found on the artist
+        page. If chart_bp_url_code is provided, only matching charts are included.
+
+    Notes:
+        - This function relies on Selenium WebDriver (Chrome) to render
+        and scrape dynamic content from Beatport.
+        - The function assumes that chart links can be found using the CSS
+        selector '.artwork[href*="/chart/"]'.
+        - Make sure the appropriate Selenium WebDriver and browser are
+        installed and configured.
+
+    """
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
     from selenium.webdriver.common.by import By
@@ -73,11 +98,9 @@ def scrape_beatport_charts(
     driver.get(url)
 
     # Wait for the page to load
-    _ = WebDriverWait(driver, max_wait)
-
-    # Wait for chart containers to appear
-    # Adjust these selectors based on actual page structure
-    time.sleep(5)  # Give extra time for dynamic content
+    _ = WebDriverWait(driver, max_wait).until(
+        lambda d: d.find_element(By.CSS_SELECTOR, '.artwork[href*="/chart/"]')
+    )
 
     # Try to find chart elements - you may need to inspect the page
     # to find the correct selectors
@@ -87,22 +110,23 @@ def scrape_beatport_charts(
 
     for idx, link in enumerate(chart_links, 1):
         try:
+            href = link.get_attribute("href")
             chart_data = {
                 "rank": idx,
                 "title": link.get_attribute("title"),
-                "href": link.get_attribute("href"),
-                "full_url": link.get_attribute("href")
-                if link.get_attribute("href").startswith("http")
-                else f"https://www.beatport.com{link.get_attribute('href')}",
+                "href": href,
+                "full_url": href
+                if href.startswith("http")
+                else f"https://www.beatport.com{href}",
             }
 
-            if len(chart_bp_url_code) > 1 and chart_bp_url_code in chart_data["href"]:
+            if chart_bp_url_code and chart_bp_url_code in chart_data["href"]:
                 logger.info(
                     f"Matched requested chart: {chart_data['href']}"
                     f"at rank {idx}, with title {chart_data['title']}"
                 )
                 charts.append(chart_data["href"])
-            elif len(chart_bp_url_code) == 0:
+            elif not chart_bp_url_code:
                 charts.append(chart_data["href"])
 
         except Exception as e:
@@ -236,8 +260,11 @@ def find_chart(chart: str, chart_bp_url_code: str) -> Any | str | None:
         chart_urls = [chart["url_tentative"] for chart in charts]
         chart_urls.sort(reverse=True)  # That way larger ID is on top = newest chart
         # TODO reverse above not necessary charts have release date now
-    else:
+    elif re.match(r".*(\/[0-9]{6})", chart_bp_url_code) is not None:
+        # Direct chart ID
         chart_urls = ["https://www.beatport.com/chart/" + chart_bp_url_code]
+    else:
+        raise ValueError("Chart code format not recognized")
 
     if len(chart_urls) >= 1:
         # TODO export as function ?

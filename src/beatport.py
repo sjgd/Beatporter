@@ -3,6 +3,7 @@
 import json
 import logging
 import re
+import time
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -46,6 +47,70 @@ def get_beatport_page_script_queries(url: str) -> dict:
     ]
 
     return results_data_queries
+
+
+def scrape_beatport_charts(
+    url: str, max_wait: int = 20, chart_bp_url_code: str = ""
+) -> list[dict]:
+    """Get Beatport charts from artist page."""
+    from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")  # Run in background
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument(
+        "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    )
+
+    driver = webdriver.Chrome(options=chrome_options)
+    charts = []
+
+    logger.info(f"Loading URL: {url}")
+    driver.get(url)
+
+    # Wait for the page to load
+    _ = WebDriverWait(driver, max_wait)
+
+    # Wait for chart containers to appear
+    # Adjust these selectors based on actual page structure
+    time.sleep(5)  # Give extra time for dynamic content
+
+    # Try to find chart elements - you may need to inspect the page
+    # to find the correct selectors
+    chart_links = driver.find_elements(By.CSS_SELECTOR, '.artwork[href*="/chart/"]')
+
+    logger.info(f"Found {len(chart_links)} chart links")
+
+    for idx, link in enumerate(chart_links, 1):
+        try:
+            chart_data = {
+                "rank": idx,
+                "title": link.get_attribute("title"),
+                "href": link.get_attribute("href"),
+                "full_url": link.get_attribute("href")
+                if link.get_attribute("href").startswith("http")
+                else f"https://www.beatport.com{link.get_attribute('href')}",
+            }
+
+            if len(chart_bp_url_code) > 1 and chart_bp_url_code in chart_data["href"]:
+                logger.info(
+                    f"Matched requested chart: {chart_data['href']}"
+                    f"at rank {idx}, with title {chart_data['title']}"
+                )
+                charts.append(chart_data["href"])
+            elif len(chart_bp_url_code) == 0:
+                charts.append(chart_data["href"])
+
+        except Exception as e:
+            logger.error(f"Error extracting chart {idx}: {e!s}")
+            continue
+
+    driver.quit()
+    return charts
 
 
 def get_top_100_playables(genre: str) -> list[dict]:
@@ -138,9 +203,16 @@ def find_chart(chart: str, chart_bp_url_code: str) -> Any | str | None:
     Returns: Beatport chart URL.
 
     """
-    # Check if have chart number in name already
+    # Check if have chart number is missing
+    # And if format with year-week pattern
+    if (re.match(r".*(\/[0-9]{6})", chart_bp_url_code) is None) and (
+        # Regex to match patterns like weekend-picks-2025-week-7
+        re.match(r"^weekend-picks-(\d{4})-week-(\d{1,2})$", chart_bp_url_code) is not None
+    ):
+        url = "https://www.beatport.com/artist/beatport/45/charts?page=1&per_page=150"
+        chart_urls = scrape_beatport_charts(url, chart_bp_url_code=chart_bp_url_code)
     # Otherwise need to find the chart ID
-    if re.match(r".*(\/[0-9]{6})", chart_bp_url_code) is None:
+    elif re.match(r".*(\/[0-9]{6})", chart_bp_url_code) is None:
         # If not, search for chart code
         url = (
             "https://www.beatport.com/search/charts"
@@ -148,7 +220,7 @@ def find_chart(chart: str, chart_bp_url_code: str) -> Any | str | None:
         )
         results_data = get_beatport_page_script_queries(url)
 
-        charts = results_data = results_data[0]["state"]["data"]["data"]
+        charts = results_data[0]["state"]["data"]["data"]
 
         for i in range(len(charts)):
             charts[i]["url_tentative"] = (
@@ -191,7 +263,10 @@ def find_chart(chart: str, chart_bp_url_code: str) -> Any | str | None:
                 )
             else:
                 release_year = re.match(r"2[0-9]{3}", change_date_chart).group(0)
-                if f"({release_year})" == match_year_name:
+                if (
+                    f"({release_year})" == match_year_name
+                    and chart_bp_url_code in chart_urls[0]
+                ):
                     logger.info(
                         f"Years match ({release_year}), returning chart {chart_urls[0]}"
                     )

@@ -12,6 +12,7 @@ from src.beatport import (
     get_chart,
     get_label_tracks,
     get_top_100_tracks,
+    parse_chart_url_datetime,
 )
 from src.config import charts, genres, labels, shuffle_label, spotify_bkp
 from src.spotify_search import (
@@ -25,6 +26,10 @@ from src.utils import load_hist_file
 # Or logs are in the Output / Python Test Log
 
 logger = logging.getLogger(__name__)
+
+parsed_charts = {
+    parse_chart_url_datetime(k): parse_chart_url_datetime(v) for k, v in charts.items()
+}
 
 
 @pytest.mark.parametrize("genre", genres)
@@ -78,7 +83,7 @@ def test_backup(playlist_name: dict[str, str]) -> None:
     assert len(df_hist_pl_tracks) > 0
 
 
-@pytest.mark.parametrize("chart", charts)
+@pytest.mark.parametrize("chart", parsed_charts)
 def test_chart(chart: dict[str, str]) -> None:
     """Test each chart.
 
@@ -94,7 +99,7 @@ def test_chart(chart: dict[str, str]) -> None:
     logger.info(f"\n[!] Starting @ {start_time}")
     df_hist_pl_tracks = load_hist_file()
 
-    chart_bp_url_code = charts[chart]
+    chart_bp_url_code = parsed_charts[chart]
     logger.info(f" Getting chart : ***** {chart} : {chart_bp_url_code} *****")
     chart_url = find_chart(chart, chart_bp_url_code)
 

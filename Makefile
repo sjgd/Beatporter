@@ -18,10 +18,10 @@ ruff:
 
 # Run code quality commands
 lint:
-	uv run ruff check --fix || true & \
-	uv run ruff format || true & \
-	uv run mypy src/ tests/ || true & \
-	uv run pydocstyle src/ tests/ 
+	uv run ruff check --fix || true && \
+	uv run ruff format || true && \
+	uv run mypy --config-file pyproject.toml ./src ./tests || true && \
+	uv run pydocstyle ./src ./tests
 
 
 

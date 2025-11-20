@@ -24,7 +24,6 @@ from src.config import (
     playlist_description,
     playlist_prefix,
     redirect_uri,
-    refresh_token_n_tracks,
     scope,
     silent_search,
     username,
@@ -926,11 +925,15 @@ def add_tracks_to_playlist(playlist_id: str, track_ids: list) -> None:
         track_ids (list): List of track IDs.
 
     """
+    if len(track_ids) >= 100:
+        logger.error(
+            "Double check if can add more than 100 tracks at once to a Spotify playlist."
+        )
     if track_ids:
         spotify_ins = spotify_auth()
         position = 0 if add_at_top_playlist else None
-        spotify_ins.user_playlist_add_tracks(
-            user=username, playlist_id=playlist_id, tracks=track_ids, position=position
+        spotify_ins.playlist_add_items(
+            playlist_id=playlist_id, items=track_ids, position=position
         )
 
 
@@ -1211,9 +1214,6 @@ def add_new_tracks_to_playlist_id(
             track_count = 0
             persistent_track_ids = list()
             update_playlist_description_with_date(playlist)
-
-        if track_count_tot % refresh_token_n_tracks == 0:  # Avoid time out
-            _ = spotify_auth()
 
     if len(persistent_track_ids) > 0:
         logger.warning(

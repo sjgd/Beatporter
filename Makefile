@@ -14,4 +14,14 @@ stop:
 	./bin/dev/docker-stop.sh
 
 ruff:
-	uv run ruff check --fix 
+	uv run ruff check --fix
+
+# Run code quality commands
+lint:
+	uv run ruff check --fix || true & \
+	uv run ruff format || true & \
+	uv run mypy src/ tests/ || true & \
+	uv run pydocstyle src/ tests/ 
+
+
+

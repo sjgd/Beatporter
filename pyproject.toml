@@ -28,6 +28,7 @@ dev = [
     "ipykernel>=6.29.5",
     "mypy>=1.18.2",
     "pydocstyle>=6.3.0",
+    "pytest-cov>=7.0.0",
     "ruff>=0.9.10",
     "selenium>=4.38.0",
 ]

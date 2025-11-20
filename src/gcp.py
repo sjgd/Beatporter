@@ -30,16 +30,17 @@ def get_gcp_client_info() -> storage.Client:
     return storage_client
 
 
-def get_gcs_blob(file_name: str, bucket_folder=""):
+def get_gcs_blob(file_name: str, bucket_folder: str = "") -> storage.Blob:
     """Get blob from GCS.
 
     Uses PROJECT_ID and BUCKET_NAME set in the module.
 
     Args:
         file_name: Local filename
-        source_folder: Local source folder
-        destination_folder: Destination folder in the bucket
+        bucket_folder: Destination folder in the bucket
 
+    Returns:
+        Blob object
     """
     bucket = get_gcp_client_info().bucket(BUCKET_NAME)
     destination_blob_name = bucket_folder + file_name
@@ -48,16 +49,15 @@ def get_gcs_blob(file_name: str, bucket_folder=""):
     return blob
 
 
-def download_file_to_gcs(file_name: str, local_folder: str, gcs_folder=""):
+def download_file_to_gcs(file_name: str, local_folder: str, gcs_folder: str = "") -> None:
     """Download local file from GCS.
 
     Uses PROJECT_ID and BUCKET_NAME set in the module.
 
     Args:
         file_name: Local filename
-        source_folder: Local source folder
-        destination_folder: Destination folder in the bucket
-
+        local_folder: Local source folder
+        gcs_folder: Destination folder in the bucket
     """
     blob = get_gcs_blob(file_name=file_name, bucket_folder=gcs_folder)
     blob.download_to_filename(filename=local_folder + file_name)
@@ -67,16 +67,15 @@ def download_file_to_gcs(file_name: str, local_folder: str, gcs_folder=""):
     )
 
 
-def upload_file_to_gcs(file_name: str, local_folder: str, gcs_folder=""):
+def upload_file_to_gcs(file_name: str, local_folder: str, gcs_folder: str = "") -> None:
     """Upload local file to GCS.
 
     Use PROJECT_ID and BUCKET_NAME set in the module.
 
     Args:
         file_name: Local filename
-        source_folder: Local source folder
-        destination_folder: Destination folder in the bucket
-
+        local_folder: Local source folder
+        gcs_folder: Destination folder in the bucket
     """
     blob = get_gcs_blob(file_name=file_name, bucket_folder=gcs_folder)
     blob.upload_from_filename(filename=local_folder + file_name, if_generation_match=None)

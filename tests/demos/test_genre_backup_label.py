@@ -50,7 +50,7 @@ def test_genre(genre: dict[str, str]) -> None:
 
     logger.info(f"-Getting genre : ***** {genre} *****")
     top_100_chart = get_top_100_tracks(genre)
-    logger.debug(genre + ":" + str(top_100_chart))
+    logger.debug(f"{genre}:{top_100_chart}")
     df_hist_pl_tracks = add_new_tracks_to_playlist_genre(
         genre, top_100_chart, df_hist_pl_tracks
     )

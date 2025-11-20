@@ -7,6 +7,8 @@ import traceback
 from datetime import datetime
 from time import sleep
 
+import pandas as pd
+
 from src.beatport import (
     find_chart,
     get_chart,
@@ -69,12 +71,12 @@ def update_hist(master_refresh: bool = False) -> None:
 
     df_hist_pl_tracks = load_hist_file()
 
-    charts = {
+    parsed_charts = {
         parse_chart_url_datetime(k): parse_chart_url_datetime(v)
         for k, v in charts.items()
     }
 
-    for chart, chart_bp_url_code in charts.items():
+    for chart, chart_bp_url_code in parsed_charts.items():
         df_hist_pl_tracks = update_hist_from_playlist(chart, df_hist_pl_tracks)
 
     for label, label_bp_url_code in labels.items():
@@ -93,39 +95,9 @@ def update_hist(master_refresh: bool = False) -> None:
     save_hist_dataframe(df_hist_pl_tracks)
 
 
-def main(
-    spotify_bkp: dict[str, str] = spotify_bkp,
-    charts: dict[str, str] = charts,
-    genres: dict[str, str] = genres,
-    labels: dict[str, str] = labels,
-) -> None:
-    """Run Beatporter.
-
-    Args:
-        spotify_bkp: List of Spotify playlist to backup
-        charts: List of Beatport charts to add to Spotify playlists
-        genres: List of Beatport genres to add to Spotify playlists
-        labels: List of Beatport labels to add to Spotify playlists
-
-    """
-    # Init
-    start_time = datetime.now()
-    logger.info(" ")
-    logger.info(f"[!] Starting @ {start_time}")
-    df_hist_pl_tracks = load_hist_file()
-    charts = {
-        parse_chart_url_datetime(k): parse_chart_url_datetime(v)
-        for k, v in charts.items()
-    }
-
-    # Load arguments
-    args = sys.argv[1:]
-    args = [arg.replace("-", "") for arg in args]
-    if len(args) == 0:
-        # If not argument passed then parse all
-        args = option_parse
-    logger.info(f"Using arguments: {args} of available {option_parse}")
-
+def _handle_backups(
+    args: list[str], spotify_bkp: dict[str, str], df_hist_pl_tracks: pd.DataFrame
+) -> pd.DataFrame:
     if "backups" in args:
         for playlist_name, org_playlist_id in spotify_bkp.items():
             logger.info(" ")
@@ -143,10 +115,16 @@ def main(
                     f"***** {playlist_name} : {org_playlist_id} ***** "
                     f"with error: {e}"
                 )
+    return df_hist_pl_tracks
 
-    # Parse lists
+
+def _handle_charts(
+    args: list[str],
+    parsed_charts: dict[str, str],
+    df_hist_pl_tracks: pd.DataFrame,
+) -> pd.DataFrame:
     if "charts" in args:
-        for chart, chart_bp_url_code in charts.items():
+        for chart, chart_bp_url_code in parsed_charts.items():
             # TODO check if chart are working, otherwise do as genre and label
             # TODO handle return None, handle chart_bp_url_code has ID already or not
             logger.info(" ")
@@ -170,7 +148,12 @@ def main(
                     )
             else:
                 logger.info(f"\t[+] Chart {chart} not found")
+    return df_hist_pl_tracks
 
+
+def _handle_genres(
+    args: list[str], genres: dict[str, str], df_hist_pl_tracks: pd.DataFrame
+) -> pd.DataFrame:
     if "genres" in args:
         for genre, genre_bp_url_code in genres.items():
             spotify_auth()
@@ -187,7 +170,15 @@ def main(
                 logger.warning(
                     f"FAILED getting genre: ***** {genre} ***** with error: {e}"
                 )
+    return df_hist_pl_tracks
 
+
+def _handle_labels(
+    args: list[str],
+    labels: dict[str, str],
+    df_hist_pl_tracks: pd.DataFrame,
+    shuffle_label: bool,
+) -> pd.DataFrame:
     if "labels" in args:
         for label, label_bp_url_code in labels.items():
             # TODO avoid looping through all pages if already parsed before ?
@@ -211,6 +202,46 @@ def main(
                     f"***** {label} : {label_bp_url_code} ***** "
                     f"with error: {e}"
                 )
+    return df_hist_pl_tracks
+
+
+def main(
+    spotify_bkp: dict[str, str] = spotify_bkp,
+    charts: dict[str, str] = charts,
+    genres: dict[str, str] = genres,
+    labels: dict[str, str] = labels,
+) -> None:
+    """Run Beatporter.
+
+    Args:
+        spotify_bkp: List of Spotify playlist to backup
+        charts: List of Beatport charts to add to Spotify playlists
+        genres: List of Beatport genres to add to Spotify playlists
+        labels: List of Beatport labels to add to Spotify playlists
+
+    """
+    # Init
+    start_time = datetime.now()
+    logger.info(" ")
+    logger.info(f"[!] Starting @ {start_time}")
+    df_hist_pl_tracks = load_hist_file()
+    parsed_charts = {
+        parse_chart_url_datetime(k): parse_chart_url_datetime(v)
+        for k, v in charts.items()
+    }
+
+    # Load arguments
+    args = sys.argv[1:]
+    args = [arg.replace("-", "") for arg in args]
+    if len(args) == 0:
+        # If not argument passed then parse all
+        args = option_parse
+    logger.info(f"Using arguments: {args} of available {option_parse}")
+
+    df_hist_pl_tracks = _handle_backups(args, spotify_bkp, df_hist_pl_tracks)
+    df_hist_pl_tracks = _handle_charts(args, parsed_charts, df_hist_pl_tracks)
+    df_hist_pl_tracks = _handle_genres(args, genres, df_hist_pl_tracks)
+    df_hist_pl_tracks = _handle_labels(args, labels, df_hist_pl_tracks, shuffle_label)
 
     # Output
     sleep(5)

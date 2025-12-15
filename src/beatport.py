@@ -122,7 +122,7 @@ def scrape_beatport_charts(
             if chart_bp_url_code and chart_bp_url_code in chart_data["href"]:
                 logger.info(
                     f"Matched requested chart: {chart_data['href']}"
-                    f"at rank {idx}, with title {chart_data['title']}"
+                    f" at rank {idx}, with title {chart_data['title']}"
                 )
                 charts.append(chart_data["full_url"])
             elif not chart_bp_url_code:

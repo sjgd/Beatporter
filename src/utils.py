@@ -2,6 +2,7 @@
 
 import gc
 import logging
+import multiprocessing
 import os
 from datetime import datetime
 from os import path
@@ -37,7 +38,6 @@ def load_hist_file(allow_empty: bool = False) -> pd.DataFrame:
     """
     try:
         if use_gcp:
-            # TODO arguments for file path / type ?
             download_file_to_gcs(file_name=FILE_NAME_HIST, local_folder=PATH_HIST_LOCAL)
             df_hist_pl_tracks = pd.read_parquet(PATH_HIST_LOCAL + FILE_NAME_HIST)
             logger.info(" ")
@@ -90,78 +90,62 @@ def load_hist_file(allow_empty: bool = False) -> pd.DataFrame:
             "Creating an empty DataFrame is not allowed (allow_empty=False)."
         )
 
-    # Alternative method
-    # for col in [
-    #     "playlist_id",
-    #     "playlist_name",
-    #     "track_id",
-    #     "artist_name",
-    # ]:
-    #     df_hist_pl_tracks[col] = df_hist_pl_tracks[col].astype(pd.StringDtype())
-
-    # for col in [
-    #     "playlist_id",
-    #     "playlist_name",
-    #     "track_id",
-    #     "artist_name",
-    # ]:
-    #     max_length = int(max(df_hist_pl_tracks[col].apply(lambda x: len(x))) * 1.2)
-    #     print(col, f"|S{max_length}")
-    #     if max_length < 128:
-    #         try:
-    #             df_hist_pl_tracks[col] = (
-    #                   df_hist_pl_tracks[col].astype(f"|S{max_length}"))
-    #         except Exception as e:
-    #             print(e)
-
     return df_hist_pl_tracks
 
 
-def save_hist_dataframe(df_hist_pl_tracks: pd.DataFrame) -> None:
-    """Save the history dataframe according to configs."""
-    logger = logging.getLogger()
-    print_memory_usage_readable()
-    sleep(1)  # try to avoid read-write errors if running too quickly
-    logger.debug("Saving file of length: " + str(len(df_hist_pl_tracks)))
-    # df_hist_pl_tracks = df_hist_pl_tracks[
-    #     ["playlist_id", "playlist_name", "track_id", "datetime_added", "artist_name"]
-    # ]
-    df_hist_pl_tracks.to_parquet(
-        PATH_HIST_LOCAL + FILE_NAME_HIST, compression="gzip", index=False
-    )
-    if use_gcp:
-        upload_file_to_gcs(file_name=FILE_NAME_HIST, local_folder=PATH_HIST_LOCAL)
-    if use_local:
-        df_hist_pl_tracks.to_excel(
-            folder_path + "hist_playlists_tracks.xlsx", index=False
+def _save_hist_file_proc(df_hist_pl_tracks: pd.DataFrame) -> None:
+    """Save the history dataframe in a separate process."""
+    # NOTE: This function runs in a separate process.
+    # Logging from here might not be captured by the main process's handlers.
+    proc_logger = logging.getLogger("proc_saver")
+    
+    try:
+        df_hist_pl_tracks.to_parquet(
+            PATH_HIST_LOCAL + FILE_NAME_HIST, compression="gzip", index=False
         )
-    logger.info(
-        f"Successfully saved hist file with {df_hist_pl_tracks.shape[0]:,} records"
-    )
+        if use_gcp:
+            upload_file_to_gcs(file_name=FILE_NAME_HIST, local_folder=PATH_HIST_LOCAL)
+        if use_local:
+            df_hist_pl_tracks.to_excel(
+                folder_path + "hist_playlists_tracks.xlsx", index=False
+            )
+        proc_logger.info(
+            f"Successfully saved hist file with {df_hist_pl_tracks.shape[0]:,} records"
+        )
+    except Exception as e:
+        proc_logger.error(f"Failed to save hist file in subprocess: {e}", exc_info=True)
 
-    _ = gc.collect()
+
+def save_hist_dataframe(df_hist_pl_tracks: pd.DataFrame) -> None:
+    """Save the history dataframe according to configs in a separate process."""
+    logger.info("Saving history file in a separate process to manage memory.")
+    print_memory_usage_readable()
+    sleep(1)
+    
+    ctx = multiprocessing.get_context("spawn")
+    p = ctx.Process(target=_save_hist_file_proc, args=(df_hist_pl_tracks,))
+    p.start()
+    p.join()
+
+    if p.exitcode != 0:
+        logger.error("Subprocess for saving history file failed.")
+
+    gc.collect()
+
+    logger.info("Subprocess finished. Memory usage in main process:")
     print_memory_usage_readable()
 
 
 def print_memory_usage_readable() -> None:
-    """Print the total memory size used by the current process.
-
-    Print it in a human-readable format.
-
-    """
-    # Get the current process
+    """Print the total memory size used by the current process."""
     process = psutil.Process(os.getpid())
-
-    # Get memory usage in bytes
-    memory_usage_bytes = process.memory_info().rss  # Resident Set Size
-
-    # Convert bytes to a readable format
+    memory_usage_bytes = process.memory_info().rss
     for unit in ["B", "KB", "MB", "GB", "TB"]:
         if memory_usage_bytes < 1024.0:
             logging.getLogger(__file__).info(
                 f"Memory usage: {memory_usage_bytes:.2f} {unit}"
             )
-            return None
+            return
         memory_usage_bytes /= 1024.0
 
 

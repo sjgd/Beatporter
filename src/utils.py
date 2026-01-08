@@ -52,6 +52,7 @@ def load_hist_file(allow_empty: bool = False) -> pd.DataFrame:
                     )
                 except Exception as e:
                     logger.warning(e)
+            print_memory_usage_readable()
             return df_hist_pl_tracks
     except Exception as e:
         logger.warning(
@@ -122,9 +123,9 @@ def save_hist_dataframe(df_hist_pl_tracks: pd.DataFrame) -> None:
     print_memory_usage_readable()
     sleep(1)  # try to avoid read-write errors if running too quickly
     logger.debug("Saving file of length: " + str(len(df_hist_pl_tracks)))
-    df_hist_pl_tracks = df_hist_pl_tracks.loc[
-        :, ["playlist_id", "playlist_name", "track_id", "datetime_added", "artist_name"]
-    ]
+    # df_hist_pl_tracks = df_hist_pl_tracks[
+    #     ["playlist_id", "playlist_name", "track_id", "datetime_added", "artist_name"]
+    # ]
     df_hist_pl_tracks.to_parquet(
         PATH_HIST_LOCAL + FILE_NAME_HIST, compression="gzip", index=False
     )

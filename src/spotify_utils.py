@@ -1051,6 +1051,8 @@ def update_hist_pl_tracks(
     # Create a temporary DataFrame with the new tracks to be added to history
     df_temp = pd.DataFrame(
         {
+            "playlist_id": playlist["id"],
+            "playlist_name": playlist["name"],
             "track_id": track_details["id"],
             "datetime_added": df_playlist_tracks["added_at"],
             "artist_name": (
@@ -1060,10 +1062,12 @@ def update_hist_pl_tracks(
                 + " - "
                 + track_details["name"]
             ),
-            "playlist_id": playlist["id"],
-            "playlist_name": playlist["name"],
         }
     )
+    # Make sure columns are in the correct order
+    df_temp = df_temp[
+        ["playlist_id", "playlist_name", "track_id", "datetime_added", "artist_name"]
+    ]
 
     # Combine with the main history DataFrame, remove duplicates, and reset index
     df_hist_pl_tracks = pd.concat([df_hist_pl_tracks, df_temp], ignore_index=True)

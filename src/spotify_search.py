@@ -733,6 +733,7 @@ def _update_playlists_and_history(
         )
         add_tracks_to_playlist(playlists[0]["id"], persistent_track_ids)
         update_playlist_description_with_date(playlists[0])
+        df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlists[0])
     else:
         logger.info(
             f"[+] No new tracks to add to the playlist: "
@@ -748,6 +749,7 @@ def _update_playlists_and_history(
         )
         add_tracks_to_playlist(playlists[1]["id"], daily_top_n_track_ids)
         update_playlist_description_with_date(playlists[1])
+        df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlists[1])
     else:
         logger.info(
             f'[+] No new tracks to add to the playlist: "{daily_top_n_playlist_name}"'

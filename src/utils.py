@@ -98,7 +98,7 @@ def _save_hist_file_proc(df_hist_pl_tracks: pd.DataFrame) -> None:
     # NOTE: This function runs in a separate process.
     # Logging from here might not be captured by the main process's handlers.
     proc_logger = logging.getLogger("proc_saver")
-    
+
     try:
         df_hist_pl_tracks.to_parquet(
             PATH_HIST_LOCAL + FILE_NAME_HIST, compression="gzip", index=False
@@ -121,7 +121,7 @@ def save_hist_dataframe(df_hist_pl_tracks: pd.DataFrame) -> None:
     logger.info("Saving history file in a separate process to manage memory.")
     print_memory_usage_readable()
     sleep(1)
-    
+
     ctx = multiprocessing.get_context("spawn")
     p = ctx.Process(target=_save_hist_file_proc, args=(df_hist_pl_tracks,))
     p.start()

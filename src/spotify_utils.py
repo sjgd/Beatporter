@@ -138,7 +138,7 @@ def listen_for_callback_code() -> str:
     s.bind(("localhost", int(redirect_uri.split(":")[-1])))
     s.listen(1)
     while True:
-        connection, address = s.accept()
+        connection, _ = s.accept()
         buf = str(connection.recv(1024))
         if len(buf) > 0:
             break

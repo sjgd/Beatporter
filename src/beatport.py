@@ -341,20 +341,20 @@ def get_chart(url: str) -> list[BeatportTrack]:
     return tracks_dicts
 
 
-def parse_chart_url_datetime(str: str) -> str:
+def parse_chart_url_datetime(date_str: str) -> str:
     """Format date string; if Sunday, return previous week.
 
     Args:
-        str: string to format.
+        date_str: string to format.
 
     Returns:
         datetime object.
 
     """
     if datetime.today().weekday() > 5:
-        return (datetime.today() - timedelta(days=6)).strftime(str)
+        return (datetime.today() - timedelta(days=6)).strftime(date_str)
     else:
-        return datetime.today().strftime(str)
+        return datetime.today().strftime(date_str)
 
 
 def get_label_tracks(

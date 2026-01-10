@@ -583,6 +583,9 @@ def add_new_tracks_to_playlist_chart_label(
                 playlist_track_ids = df_hist_pl_tracks.loc[
                     df_hist_pl_tracks["playlist_id"] == playlist["id"], "track_id"
                 ]
+                df_local_hist = _get_local_history_dataframe(
+                    df_hist_pl_tracks, playlist["id"], digging_mode
+                )
                 track_count = 0
                 persistent_track_ids = list()
                 update_playlist_description_with_date(playlist)

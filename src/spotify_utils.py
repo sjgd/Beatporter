@@ -1093,7 +1093,7 @@ def sync_playlist_history(playlist: dict, digging_mode: str) -> pd.DataFrame:
     df_playlist_hist = _get_history_for_digging(digging_mode, playlist["id"])
     new_tracks_from_spotify = _get_new_spotify_tracks(playlist, df_playlist_hist)
     if not new_tracks_from_spotify.empty:
-        logger.info(
+        logger.warning(
             f"\t[+] Found {len(new_tracks_from_spotify)} new tracks"
             " in Spotify playlist not in history, adding to history."
         )

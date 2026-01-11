@@ -12,7 +12,7 @@ import psutil
 
 from src.config import ROOT_PATH, use_gcp
 from src.configure_logging import configure_logging
-from src.gcp import download_file_to_gcs, upload_file_to_gcs
+from src.gcp import upload_file_to_gcs
 
 PATH_HIST_LOCAL = ROOT_PATH + "data/"
 FILE_NAME_HIST = "hist_playlists_tracks.parquet.gz"
@@ -40,16 +40,6 @@ def load_hist_file(
     Raises:
         ValueError: If the file does not exist and allow_empty is False.
     """
-    if use_gcp and file_path == PATH_HIST_LOCAL + FILE_NAME_HIST:
-        try:
-            download_file_to_gcs(file_name=FILE_NAME_HIST, local_folder=PATH_HIST_LOCAL)
-        except Exception as e:
-            logger.warning(
-                "Loading from GCP failed while the option is selected. "
-                "Trying loading from local saved file. "
-                f"Error {e}"
-            )
-
     if not os.path.exists(file_path):
         if allow_empty:
             return pd.DataFrame(

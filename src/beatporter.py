@@ -26,7 +26,7 @@ from src.config import (
     use_gcp,
     username,
 )
-from src.gcp import download_file_to_gcs
+from src.gcp import download_file_to_gcs, upload_file_to_gcs
 from src.spotify_search import (
     add_new_tracks_to_playlist_chart_label,
     add_new_tracks_to_playlist_genre,
@@ -238,6 +238,8 @@ def main(
     # Output
     sleep(5)
     deduplicate_hist_file()
+    if use_gcp:
+        upload_file_to_gcs(file_name=FILE_NAME_HIST, local_folder=PATH_HIST_LOCAL)
     # TODO add back option to save to excel for manual checking
     end_time = datetime.now()
     logger.info(f"[!] Done @ {end_time} (Ran for: {end_time - start_time})")

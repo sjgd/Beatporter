@@ -18,7 +18,6 @@ from src.config import (
 from src.configure_logging import configure_logging
 from src.models import BeatportTrack
 from src.spotify_utils import (
-    _get_history_for_digging,
     add_space,
     add_tracks_to_playlist,
     clear_playlist,
@@ -33,6 +32,7 @@ from src.spotify_utils import (
     query_track_label,
     search_wrapper,
     spotify_auth,
+    sync_playlist_history,
     track_in_playlist,
     update_playlist_description_with_date,
 )
@@ -481,7 +481,7 @@ def add_new_tracks_to_playlist_chart_label(
         )
         playlist["id"] = create_playlist(playlist["name"])
 
-    df_playlist_hist = _get_history_for_digging(digging_mode, playlist["id"])
+    df_playlist_hist = sync_playlist_history(playlist, digging_mode)
 
     persistent_track_ids = []
     new_history_tracks = []
@@ -699,11 +699,11 @@ def add_new_tracks_to_playlist_genre(
     )
 
     playlists = _get_or_create_genre_playlists(genre, playlist_prefix, daily_mode)
-    df_persistent_hist = _get_history_for_digging(digging_mode, playlists[0]["id"])
+    df_persistent_hist = sync_playlist_history(playlists[0], digging_mode)
 
     df_daily_hist = pd.DataFrame()
     if daily_mode:
-        df_daily_hist = _get_history_for_digging(digging_mode, playlists[1]["id"])
+        df_daily_hist = sync_playlist_history(playlists[1], digging_mode)
 
     n_daily_tracks = 0
     if daily_mode:

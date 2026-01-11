@@ -1201,6 +1201,7 @@ def back_up_spotify_playlist(playlist_name: str, org_playlist_id: str) -> None:
         org_playlist_id (str): The ID of the playlist to back up from.
     """
     logger.info(f"Backing up playlist {playlist_name}...")
+
     # Get the tracks from the original playlist
     org_playlist_tracks = get_all_tracks_in_playlist(playlist_id=org_playlist_id)
     track_ids = [

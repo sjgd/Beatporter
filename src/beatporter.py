@@ -37,13 +37,7 @@ from src.spotify_utils import (
     get_all_playlists,
     update_hist_from_playlist,
 )
-from src.utils import (
-    FILE_NAME_HIST,
-    PATH_HIST_LOCAL,
-    deduplicate_hist_file,
-    load_hist_file,
-    save_hist_dataframe,
-)
+from src.utils import FILE_NAME_HIST, PATH_HIST_LOCAL, deduplicate_hist_file
 
 logger = logging.getLogger("beatporter")
 
@@ -84,11 +78,8 @@ def update_hist(master_refresh: bool = False) -> None:
 
     Args:
         master_refresh: Refresh hist for all playlist of user?
-
     """
     # TODO: testing, to refine usage, include in first init ?
-
-    df_hist_pl_tracks = load_hist_file()
 
     parsed_charts = {
         parse_chart_url_datetime(k): parse_chart_url_datetime(v)
@@ -96,10 +87,10 @@ def update_hist(master_refresh: bool = False) -> None:
     }
 
     for chart, chart_bp_url_code in parsed_charts.items():
-        update_hist_from_playlist(chart, df_hist_pl_tracks)
+        update_hist_from_playlist(chart)
 
     for label, label_bp_url_code in labels.items():
-        update_hist_from_playlist(label, df_hist_pl_tracks)
+        update_hist_from_playlist(label)
 
     if master_refresh:
         # Get track ids from all playlists from username from config
@@ -109,9 +100,7 @@ def update_hist(master_refresh: bool = False) -> None:
             if playlist["owner"]["id"] == username:
                 logger.info(playlist["name"])
                 playlist = {"name": playlist["name"], "id": playlist["id"]}
-                update_hist_pl_tracks(df_hist_pl_tracks, playlist)
-
-    save_hist_dataframe(df_hist_pl_tracks)
+                update_hist_pl_tracks(playlist)
 
 
 def _handle_backups(args: list[str], spotify_bkp: dict[str, str]) -> None:

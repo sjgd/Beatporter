@@ -31,10 +31,7 @@ from src.config import (
 from src.configure_logging import configure_logging
 from src.models import BeatportTrack
 from src.search_utils import clean_track_name
-from src.utils import (
-    append_to_hist_file,
-    load_hist_file,
-)
+from src.utils import append_to_hist_file, load_hist_file
 
 
 def _get_history_for_digging(digging_mode: str, playlist_id: str | None) -> pd.DataFrame:
@@ -1028,23 +1025,15 @@ def parse_tracks_spotify(tracks_json: dict) -> list[BeatportTrack]:
     return tracks
 
 
-def update_hist_pl_tracks(
-    df_hist_pl_tracks: pd.DataFrame, playlist: dict
-) -> pd.DataFrame:
+def update_hist_pl_tracks(playlist: dict) -> None:
     """Update the history DataFrame with a playlist.
 
     Args:
-        df_hist_pl_tracks (pd.DataFrame): DataFrame of
-          history of track id and playlist id.
         playlist (dict): Playlist dictionary.
-
-    Returns:
-        pd.DataFrame: Updated DataFrame.
-
     """
     track_list = get_all_tracks_in_playlist(playlist["id"])
     if not track_list:
-        return df_hist_pl_tracks
+        return
 
     df_playlist_tracks = pd.DataFrame.from_records(track_list)
 
@@ -1053,12 +1042,10 @@ def update_hist_pl_tracks(
     df_playlist_tracks.reset_index(drop=True, inplace=True)  # Reset index for alignment
 
     if df_playlist_tracks.empty:
-        return df_hist_pl_tracks
+        return
 
-    # Expand the 'track' column (which contains dicts) into a DataFrame
     track_details = pd.json_normalize(df_playlist_tracks["track"])
-
-    df_temp = pd.DataFrame(
+    df_from_spotify = pd.DataFrame(
         {
             "playlist_id": playlist["id"],
             "playlist_name": playlist["name"],
@@ -1073,18 +1060,15 @@ def update_hist_pl_tracks(
             ),
         }
     )
-    df_temp = df_temp[
-        ["playlist_id", "playlist_name", "track_id", "datetime_added", "artist_name"]
+
+    df_local_hist = load_hist_file(playlist_id=playlist["id"], allow_empty=True)
+    new_tracks_df = df_from_spotify[
+        ~df_from_spotify["track_id"].isin(df_local_hist["track_id"])
     ]
 
-    df_hist_pl_tracks = pd.concat([df_hist_pl_tracks, df_temp], ignore_index=True)
-    df_hist_pl_tracks = df_hist_pl_tracks.drop_duplicates(inplace=False)
-    df_hist_pl_tracks = df_hist_pl_tracks.reset_index(drop=True, inplace=False)
-    df_hist_pl_tracks = df_hist_pl_tracks.copy(deep=True)
-
+    if not new_tracks_df.empty:
+        append_to_hist_file(new_tracks_df)
     _ = gc.collect()
-
-    return df_hist_pl_tracks
 
 
 def find_playlist_chart_label(title: str) -> dict:
@@ -1133,7 +1117,7 @@ def add_new_tracks_to_playlist_id(
         new_playlist_id: str = create_playlist(cast(str, playlist["name"]))
         playlist["id"] = new_playlist_id
 
-    assert playlist["id"] is not None
+    update_hist_pl_tracks(playlist)
 
     df_playlist_hist = _get_history_for_digging(digging_mode, playlist["id"])
 
@@ -1219,20 +1203,12 @@ def update_playlist_description_with_date(playlist: dict) -> None:
     )
 
 
-def update_hist_from_playlist(
-    title: str, df_hist_pl_tracks: pd.DataFrame
-) -> pd.DataFrame:
+def update_hist_from_playlist(title: str) -> None:
     """Update history from playlist.
 
     Args:
         title (str): Playlist title.
-        df_hist_pl_tracks (pd.DataFrame): DataFrame of history of track.
-
-    Returns:
-        pd.DataFrame: Updated DataFrame.
-
     """
-    # TODO test, to remove
     persistent_playlist_name = f"{playlist_prefix}{title}"
     logger.info(f'[+] Getting hist of tracks for playlist: "{persistent_playlist_name}"')
 
@@ -1242,11 +1218,7 @@ def update_hist_from_playlist(
     }
 
     if playlist["id"]:
-        assert isinstance(playlist["id"], str)
-        df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
-        # TODO else pass ?
-
-    return df_hist_pl_tracks
+        update_hist_pl_tracks(playlist)
 
 
 def back_up_spotify_playlist(playlist_name: str, org_playlist_id: str) -> None:

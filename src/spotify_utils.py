@@ -1097,8 +1097,8 @@ def sync_playlist_history(playlist: dict, digging_mode: str) -> pd.DataFrame:
     new_tracks_from_spotify = _get_new_spotify_tracks(playlist, df_playlist_hist)
     if not new_tracks_from_spotify.empty:
         logger.warning(
-            f"\t[+] Adding {len(new_tracks_from_spotify)} new tracks "
-            "from playlist missing from history"
+            f"\t[+] Adding {len(new_tracks_from_spotify)} new tracks to playlist "
+            f"'{playlist['name']}' (missing from history)"
         )
         append_to_hist_file(new_tracks_from_spotify)
         df_playlist_hist = pd.concat(

@@ -6,6 +6,7 @@ import multiprocessing
 import os
 from datetime import datetime
 from time import sleep
+from typing import ClassVar
 
 import pandas as pd
 import psutil
@@ -19,6 +20,22 @@ FILE_NAME_HIST = "hist_playlists_tracks.parquet.gz"
 curr_date = datetime.today().strftime("%Y-%m-%d")
 
 logger = logging.getLogger("utils")
+
+
+class HistoryCache:
+    """Cache for history files to avoid reloading them from disk."""
+
+    _cache: ClassVar[dict[str, pd.DataFrame]] = {}
+
+    @classmethod
+    def get(cls, file_path: str) -> pd.DataFrame | None:
+        """Get dataframe from cache."""
+        return cls._cache.get(file_path)
+
+    @classmethod
+    def set(cls, file_path: str, df: pd.DataFrame) -> None:
+        """Set dataframe in cache."""
+        cls._cache[file_path] = df
 
 
 def load_hist_file(
@@ -40,55 +57,71 @@ def load_hist_file(
     Raises:
         ValueError: If the file does not exist and allow_empty is False.
     """
-    if not os.path.exists(file_path):
-        if allow_empty:
-            return pd.DataFrame(
-                columns=[
-                    "playlist_id",
-                    "playlist_name",
-                    "track_id",
-                    "datetime_added",
-                    "artist_name",
-                ]
-            )
-        # Try to load excel file if it exists
-        excel_path = file_path.replace(".parquet.gz", ".xlsx")
-        if os.path.exists(excel_path):
-            logger.info("Found excel history file, loading it.")
-            return pd.read_excel(excel_path)
+    df_hist_pl_tracks = HistoryCache.get(file_path)
 
-        raise ValueError(
-            f"File does not exist at the expected path: {file_path}. "
-            "Creating an empty DataFrame is not allowed (allow_empty=False)."
-        )
-
-    try:
-        filters = [("playlist_id", "==", playlist_id)] if playlist_id else None
-        df_hist_pl_tracks = pd.read_parquet(file_path, filters=filters)
-        logger.info(
-            f"Successfully loaded hist file with {df_hist_pl_tracks.shape[0]} records"
-        )
-        gc.collect()
-        for col in df_hist_pl_tracks.columns:
+    if df_hist_pl_tracks is None:
+        if not os.path.exists(file_path):
+            if allow_empty:
+                df_hist_pl_tracks = pd.DataFrame(
+                    columns=[
+                        "playlist_id",
+                        "playlist_name",
+                        "track_id",
+                        "datetime_added",
+                        "artist_name",
+                    ]
+                )
+                HistoryCache.set(file_path, df_hist_pl_tracks)
+            else:
+                # Try to load excel file if it exists
+                excel_path = file_path.replace(".parquet.gz", ".xlsx")
+                if os.path.exists(excel_path):
+                    logger.info("Found excel history file, loading it.")
+                    df_hist_pl_tracks = pd.read_excel(excel_path)
+                    HistoryCache.set(file_path, df_hist_pl_tracks)
+                else:
+                    raise ValueError(
+                        f"File does not exist at the expected path: {file_path}. "
+                        "Creating an empty DataFrame is not allowed (allow_empty=False)."
+                    )
+        else:
             try:
-                df_hist_pl_tracks[col] = df_hist_pl_tracks[col].astype(pd.StringDtype())
+                # We load the full file to cache it
+                df_hist_pl_tracks = pd.read_parquet(file_path)
+                logger.info(
+                    f"Successfully loaded hist file with "
+                    f"{df_hist_pl_tracks.shape[0]} records"
+                )
+                gc.collect()
+                for col in df_hist_pl_tracks.columns:
+                    try:
+                        df_hist_pl_tracks[col] = df_hist_pl_tracks[col].astype(
+                            pd.StringDtype()
+                        )
+                    except Exception as e:
+                        logger.warning(e)
+                HistoryCache.set(file_path, df_hist_pl_tracks)
+                print_memory_usage_readable()
             except Exception as e:
-                logger.warning(e)
-        print_memory_usage_readable()
-        return df_hist_pl_tracks
-    except Exception as e:
-        logger.error(f"Failed to load Parquet file: {e}", exc_info=True)
-        if allow_empty:
-            return pd.DataFrame(
-                columns=[
-                    "playlist_id",
-                    "playlist_name",
-                    "track_id",
-                    "datetime_added",
-                    "artist_name",
-                ]
-            )
-        raise
+                logger.error(f"Failed to load Parquet file: {e}", exc_info=True)
+                if allow_empty:
+                    df_hist_pl_tracks = pd.DataFrame(
+                        columns=[
+                            "playlist_id",
+                            "playlist_name",
+                            "track_id",
+                            "datetime_added",
+                            "artist_name",
+                        ]
+                    )
+                    HistoryCache.set(file_path, df_hist_pl_tracks)
+                else:
+                    raise
+
+    if playlist_id:
+        return df_hist_pl_tracks[df_hist_pl_tracks["playlist_id"] == playlist_id].copy()
+
+    return df_hist_pl_tracks
 
 
 def _save_hist_file_proc(df_hist_pl_tracks: pd.DataFrame) -> None:
@@ -144,6 +177,7 @@ def append_to_hist_file(
     try:
         df_history = load_hist_file(file_path=file_path, allow_empty=True)
         df_updated = pd.concat([df_history, df_new_tracks], ignore_index=True)
+        HistoryCache.set(file_path, df_updated)
         save_hist_dataframe(df_updated)
     except Exception as e:
         logger.error(f"Failed to append to hist file: {e}", exc_info=True)

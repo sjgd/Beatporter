@@ -231,6 +231,25 @@ def get_playlist_id(playlist_name: str) -> str | None:
     return None
 
 
+def find_playlist_chart_label(playlist_name: str) -> dict:
+    """Find a playlist by name, creating it if it doesn't exist.
+
+    The playlist name is prefixed with the value of playlist_prefix from config.
+    """
+    from src.config import playlist_prefix
+
+    prefixed_playlist_name = f"{playlist_prefix}{playlist_name}"
+    playlist_id = get_playlist_id(prefixed_playlist_name)
+
+    if playlist_id is None:
+        logger.warning(
+            f'\t[!] Playlist "{prefixed_playlist_name}" does not exist, creating it.'
+        )
+        playlist_id = create_playlist(prefixed_playlist_name)
+
+    return {"name": prefixed_playlist_name, "id": playlist_id}
+
+
 def do_durations_match(
     source_track_duration: int,
     found_track_duration: int,
@@ -936,7 +955,7 @@ def add_tracks_to_playlist(playlist_id: str, track_ids: list) -> None:
     position = 0 if add_at_top_playlist else None
 
     for i in range(0, len(track_ids), 100):
-        chunk = track_ids[i : i + 100]  # noqa: E203
+        chunk = track_ids[i : i + 100]
         spotify_ins.playlist_add_items(
             playlist_id=playlist_id, items=chunk, position=position
         )
@@ -1023,6 +1042,83 @@ def parse_tracks_spotify(tracks_json: dict) -> list[BeatportTrack]:
     return tracks
 
 
+def _get_new_spotify_tracks(
+    playlist: dict, df_playlist_hist: pd.DataFrame
+) -> pd.DataFrame:
+    spotify_tracks = get_all_tracks_in_playlist(playlist["id"])
+    df_from_spotify = pd.DataFrame.from_records(spotify_tracks)
+
+    if not df_from_spotify.empty and "track" in df_from_spotify.columns:
+        df_from_spotify.dropna(subset=["track"], inplace=True)
+        df_from_spotify.reset_index(drop=True, inplace=True)
+        track_details = pd.json_normalize(df_from_spotify["track"])
+
+        if "id" not in track_details.columns:
+            logger.info(f"Playlist {playlist['name']} is empty, no tracks to sync.")
+            return pd.DataFrame()
+
+        df_from_spotify = pd.DataFrame(
+            {
+                "playlist_id": playlist["id"],
+                "playlist_name": playlist["name"],
+                "track_id": track_details["id"],
+                "datetime_added": df_from_spotify["added_at"],
+                "artist_name": (
+                    track_details["artists"].apply(
+                        lambda a: a[0]["name"] if a and len(a) > 0 else "Unknown Artist"
+                    )
+                    + " - "
+                    + track_details["name"]
+                ),
+            }
+        )
+        new_tracks_from_spotify = df_from_spotify[
+            ~df_from_spotify["track_id"].isin(df_playlist_hist["track_id"])
+        ]
+        return new_tracks_from_spotify
+    return pd.DataFrame()
+
+
+def sync_playlist_history(playlist: dict, digging_mode: str) -> pd.DataFrame:
+    """Syncs Spotify playlist tracks with local history.
+
+    Args:
+        playlist (dict): A dictionary representing the Spotify playlist,
+            containing at least 'id' and 'name'.
+        digging_mode (str): The digging mode, e.g., 'all' or 'playlist'.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing the updated playlist history.
+    """
+    df_playlist_hist = _get_history_for_digging(digging_mode, playlist["id"])
+    new_tracks_from_spotify = _get_new_spotify_tracks(playlist, df_playlist_hist)
+    if not new_tracks_from_spotify.empty:
+        logger.info(
+            f"\t[+] Found {len(new_tracks_from_spotify)} new tracks"
+            " in Spotify playlist not in history, adding to history."
+        )
+        df_playlist_hist = pd.concat(
+            [df_playlist_hist, new_tracks_from_spotify], ignore_index=True
+        )
+    return df_playlist_hist
+
+
+def update_hist_pl_tracks(playlist: dict) -> None:
+    """Update the history file for a playlist with new tracks found on Spotify."""
+    from src.config import digging_mode
+
+    df_playlist_hist = _get_history_for_digging(digging_mode, playlist["id"])
+    new_tracks_from_spotify = _get_new_spotify_tracks(playlist, df_playlist_hist)
+    if not new_tracks_from_spotify.empty:
+        logger.info(
+            f"\t[+] Found {len(new_tracks_from_spotify)} new tracks"
+            " in Spotify playlist not in history, adding to history file."
+        )
+        append_to_hist_file(new_tracks_from_spotify)
+
+
+
+
 def add_new_tracks_to_playlist_id(
     playlist_name: str,
     track_ids: list,
@@ -1051,39 +1147,7 @@ def add_new_tracks_to_playlist_id(
         playlist["id"] = new_playlist_id
 
     # Pre-sync with spotify
-    df_playlist_hist = _get_history_for_digging(digging_mode, playlist["id"])
-    spotify_tracks = get_all_tracks_in_playlist(playlist["id"])
-    df_from_spotify = pd.DataFrame.from_records(spotify_tracks)
-    if not df_from_spotify.empty:
-        df_from_spotify.dropna(subset=["track"], inplace=True)
-        df_from_spotify.reset_index(drop=True, inplace=True)
-        track_details = pd.json_normalize(df_from_spotify["track"])
-        df_from_spotify = pd.DataFrame(
-            {
-                "playlist_id": playlist["id"],
-                "playlist_name": playlist["name"],
-                "track_id": track_details["id"],
-                "datetime_added": df_from_spotify["added_at"],
-                "artist_name": (
-                    track_details["artists"].apply(
-                        lambda a: a[0]["name"] if a else "Unknown Artist"
-                    )
-                    + " - "
-                    + track_details["name"]
-                ),
-            }
-        )
-        new_tracks_from_spotify = df_from_spotify[
-            ~df_from_spotify["track_id"].isin(df_playlist_hist["track_id"])
-        ]
-        if not new_tracks_from_spotify.empty:
-            logger.info(
-                f"\t[+] Found {len(new_tracks_from_spotify)} new tracks"
-                " in Spotify playlist not in history, adding to history."
-            )
-            df_playlist_hist = pd.concat(
-                [df_playlist_hist, new_tracks_from_spotify], ignore_index=True
-            )
+    df_playlist_hist = sync_playlist_history(playlist, digging_mode)
 
     persistent_track_ids = []
     new_history_tracks = []

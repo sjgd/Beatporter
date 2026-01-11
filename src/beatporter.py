@@ -24,19 +24,33 @@ from src.config import (
     shuffle_label,
     spotify_bkp,
     use_gcp,
+    username,
 )
 from src.gcp import download_file_to_gcs, upload_file_to_gcs
 from src.spotify_search import (
     add_new_tracks_to_playlist_chart_label,
     add_new_tracks_to_playlist_genre,
 )
-from src.spotify_utils import back_up_spotify_playlist
+from src.spotify_utils import (
+    back_up_spotify_playlist,
+    get_all_playlists,
+    update_hist_pl_tracks,
+)
 from src.utils import FILE_NAME_HIST, PATH_HIST_LOCAL, deduplicate_hist_file
 
 logger = logging.getLogger("beatporter")
 
 curr_date = datetime.today().strftime("%Y-%m-%d")
-option_parse = ["backups", "charts", "genres", "labels"]
+option_parse = ["backups", "charts", "genres", "labels", "refresh-hist"]
+
+
+def refresh_all_playlists_history() -> None:
+    """Refresh history for all playlists of user."""
+    all_playlists = get_all_playlists()
+    for playlist in all_playlists:
+        if playlist["owner"]["id"] == username:
+            logger.info(f"Refreshing history for playlist: {playlist['name']}")
+            update_hist_pl_tracks(playlist)
 
 
 def _transfer_excel_to_parquet_if_needed() -> None:
@@ -173,6 +187,10 @@ def main(
     # Load arguments
     args = sys.argv[1:]
     args = [arg.replace("-", "") for arg in args]
+
+    if "refresh-hist" in args:
+        refresh_all_playlists_history()
+
     if len(args) == 0:
         # If not argument passed then parse all
         args = option_parse

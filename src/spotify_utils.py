@@ -31,7 +31,17 @@ from src.config import (
 from src.configure_logging import configure_logging
 from src.models import BeatportTrack
 from src.search_utils import clean_track_name
-from src.utils import save_hist_dataframe
+from src.utils import (
+    append_to_hist_file,
+    load_hist_file,
+)
+
+
+def _get_history_for_digging(digging_mode: str, playlist_id: str | None) -> pd.DataFrame:
+    """Get history for digging mode."""
+    if digging_mode == "all":
+        return load_hist_file(playlist_id=None, allow_empty=True)
+    return load_hist_file(playlist_id=playlist_id, allow_empty=True)
 
 
 class PlaylistDescription(TypedDict):
@@ -1096,75 +1106,18 @@ def find_playlist_chart_label(title: str) -> dict:
     return playlist
 
 
-def _get_local_history_for_playlist_id(
-    df_hist_pl_tracks: pd.DataFrame, playlist_id: str, digging_mode: str
-) -> pd.DataFrame:
-    if digging_mode == "playlist":
-        df_local_hist = df_hist_pl_tracks.loc[
-            df_hist_pl_tracks["playlist_id"] == playlist_id
-        ]
-    elif digging_mode == "all":
-        df_local_hist = df_hist_pl_tracks
-    else:
-        df_local_hist = pd.DataFrame(
-            columns=[
-                "playlist_id",
-                "playlist_name",
-                "track_id",
-                "datetime_added",
-                "artist_name",
-            ]
-        )
-    return df_local_hist
-
-
-def _process_track_in_playlist_id(
-    track: dict, df_local_hist: pd.DataFrame, playlist_track_ids: pd.Series, silent: bool
-) -> tuple[str | None, bool]:
-    track_id = None
-    added = False
-    if track["track"] is not None:  # Prevent error of empty track
-        track_id = track["track"]["id"]
-        if track_id not in df_local_hist.values:
-            if track_id not in playlist_track_ids.values:
-                if not silent:
-                    logger.info(f"\t[+] Adding track id : {track_id}")
-                if track_id is not None:
-                    added = True
-                else:
-                    logger.warn(
-                        "\t[+]! Trying to add track_id None : {} - {}".format(
-                            track["track"]["artists"][0]["name"],
-                            track["track"]["name"],
-                        )
-                    )
-            else:
-                if not silent:
-                    logger.info("\tTrack already found in playlist or history")
-    return track_id, added
-
-
 def add_new_tracks_to_playlist_id(
     playlist_name: str,
     track_ids: list,
-    df_hist_pl_tracks: pd.DataFrame,
     silent: bool = silent_search,
-) -> pd.DataFrame:
+) -> None:
     """Add new tracks to a playlist by ID.
 
     Args:
         playlist_name (str): Playlist name to be used.
         track_ids (list): List of track IDs.
-        df_hist_pl_tracks (pd.DataFrame): DataFrame of history of track.
         silent (bool): If true do not display searching details except errors.
-
-    Returns:
-        pd.DataFrame: Updated DataFrame.
-
     """
-    # TODO unify all add_new_track in one function
-
-    # TODO export playlist prefix name to config
     persistent_playlist_name = playlist_name
     logger.info(f'[+] Identifying new tracks for playlist: "{persistent_playlist_name}"')
 
@@ -1175,45 +1128,52 @@ def add_new_tracks_to_playlist_id(
 
     if playlist["id"] is None:  # Explicitly check for None
         logger.warning(
-            '\t[!] Playlist "{}" does not exist, creating it.'.format(playlist["name"])
+            f'\t[!] Playlist "{playlist["name"]}" does not exist, creating it.'
         )
         new_playlist_id: str = create_playlist(cast(str, playlist["name"]))
         playlist["id"] = new_playlist_id
 
     assert playlist["id"] is not None
 
-    df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
-    playlist_track_ids = df_hist_pl_tracks.loc[
-        df_hist_pl_tracks["playlist_id"] == playlist["id"], "track_id"
-    ]
+    df_playlist_hist = _get_history_for_digging(digging_mode, playlist["id"])
 
-    df_local_hist = _get_local_history_for_playlist_id(
-        df_hist_pl_tracks, playlist["id"], digging_mode
-    )
-
-    persistent_track_ids = list()
+    persistent_track_ids = []
+    new_history_tracks = []
     track_count = 0
 
     for track_count_tot, track in enumerate(track_ids):
-        track_id, added = _process_track_in_playlist_id(
-            track, df_local_hist, playlist_track_ids, silent
-        )
-        if added:
-            persistent_track_ids.append(track_id)
-            track_count += 1
+        if track["track"] is not None:
+            track_id = track["track"]["id"]
+            if track_id not in df_playlist_hist["track_id"].values:
+                if not silent:
+                    logger.info(f"\t[+] Adding track id : {track_id}")
+                persistent_track_ids.append(track_id)
+                new_history_tracks.append(
+                    {
+                        "playlist_id": playlist["id"],
+                        "playlist_name": playlist["name"],
+                        "track_id": track_id,
+                        "datetime_added": pd.Timestamp.now(tz="UTC"),
+                        "artist_name": track["track"]["artists"][0]["name"],
+                    }
+                )
+                track_count += 1
+
         if track_count >= 99:  # Have limit of 100 trakcks per import
             logger.warning(
                 f"[+] Adding {len(persistent_track_ids)} new tracks "
                 f'to the playlist: "{persistent_playlist_name}"'
             )
             add_tracks_to_playlist(playlist["id"], persistent_track_ids)
-            # TODO consider only adding new ID to avoid reloading large playlist
-            df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
-            playlist_track_ids = df_hist_pl_tracks.loc[
-                df_hist_pl_tracks["playlist_id"] == playlist["id"], "track_id"
-            ]
+            df_new_tracks = pd.DataFrame(new_history_tracks)
+            append_to_hist_file(df_new_tracks)
+            df_playlist_hist = pd.concat(
+                [df_playlist_hist, df_new_tracks],
+                ignore_index=True,
+            )
             track_count = 0
-            persistent_track_ids = list()
+            persistent_track_ids = []
+            new_history_tracks = []
             update_playlist_description_with_date(playlist)
 
     if len(persistent_track_ids) > 0:
@@ -1223,17 +1183,13 @@ def add_new_tracks_to_playlist_id(
         )
         add_tracks_to_playlist(playlist["id"], persistent_track_ids)
         update_playlist_description_with_date(playlist)
+        append_to_hist_file(pd.DataFrame(new_history_tracks))
     else:
         logger.info(
             f'[+] No new tracks to add to the playlist: "{persistent_playlist_name}"'
         )
 
-    df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
-
-    if len(persistent_track_ids) > 0:
-        save_hist_dataframe(df_hist_pl_tracks)
-
-    return df_hist_pl_tracks
+    return
 
 
 def update_playlist_description_with_date(playlist: dict) -> None:
@@ -1293,26 +1249,17 @@ def update_hist_from_playlist(
     return df_hist_pl_tracks
 
 
-def back_up_spotify_playlist(
-    playlist_name: str, org_playlist_id: str, df_hist_pl_tracks: pd.DataFrame
-) -> pd.DataFrame:
+def back_up_spotify_playlist(playlist_name: str, org_playlist_id: str) -> None:
     """Back up tracks in Spotify playlist.
 
     Args:
         playlist_name (str): Playlist name.
         org_playlist_id (str): Original playlist ID.
-        df_hist_pl_tracks (pd.DataFrame): DataFrame of history of track.
-
-    Returns:
-        pd.DataFrame: Updated DataFrame.
-
     """
     track_ids = get_all_tracks_in_playlist(org_playlist_id)
-    df_hist_pl_tracks = add_new_tracks_to_playlist_id(
-        playlist_name, track_ids, df_hist_pl_tracks
-    )
+    add_new_tracks_to_playlist_id(playlist_name, track_ids)
 
-    return df_hist_pl_tracks
+    return
 
 
 def get_track_detail(track_id: str) -> str:

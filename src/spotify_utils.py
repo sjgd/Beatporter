@@ -1063,9 +1063,9 @@ def _get_new_spotify_tracks(
                 "playlist_id": playlist["id"],
                 "playlist_name": playlist["name"],
                 "track_id": track_details["id"],
-                "datetime_added": pd.to_datetime(
-                    df_from_spotify["added_at"]
-                ).dt.strftime("%Y-%m-%d %H:%M:%S"),
+                "datetime_added": pd.to_datetime(df_from_spotify["added_at"]).dt.strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                ),
                 "artist_name": (
                     track_details["artists"].apply(
                         lambda a: a[0]["name"] if a and len(a) > 0 else "Unknown Artist"

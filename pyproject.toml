@@ -50,11 +50,11 @@ line-length = 90
 
 [tool.ruff.lint]
 extend-select = [
-  'D', #pydocstyle
+  'D', # pydocstyle
   'E', 'W', # pycodestyle
-  'F', #pyflakes
+  'F', # pyflakes
   'I', # sort imports
-  'UP', #pyupgrade
+  'UP', # pyupgrade
   "RUF",  # ruff dev's own rules
   "SIM", # pyflakes simplicity
   "C90", # more complexity rules

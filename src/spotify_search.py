@@ -456,9 +456,6 @@ def add_new_tracks_to_playlist(genre: str, tracks_dict: list) -> None:
         add_tracks_to_playlist(playlists[1]["id"], daily_top_n_track_ids)
 
 
-
-
-
 def add_new_tracks_to_playlist_chart_label(
     title: str,
     tracks_dict: list[BeatportTrack],
@@ -487,8 +484,6 @@ def add_new_tracks_to_playlist_chart_label(
         )
         playlist["id"] = create_playlist(playlist["name"])
 
-    # TODO put back?
-    # update_hist_pl_tracks(playlist)
     df_playlist_hist = _get_history_for_digging(digging_mode, playlist["id"])
 
     persistent_track_ids = []

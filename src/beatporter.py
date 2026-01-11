@@ -30,12 +30,12 @@ from src.gcp import download_file_to_gcs
 from src.spotify_search import (
     add_new_tracks_to_playlist_chart_label,
     add_new_tracks_to_playlist_genre,
-    update_hist_pl_tracks,
 )
 from src.spotify_utils import (
     back_up_spotify_playlist,
     get_all_playlists,
     update_hist_from_playlist,
+    update_hist_pl_tracks,
 )
 from src.utils import FILE_NAME_HIST, PATH_HIST_LOCAL, deduplicate_hist_file
 

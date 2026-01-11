@@ -1083,7 +1083,7 @@ def _get_new_spotify_tracks(
 
 
 def sync_playlist_history(playlist: dict, digging_mode: str) -> pd.DataFrame:
-    """Syncs Spotify playlist tracks with local history.
+    """Sync Spotify playlist tracks with local history.
 
     Args:
         playlist (dict): A dictionary representing the Spotify playlist,
@@ -1158,25 +1158,21 @@ def add_new_tracks_to_playlist_id(
 
     persistent_track_ids = []
     new_history_tracks = []
-    track_count = 0
 
-    for track_count_tot, track in enumerate(track_ids):
-        if track["track"] is not None:
-            track_id = track["track"]["id"]
-            if track_id not in df_playlist_hist["track_id"].values:
-                if not silent:
-                    logger.info(f"\t[+] Adding track id : {track_id}")
-                persistent_track_ids.append(track_id)
-                new_history_tracks.append(
-                    {
-                        "playlist_id": playlist["id"],
-                        "playlist_name": playlist["name"],
-                        "track_id": track_id,
-                        "datetime_added": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "artist_name": track["track"]["artists"][0]["name"],
-                    }
-                )
-                track_count += 1
+    for track_id in track_ids:
+        if track_id is not None and track_id not in df_playlist_hist["track_id"].values:
+            if not silent:
+                logger.info(f"\t[+] Adding track id : {track_id}")
+            persistent_track_ids.append(track_id)
+            new_history_tracks.append(
+                {
+                    "playlist_id": playlist["id"],
+                    "playlist_name": playlist["name"],
+                    "track_id": track_id,
+                    "datetime_added": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "artist_name": get_track_detail(track_id),
+                }
+            )
 
     if persistent_track_ids:
         add_tracks_to_playlist(playlist["id"], persistent_track_ids)
@@ -1194,16 +1190,23 @@ def add_new_tracks_to_playlist_id(
 
 
 def back_up_spotify_playlist(playlist_name: str, org_playlist_id: str) -> None:
-    """Back up tracks in Spotify playlist.
+    """Back up a Spotify playlist.
 
-    Args:
-        playlist_name (str): Playlist name.
-        org_playlist_id (str): Original playlist ID.
+    :param playlist_name:
+    :param org_playlist_id:
+    :return:
     """
-    track_ids = get_all_tracks_in_playlist(org_playlist_id)
-    add_new_tracks_to_playlist_id(playlist_name, track_ids)
+    logger.info(f"Backing up playlist {playlist_name}...")
+    # Get the tracks from the original playlist
+    org_playlist_tracks = get_all_tracks_in_playlist(playlist_id=org_playlist_id)
+    track_ids = [
+        track["track"]["id"]
+        for track in org_playlist_tracks
+        if track["track"] and track["track"]["id"]
+    ]
 
-    return
+    # Add the tracks to the backup playlist
+    add_new_tracks_to_playlist_id(playlist_name, track_ids)
 
 
 def get_track_detail(track_id: str) -> str:

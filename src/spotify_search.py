@@ -416,11 +416,8 @@ def add_new_tracks_to_playlist(genre: str, tracks_dict: list) -> None:
         tracks_dict (list): Dictionary of tracks.
 
     """
-    # TODO export playlist anterior name to config
-    # persistent_top_100_playlist_name = "{}{} - Top 100".format(playlist_prefix, genre)
-    # daily_top_10_playlist_name = "{}{} - Daily Top".format(playlist_prefix, genre)
-    persistent_top_100_playlist_name = f"Beatporter: {genre} - Top 100"
-    daily_top_n_playlist_name = f"Beatporter: {genre} - Daily Top"
+    persistent_top_100_playlist_name = f"{playlist_prefix}{genre} - Top 100"
+    daily_top_n_playlist_name = f"{playlist_prefix}{genre} - Daily Top"
     logger.info(
         f'[+] Identifying new tracks for playlist: "{persistent_top_100_playlist_name}"'
     )

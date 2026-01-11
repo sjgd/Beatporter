@@ -24,19 +24,13 @@ from src.config import (
     shuffle_label,
     spotify_bkp,
     use_gcp,
-    username,
 )
 from src.gcp import download_file_to_gcs, upload_file_to_gcs
 from src.spotify_search import (
     add_new_tracks_to_playlist_chart_label,
     add_new_tracks_to_playlist_genre,
 )
-from src.spotify_utils import (
-    back_up_spotify_playlist,
-    get_all_playlists,
-    update_hist_from_playlist,
-    update_hist_pl_tracks,
-)
+from src.spotify_utils import back_up_spotify_playlist
 from src.utils import FILE_NAME_HIST, PATH_HIST_LOCAL, deduplicate_hist_file
 
 logger = logging.getLogger("beatporter")
@@ -55,36 +49,6 @@ def _transfer_excel_to_parquet_if_needed() -> None:
         df = pd.read_excel(excel_path)
         df.to_parquet(parquet_path, compression="gzip", index=False)
         logger.info("Transfer complete.")
-
-
-def update_hist(master_refresh: bool = False) -> None:
-    """Update hist file with configs.
-
-    Args:
-        master_refresh: Refresh hist for all playlist of user?
-    """
-    # TODO: testing, to refine usage, include in first init ?
-
-    parsed_charts = {
-        parse_chart_url_datetime(k): parse_chart_url_datetime(v)
-        for k, v in charts.items()
-    }
-
-    for chart, chart_bp_url_code in parsed_charts.items():
-        update_hist_from_playlist(chart)
-
-    for label, label_bp_url_code in labels.items():
-        update_hist_from_playlist(label)
-
-    if master_refresh:
-        # Get track ids from all playlists from username from config
-        all_playlists = get_all_playlists()
-        for playlist in all_playlists:
-            # logger.info(playlist['name'])
-            if playlist["owner"]["id"] == username:
-                logger.info(playlist["name"])
-                playlist = {"name": playlist["name"], "id": playlist["id"]}
-                update_hist_pl_tracks(playlist)
 
 
 def _handle_backups(args: list[str], spotify_bkp: dict[str, str]) -> None:

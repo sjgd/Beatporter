@@ -1,7 +1,6 @@
 """Module to manage Spotify queries."""
 
 import asyncio
-import gc
 import logging
 import re
 import socket
@@ -22,7 +21,6 @@ from src.config import (
     client_secret,
     digging_mode,
     playlist_description,
-    playlist_prefix,
     redirect_uri,
     scope,
     silent_search,
@@ -930,17 +928,17 @@ def add_tracks_to_playlist(playlist_id: str, track_ids: list) -> None:
     Args:
         playlist_id (str): Playlist ID.
         track_ids (list): List of track IDs.
-
     """
-    if len(track_ids) >= 100:
-        logger.error(
-            "Double check if can add more than 100 tracks at once to a Spotify playlist."
-        )
-    if track_ids:
-        spotify_ins = spotify_auth()
-        position = 0 if add_at_top_playlist else None
+    if not track_ids:
+        return
+
+    spotify_ins = spotify_auth()
+    position = 0 if add_at_top_playlist else None
+
+    for i in range(0, len(track_ids), 100):
+        chunk = track_ids[i : i + 100]  # noqa: E203
         spotify_ins.playlist_add_items(
-            playlist_id=playlist_id, items=track_ids, position=position
+            playlist_id=playlist_id, items=chunk, position=position
         )
 
 
@@ -1025,75 +1023,6 @@ def parse_tracks_spotify(tracks_json: dict) -> list[BeatportTrack]:
     return tracks
 
 
-def update_hist_pl_tracks(playlist: dict) -> None:
-    """Update the history DataFrame with a playlist.
-
-    Args:
-        playlist (dict): Playlist dictionary.
-    """
-    track_list = get_all_tracks_in_playlist(playlist["id"])
-    if not track_list:
-        return
-
-    df_playlist_tracks = pd.DataFrame.from_records(track_list)
-
-    # A track can be None if it has been removed from Spotify
-    df_playlist_tracks.dropna(subset=["track"], inplace=True)
-    df_playlist_tracks.reset_index(drop=True, inplace=True)  # Reset index for alignment
-
-    if df_playlist_tracks.empty:
-        return
-
-    track_details = pd.json_normalize(df_playlist_tracks["track"])
-    df_from_spotify = pd.DataFrame(
-        {
-            "playlist_id": playlist["id"],
-            "playlist_name": playlist["name"],
-            "track_id": track_details["id"],
-            "datetime_added": df_playlist_tracks["added_at"],
-            "artist_name": (
-                track_details["artists"].apply(
-                    lambda a: a[0]["name"] if a else "Unknown Artist"
-                )
-                + " - "
-                + track_details["name"]
-            ),
-        }
-    )
-
-    df_local_hist = load_hist_file(playlist_id=playlist["id"], allow_empty=True)
-    new_tracks_df = df_from_spotify[
-        ~df_from_spotify["track_id"].isin(df_local_hist["track_id"])
-    ]
-
-    if not new_tracks_df.empty:
-        logger.info(
-            f"[+] Updating history with {len(new_tracks_df)} new tracks"
-            f' from playlist: "{playlist["name"]}"'
-        )
-        append_to_hist_file(new_tracks_df)
-    _ = gc.collect()
-
-
-def find_playlist_chart_label(title: str) -> dict:
-    """Find playlist chart label.
-
-    Args:
-        title (str): Chart or label title.
-
-    Returns:
-        dict: Dictionary of playlist name and playlist ID.
-
-    """
-    persistent_playlist_name = f"{playlist_prefix}{title}"
-    playlist = {
-        "name": persistent_playlist_name,
-        "id": get_playlist_id(persistent_playlist_name),
-    }
-
-    return playlist
-
-
 def add_new_tracks_to_playlist_id(
     playlist_name: str,
     track_ids: list,
@@ -1121,9 +1050,40 @@ def add_new_tracks_to_playlist_id(
         new_playlist_id: str = create_playlist(cast(str, playlist["name"]))
         playlist["id"] = new_playlist_id
 
-    update_hist_pl_tracks(playlist)
-
+    # Pre-sync with spotify
     df_playlist_hist = _get_history_for_digging(digging_mode, playlist["id"])
+    spotify_tracks = get_all_tracks_in_playlist(playlist["id"])
+    df_from_spotify = pd.DataFrame.from_records(spotify_tracks)
+    if not df_from_spotify.empty:
+        df_from_spotify.dropna(subset=["track"], inplace=True)
+        df_from_spotify.reset_index(drop=True, inplace=True)
+        track_details = pd.json_normalize(df_from_spotify["track"])
+        df_from_spotify = pd.DataFrame(
+            {
+                "playlist_id": playlist["id"],
+                "playlist_name": playlist["name"],
+                "track_id": track_details["id"],
+                "datetime_added": df_from_spotify["added_at"],
+                "artist_name": (
+                    track_details["artists"].apply(
+                        lambda a: a[0]["name"] if a else "Unknown Artist"
+                    )
+                    + " - "
+                    + track_details["name"]
+                ),
+            }
+        )
+        new_tracks_from_spotify = df_from_spotify[
+            ~df_from_spotify["track_id"].isin(df_playlist_hist["track_id"])
+        ]
+        if not new_tracks_from_spotify.empty:
+            logger.info(
+                f"\t[+] Found {len(new_tracks_from_spotify)} new tracks"
+                " in Spotify playlist not in history, adding to history."
+            )
+            df_playlist_hist = pd.concat(
+                [df_playlist_hist, new_tracks_from_spotify], ignore_index=True
+            )
 
     persistent_track_ids = []
     new_history_tracks = []
@@ -1147,28 +1107,7 @@ def add_new_tracks_to_playlist_id(
                 )
                 track_count += 1
 
-        if track_count >= 99:  # Have limit of 100 trakcks per import
-            logger.warning(
-                f"[+] Adding {len(persistent_track_ids)} new tracks "
-                f'to the playlist: "{persistent_playlist_name}"'
-            )
-            add_tracks_to_playlist(playlist["id"], persistent_track_ids)
-            df_new_tracks = pd.DataFrame(new_history_tracks)
-            append_to_hist_file(df_new_tracks)
-            df_playlist_hist = pd.concat(
-                [df_playlist_hist, df_new_tracks],
-                ignore_index=True,
-            )
-            track_count = 0
-            persistent_track_ids = []
-            new_history_tracks = []
-            update_playlist_description_with_date(playlist)
-
-    if len(persistent_track_ids) > 0:
-        logger.warning(
-            f"[+] Adding {len(persistent_track_ids)} new tracks to the "
-            f'playlist: "{persistent_playlist_name}"'
-        )
+    if persistent_track_ids:
         add_tracks_to_playlist(playlist["id"], persistent_track_ids)
         update_playlist_description_with_date(playlist)
         append_to_hist_file(pd.DataFrame(new_history_tracks))
@@ -1178,51 +1117,6 @@ def add_new_tracks_to_playlist_id(
         )
 
     return
-
-
-def update_playlist_description_with_date(playlist: dict) -> None:
-    """Update playlist description with current date.
-
-    Args:
-        playlist (dict): Playlist dictionary.
-
-    """
-    spotify_ins = spotify_auth()
-    # Cast the entire playlist_desc to help mypy understand its structure
-    # We assume 'description' key will always be a string for a playlist object
-    playlist_info: PlaylistDescription = cast(
-        PlaylistDescription, spotify_ins.playlist(playlist_id=playlist["id"])
-    )
-
-    current_description: str = playlist_info["description"]
-    current_description = re.sub(
-        r"\s*Updated on \d{4}-\d{2}-\d{2}\.*", "", current_description
-    )
-    current_description = re.sub(r"&#x2F;", "/", current_description)
-
-    spotify_ins.playlist_change_details(
-        playlist_id=playlist["id"],
-        description=current_description
-        + " Updated on {}.".format(datetime.today().strftime("%Y-%m-%d")),
-    )
-
-
-def update_hist_from_playlist(title: str) -> None:
-    """Update history from playlist.
-
-    Args:
-        title (str): Playlist title.
-    """
-    persistent_playlist_name = f"{playlist_prefix}{title}"
-    logger.info(f'[+] Getting hist of tracks for playlist: "{persistent_playlist_name}"')
-
-    playlist = {
-        "name": persistent_playlist_name,
-        "id": get_playlist_id(persistent_playlist_name),
-    }
-
-    if playlist["id"]:
-        update_hist_pl_tracks(playlist)
 
 
 def back_up_spotify_playlist(playlist_name: str, org_playlist_id: str) -> None:
@@ -1254,6 +1148,30 @@ def get_track_detail(track_id: str) -> str:
     artists_str: str = ", ".join(artists_list)
 
     return "{} by {}".format(track_result["name"], artists_str)
+
+
+def update_playlist_description_with_date(playlist: dict) -> None:
+    """Update playlist description with current date.
+
+    Args:
+        playlist (dict): Playlist dictionary.
+    """
+    spotify_ins = spotify_auth()
+    playlist_info: PlaylistDescription = cast(
+        PlaylistDescription, spotify_ins.playlist(playlist_id=playlist["id"])
+    )
+
+    current_description: str = playlist_info["description"]
+    current_description = re.sub(
+        r"\s*Updated on \d{4}-\d{2}-\d{2}\.*", "", current_description
+    )
+    current_description = re.sub(r"&#x2F;", "/", current_description)
+
+    spotify_ins.playlist_change_details(
+        playlist_id=playlist["id"],
+        description=current_description
+        + " Updated on {}.".format(datetime.today().strftime("%Y-%m-%d")),
+    )
 
 
 # Annex testing tracks with known issues

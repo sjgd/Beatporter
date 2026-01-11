@@ -129,6 +129,10 @@ def _save_hist_file_proc(df_hist_pl_tracks: pd.DataFrame) -> None:
     proc_logger = logging.getLogger("proc_saver")
 
     try:
+        if "datetime_added" in df_hist_pl_tracks.columns:
+            df_hist_pl_tracks["datetime_added"] = pd.to_datetime(
+                df_hist_pl_tracks["datetime_added"]
+            )
         df_hist_pl_tracks.to_parquet(
             PATH_HIST_LOCAL + FILE_NAME_HIST, compression="gzip", index=False
         )

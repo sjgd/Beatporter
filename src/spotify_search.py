@@ -733,6 +733,11 @@ def add_new_tracks_to_playlist_genre(
         add_tracks_to_playlist(playlists[0]["id"], persistent_track_ids)
         update_playlist_description_with_date(playlists[0])
         append_to_hist_file(pd.DataFrame(new_persistent_history_tracks))
+    else:
+        logger.info(
+            f"[+] No new tracks to add to the "
+            f"playlist: {persistent_top_100_playlist_name}"
+        )
 
     if daily_mode and daily_top_n_track_ids:
         logger.warning(
@@ -742,6 +747,10 @@ def add_new_tracks_to_playlist_genre(
         add_tracks_to_playlist(playlists[1]["id"], daily_top_n_track_ids)
         update_playlist_description_with_date(playlists[1])
         append_to_hist_file(pd.DataFrame(new_daily_history_tracks))
+    else:
+        logger.info(
+            f'[+] No new tracks to add to the playlist: "{daily_top_n_playlist_name}"'
+        )
 
     if daily_mode:
         _backfill_daily_playlist(

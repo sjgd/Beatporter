@@ -57,22 +57,6 @@ def _transfer_excel_to_parquet_if_needed() -> None:
         logger.info("Transfer complete.")
 
 
-def dump_tracks(tracks: dict) -> None:
-    """Util function to print all tracks in list."""
-    i = 1
-    for track in tracks:
-        logger.info(
-            "{}: {} ({}) - {} ({})".format(
-                i,
-                track.name,
-                track.mix,
-                ", ".join(track.artists),
-                track.duration,
-            )
-        )
-        i += 1
-
-
 def update_hist(master_refresh: bool = False) -> None:
     """Update hist file with configs.
 

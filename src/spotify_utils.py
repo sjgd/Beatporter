@@ -1097,8 +1097,8 @@ def sync_playlist_history(playlist: dict, digging_mode: str) -> pd.DataFrame:
     new_tracks_from_spotify = _get_new_spotify_tracks(playlist, df_playlist_hist)
     if not new_tracks_from_spotify.empty:
         logger.warning(
-            f"\t[+] Found {len(new_tracks_from_spotify)} new tracks"
-            " in Spotify playlist not in history, adding to history."
+            f"\t[+] Backing up {len(new_tracks_from_spotify)} tracks "
+            "from playlist to history"
         )
         append_to_hist_file(new_tracks_from_spotify)
         df_playlist_hist = pd.concat(
@@ -1175,6 +1175,10 @@ def add_new_tracks_to_playlist_id(
             )
 
     if persistent_track_ids:
+        logger.warning(
+            f"\t[+] Transferring {len(persistent_track_ids)} new tracks to backup "
+            f"playlist '{playlist['name']}'"
+        )
         add_tracks_to_playlist(playlist["id"], persistent_track_ids)
         update_playlist_description_with_date(playlist)
         append_to_hist_file(pd.DataFrame(new_history_tracks))

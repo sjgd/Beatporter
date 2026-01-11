@@ -1062,7 +1062,9 @@ def _get_new_spotify_tracks(
                 "playlist_id": playlist["id"],
                 "playlist_name": playlist["name"],
                 "track_id": track_details["id"],
-                "datetime_added": df_from_spotify["added_at"],
+                "datetime_added": pd.to_datetime(
+                    df_from_spotify["added_at"]
+                ).dt.strftime("%Y-%m-%d %H:%M:%S"),
                 "artist_name": (
                     track_details["artists"].apply(
                         lambda a: a[0]["name"] if a and len(a) > 0 else "Unknown Artist"
@@ -1117,8 +1119,6 @@ def update_hist_pl_tracks(playlist: dict) -> None:
         append_to_hist_file(new_tracks_from_spotify)
 
 
-
-
 def add_new_tracks_to_playlist_id(
     playlist_name: str,
     track_ids: list,
@@ -1165,7 +1165,7 @@ def add_new_tracks_to_playlist_id(
                         "playlist_id": playlist["id"],
                         "playlist_name": playlist["name"],
                         "track_id": track_id,
-                        "datetime_added": pd.Timestamp.now(tz="UTC"),
+                        "datetime_added": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                         "artist_name": track["track"]["artists"][0]["name"],
                     }
                 )

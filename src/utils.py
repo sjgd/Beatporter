@@ -9,8 +9,6 @@ from time import sleep
 
 import pandas as pd
 import psutil
-import pyarrow as pa
-import pyarrow.parquet as pq
 
 from src.config import ROOT_PATH, use_gcp
 from src.configure_logging import configure_logging
@@ -63,6 +61,12 @@ def load_hist_file(
                     "artist_name",
                 ]
             )
+        # Try to load excel file if it exists
+        excel_path = file_path.replace(".parquet.gz", ".xlsx")
+        if os.path.exists(excel_path):
+            logger.info("Found excel history file, loading it.")
+            return pd.read_excel(excel_path)
+
         raise ValueError(
             f"File does not exist at the expected path: {file_path}. "
             "Creating an empty DataFrame is not allowed (allow_empty=False)."
@@ -99,8 +103,6 @@ def load_hist_file(
 
 def _save_hist_file_proc(df_hist_pl_tracks: pd.DataFrame) -> None:
     """Save the history dataframe in a separate process."""
-    # NOTE: This function runs in a separate process.
-    # Logging from here might not be captured by the main process's handlers.
     proc_logger = logging.getLogger("proc_saver")
 
     try:
@@ -136,8 +138,6 @@ def save_hist_dataframe(df_hist_pl_tracks: pd.DataFrame) -> None:
     print_memory_usage_readable()
 
 
-
-
 def append_to_hist_file(
     df_new_tracks: pd.DataFrame,
     file_path: str = PATH_HIST_LOCAL + FILE_NAME_HIST,
@@ -152,15 +152,9 @@ def append_to_hist_file(
         return
 
     try:
-        table = pa.Table.from_pandas(df_new_tracks)
-        if os.path.exists(file_path):
-            pq.write_to_dataset(
-                table,
-                root_path=file_path,
-                existing_data_behavior="overwrite_or_ignore",
-            )
-        else:
-            pq.write_table(table, file_path)
+        df_history = load_hist_file(file_path=file_path, allow_empty=True)
+        df_updated = pd.concat([df_history, df_new_tracks], ignore_index=True)
+        save_hist_dataframe(df_updated)
     except Exception as e:
         logger.error(f"Failed to append to hist file: {e}", exc_info=True)
 
@@ -187,16 +181,12 @@ def deduplicate_hist_file(
         n_rows_after = len(df_history)
 
         if n_rows_before > n_rows_after:
-            logger.info(
-                f"Removed {n_rows_before - n_rows_after} duplicate tracks."
-            )
+            logger.info(f"Removed {n_rows_before - n_rows_after} duplicate tracks.")
             save_hist_dataframe(df_history)
         else:
             logger.info("No duplicate tracks found.")
     except Exception as e:
-        logger.error(
-            f"Failed to de-duplicate hist file: {e}", exc_info=True
-        )
+        logger.error(f"Failed to de-duplicate hist file: {e}", exc_info=True)
 
 
 def print_memory_usage_readable() -> None:
@@ -210,6 +200,29 @@ def print_memory_usage_readable() -> None:
             )
             return
         memory_usage_bytes /= 1024.0
+
+
+def transfer_to_excel(
+    file_path: str = PATH_HIST_LOCAL + FILE_NAME_HIST,
+    excel_path: str = PATH_HIST_LOCAL + "hist_playlists_tracks.xlsx",
+) -> None:
+    """Transfer the history file to an Excel file.
+
+    Args:
+        file_path (str): Path to the history file.
+        excel_path (str): Path to the Excel file.
+    """
+    logger.info("Transferring history file to Excel...")
+    try:
+        df_history = load_hist_file(file_path=file_path, allow_empty=True)
+        if df_history.empty:
+            logger.info("History file is empty, nothing to transfer.")
+            return
+
+        df_history.to_excel(excel_path, index=False)
+        logger.info("Transfer complete.")
+    except Exception as e:
+        logger.error(f"Failed to transfer hist file to Excel: {e}", exc_info=True)
 
 
 configure_logging()

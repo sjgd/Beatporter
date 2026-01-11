@@ -1099,6 +1099,7 @@ def sync_playlist_history(playlist: dict, digging_mode: str) -> pd.DataFrame:
             f"\t[+] Found {len(new_tracks_from_spotify)} new tracks"
             " in Spotify playlist not in history, adding to history."
         )
+        append_to_hist_file(new_tracks_from_spotify)
         df_playlist_hist = pd.concat(
             [df_playlist_hist, new_tracks_from_spotify], ignore_index=True
         )

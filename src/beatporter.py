@@ -1,5 +1,6 @@
 """Main module to run Beatporter."""
 
+import gc
 import logging
 import os
 import random
@@ -81,6 +82,7 @@ def _handle_backups(args: list[str], spotify_bkp: dict[str, str]) -> None:
                     f"***** {playlist_name} : {org_playlist_id} ***** "
                     f"with error: {e}"
                 )
+            gc.collect()
 
 
 def _handle_charts(

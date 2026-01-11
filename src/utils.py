@@ -151,7 +151,10 @@ def save_hist_dataframe(df_hist_pl_tracks: pd.DataFrame) -> None:
     print_memory_usage_readable()
     sleep(1)
 
-    ctx = multiprocessing.get_context("spawn")
+    if os.name == "nt":
+        ctx = multiprocessing.get_context("spawn")
+    else:
+        ctx = multiprocessing.get_context()
     p = ctx.Process(target=_save_hist_file_proc, args=(df_hist_pl_tracks,))
     p.start()
     p.join()

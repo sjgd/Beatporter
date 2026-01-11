@@ -1192,9 +1192,9 @@ def add_new_tracks_to_playlist_id(
 def back_up_spotify_playlist(playlist_name: str, org_playlist_id: str) -> None:
     """Back up a Spotify playlist.
 
-    :param playlist_name:
-    :param org_playlist_id:
-    :return:
+    Args:
+        playlist_name (str): The name of the playlist to back up to.
+        org_playlist_id (str): The ID of the playlist to back up from.
     """
     logger.info(f"Backing up playlist {playlist_name}...")
     # Get the tracks from the original playlist

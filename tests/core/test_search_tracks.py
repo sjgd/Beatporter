@@ -13,7 +13,7 @@ logger = logging.getLogger("test_search_tracks")
 
 file_name_hist = "hist_playlists_tracks.pkl"
 curr_date = datetime.today().strftime("%Y-%m-%d")
-option_parse = ["backup", "chart", "genre", "label"]
+valid_arguments = ["backup", "chart", "genre", "label"]
 
 # Use https://open.spotify.com/track/4zC9MjbIIHJoBpny7Sh35s to explore a track
 

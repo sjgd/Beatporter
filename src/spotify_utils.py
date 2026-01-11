@@ -565,7 +565,7 @@ def search_for_track(track: BeatportTrack, silent: bool = silent_search) -> str 
         track.release,
     )
     track_id = _perform_track_search(
-        "\t\t[+] No exact matches on name, mix, artists, and release.",
+        "\t\t[+] Searching with name, mix, artists, and release.",
         query,
         track,
         silent,
@@ -1239,9 +1239,7 @@ def update_playlist_description_with_date(playlist: dict) -> None:
         playlist (dict): Playlist dictionary.
     """
     spotify_ins = spotify_auth()
-    playlist_info: PlaylistDescription = cast(
-        PlaylistDescription, spotify_ins.playlist(playlist_id=playlist["id"])
-    )
+    playlist_info = spotify_ins.playlist(playlist["id"])
 
     current_description: str = playlist_info["description"]
     current_description = re.sub(

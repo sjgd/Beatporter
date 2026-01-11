@@ -94,6 +94,8 @@ def load_hist_file(
                 )
                 gc.collect()
                 for col in df_hist_pl_tracks.columns:
+                    if col == "datetime_added":
+                        continue
                     try:
                         df_hist_pl_tracks[col] = df_hist_pl_tracks[col].astype(
                             pd.StringDtype()

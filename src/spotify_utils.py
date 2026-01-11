@@ -1067,6 +1067,10 @@ def update_hist_pl_tracks(playlist: dict) -> None:
     ]
 
     if not new_tracks_df.empty:
+        logger.info(
+            f"[+] Updating history with {len(new_tracks_df)} new tracks"
+            f' from playlist: "{playlist["name"]}"'
+        )
         append_to_hist_file(new_tracks_df)
     _ = gc.collect()
 

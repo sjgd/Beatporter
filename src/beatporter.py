@@ -42,7 +42,7 @@ from src.utils import FILE_NAME_HIST, PATH_HIST_LOCAL, deduplicate_hist_file
 logger = logging.getLogger("beatporter")
 
 curr_date = datetime.today().strftime("%Y-%m-%d")
-option_parse = ["backups", "charts", "genres", "labels", "refresh-hist"]
+valid_arguments = ["backups", "charts", "genres", "labels", "refresh-hist"]
 
 
 def refresh_all_playlists_history() -> None:
@@ -195,8 +195,8 @@ def main(
 
     if len(args) == 0:
         # If not argument passed then parse all
-        args = option_parse
-    logger.info(f"Using arguments: {args} of available {option_parse}")
+        args = valid_arguments
+    logger.info(f"Using arguments: {args} of available {valid_arguments}")
 
     _handle_backups(args, spotify_bkp)
     _handle_charts(args, parsed_charts)

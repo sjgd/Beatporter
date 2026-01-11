@@ -1,6 +1,7 @@
 """Module to manage Spotify queries."""
 
 import asyncio
+import gc
 import logging
 import re
 import socket
@@ -1119,6 +1120,9 @@ def update_hist_pl_tracks(playlist: dict) -> None:
         )
         append_to_hist_file(new_tracks_from_spotify)
 
+    del df_playlist_hist
+    gc.collect()
+
 
 def add_new_tracks_to_playlist_id(
     playlist_name: str,
@@ -1146,6 +1150,8 @@ def add_new_tracks_to_playlist_id(
         )
         new_playlist_id: str = create_playlist(cast(str, playlist["name"]))
         playlist["id"] = new_playlist_id
+
+    assert playlist["id"] is not None
 
     # Pre-sync with spotify
     df_playlist_hist = sync_playlist_history(playlist, digging_mode)
@@ -1180,6 +1186,9 @@ def add_new_tracks_to_playlist_id(
         logger.info(
             f'[+] No new tracks to add to the playlist: "{persistent_playlist_name}"'
         )
+
+    del df_playlist_hist
+    gc.collect()
 
     return
 

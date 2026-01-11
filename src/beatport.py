@@ -5,7 +5,6 @@ import logging
 import re
 from datetime import datetime, timedelta
 
-import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from pandas import to_datetime
@@ -13,6 +12,7 @@ from pandas import to_datetime
 from src.config import genres, overwrite_label, silent_search
 from src.models import BeatportTrack
 from src.spotify_utils import find_playlist_chart_label, update_hist_pl_tracks
+from src.utils import load_hist_file
 
 logger = logging.getLogger("beatport")
 
@@ -360,7 +360,6 @@ def parse_chart_url_datetime(date_str: str) -> str:
 def get_label_tracks(
     label: str,
     label_bp_url_code: str,
-    df_hist_pl_tracks: pd.DataFrame,
     overwrite: bool = overwrite_label,
     silent: bool = silent_search,
 ) -> list[BeatportTrack]:
@@ -369,7 +368,6 @@ def get_label_tracks(
     Args:
         label: label name.
         label_bp_url_code: label url code.
-        df_hist_pl_tracks: dataframe of historic track.
         overwrite: If True, reload all tracks; otherwise, stop once the date
                      of the last playlist refresh is reached.
         silent: If True, suppress logging messages.
@@ -391,10 +389,8 @@ def get_label_tracks(
     # Load history
     playlist = find_playlist_chart_label(label)
     if playlist["id"]:
-        df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
-        df_loc_hist = df_hist_pl_tracks.loc[
-            df_hist_pl_tracks.playlist_id == playlist["id"]
-        ]
+        update_hist_pl_tracks(playlist)
+        df_loc_hist = load_hist_file(playlist_id=playlist["id"], allow_empty=True)
         if len(df_loc_hist.index) > 0:
             last_update = max(df_loc_hist.loc[:, "datetime_added"])
             if isinstance(last_update, str):

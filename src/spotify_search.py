@@ -33,10 +33,9 @@ from src.spotify_utils import (
     search_wrapper,
     spotify_auth,
     track_in_playlist,
-    update_hist_pl_tracks,
     update_playlist_description_with_date,
 )
-from src.utils import save_hist_dataframe
+from src.utils import append_to_hist_file, load_hist_file
 
 configure_logging()
 logger = logging.getLogger("spotify_search")
@@ -456,79 +455,27 @@ def add_new_tracks_to_playlist(genre: str, tracks_dict: list) -> None:
         add_tracks_to_playlist(playlists[1]["id"], daily_top_n_track_ids)
 
 
-def _get_local_history_dataframe(
-    df_hist_pl_tracks: pd.DataFrame, playlist_id: str, digging_mode: str
-) -> pd.DataFrame:
-    if digging_mode == "playlist":
-        df_local_hist = df_hist_pl_tracks.loc[
-            df_hist_pl_tracks["playlist_id"] == playlist_id
-        ]
-    elif digging_mode == "all":
-        df_local_hist = df_hist_pl_tracks
-    else:
-        df_local_hist = pd.DataFrame(
-            columns=[
-                "playlist_id",
-                "playlist_name",
-                "track_id",
-                "datetime_added",
-                "artist_name",
-            ]
-        )
-    return df_local_hist
-
-
-def _check_and_add_track(
-    track: BeatportTrack,
-    df_local_hist: pd.DataFrame,
-    playlist_track_ids: pd.Series,
-    silent: bool,
-) -> tuple[str | None, bool]:
-    track_artist_name = track.artists[0] + " - " + track.name + " - " + track.mix
-    if track_artist_name not in df_local_hist.values:
-        try:
-            track_id = search_track_function(track)
-        except ReadTimeout:
-            track_id = search_track_function(track)
-        except spotipy.exceptions.SpotifyException:
-            track_id = search_track_function(track)
-        if (
-            track_id
-            and track_id not in playlist_track_ids.values
-            and track_id not in df_local_hist.values
-        ):
-            if not silent:
-                logger.info(
-                    f"  [Done] Adding track: {get_track_detail(track_id)} - {track_id}"
-                )
-            return track_id, True
-    else:
-        if not silent:
-            logger.info("  [Done] Similar track name already found")
-    return None, False
+def _get_history_for_digging(digging_mode: str, playlist_id: str | None) -> pd.DataFrame:
+    """Get history for digging mode."""
+    if digging_mode == "all":
+        return load_hist_file(playlist_id=None, allow_empty=True)
+    return load_hist_file(playlist_id=playlist_id, allow_empty=True)
 
 
 def add_new_tracks_to_playlist_chart_label(
     title: str,
     tracks_dict: list[BeatportTrack],
-    df_hist_pl_tracks: pd.DataFrame,
     use_prefix: bool = True,
     silent: bool = silent_search,
-) -> pd.DataFrame:
+) -> None:
     """Add tracks from Beatport to a Spotify playlist.
 
     Args:
         title (str): Chart or label playlist title.
         tracks_dict (list): Dictionary of tracks to add.
-        df_hist_pl_tracks (pd.DataFrame): DataFrame of history of track.
         use_prefix (bool): Add a prefix to the playlist name as defined in config.
         silent (bool): If True, do not display searching details except errors.
-
-    Returns:
-        pd.DataFrame: Updated DataFrame.
-
     """
-    # TODO export playlist anterior name to config
     persistent_playlist_name = f"{playlist_prefix}{title}" if use_prefix else title
     logger.info(f'[+] Identifying new tracks for playlist: "{persistent_playlist_name}"')
 
@@ -539,75 +486,78 @@ def add_new_tracks_to_playlist_chart_label(
 
     if not playlist["id"]:
         logger.warning(
-            '\t[!] Playlist "{}" does not exist, creating it.'.format(playlist["name"])
+            f'\t[!] Playlist "{playlist["name"]}" does not exist, creating it.'
         )
         playlist["id"] = create_playlist(playlist["name"])
 
-    df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
-    playlist_track_ids = df_hist_pl_tracks.loc[
-        df_hist_pl_tracks["playlist_id"] == playlist["id"], "track_id"
-    ]
+    # TODO put back?
+    # update_hist_pl_tracks(playlist)
+    df_playlist_hist = _get_history_for_digging(digging_mode, playlist["id"])
 
-    df_local_hist = _get_local_history_dataframe(
-        df_hist_pl_tracks, playlist["id"], digging_mode
-    )
-
-    persistent_track_ids = list()
+    persistent_track_ids = []
+    new_history_tracks = []
     track_count = 0
 
-    # TODO Refresh oauth to avoid time out
-    spotify_auth()
-
     for track_count_tot, track in enumerate(tracks_dict):
-        track_artist_name = track.artists[0] + " - " + track.name + " - " + track.mix
+        track_artist_name = f"{track.artists[0]} - {track.name} - {track.mix}"
         if not silent:
             logger.info(
                 f"  [Start] {round(track_count_tot / len(tracks_dict) * 100, 2)!s}% "
                 f": {track_artist_name} : nb {track_count_tot} out of {len(tracks_dict)}"
             )
 
-        track_id, added = _check_and_add_track(
-            track, df_local_hist, playlist_track_ids, silent
-        )
-        if added:
-            persistent_track_ids.append(track_id)
-            track_count += 1
-            if track_count >= 99:  # Have limit of 100 trakcks per import
-                logger.warning(
-                    f"[+] Adding {len(persistent_track_ids)} new tracks to the playlist:"
-                    f' "{persistent_playlist_name}"'
+        if track_artist_name not in df_playlist_hist["artist_name"].values:
+            track_id = search_track_function(track)
+
+            if track_id and track_id not in df_playlist_hist["track_id"].values:
+                if not silent:
+                    logger.info(
+                        f"  [Done] Adding: {get_track_detail(track_id)} - {track_id}"
+                    )
+                persistent_track_ids.append(track_id)
+                new_history_tracks.append(
+                    {
+                        "playlist_id": playlist["id"],
+                        "playlist_name": playlist["name"],
+                        "track_id": track_id,
+                        "datetime_added": pd.Timestamp.now(tz="UTC"),
+                        "artist_name": track.artists[0],
+                    }
                 )
-                add_tracks_to_playlist(playlist["id"], persistent_track_ids)
-                # TODO consider only adding new ID to avoid reloading large playlist
-                df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
-                playlist_track_ids = df_hist_pl_tracks.loc[
-                    df_hist_pl_tracks["playlist_id"] == playlist["id"], "track_id"
-                ]
-                df_local_hist = _get_local_history_dataframe(
-                    df_hist_pl_tracks, playlist["id"], digging_mode
-                )
-                track_count = 0
-                persistent_track_ids = list()
-                update_playlist_description_with_date(playlist)
+                track_count += 1
+
+                if track_count >= 99:
+                    logger.warning(
+                        f"[+] Adding {len(persistent_track_ids)} new tracks to"
+                        f' "{persistent_playlist_name}"'
+                    )
+                    add_tracks_to_playlist(playlist["id"], persistent_track_ids)
+                    df_new_tracks = pd.DataFrame(new_history_tracks)
+                    append_to_hist_file(df_new_tracks)
+                    df_playlist_hist = pd.concat(
+                        [df_playlist_hist, df_new_tracks],
+                        ignore_index=True,
+                    )
+                    track_count = 0
+                    persistent_track_ids = []
+                    new_history_tracks = []
+                    update_playlist_description_with_date(playlist)
 
     if len(persistent_track_ids) > 0:
         logger.warning(
-            f"[+] Adding {len(persistent_track_ids)} new tracks to the playlist:"
+            f"[+] Adding {len(persistent_track_ids)} new tracks to"
             f' "{persistent_playlist_name}"'
         )
         add_tracks_to_playlist(playlist["id"], persistent_track_ids)
         update_playlist_description_with_date(playlist)
+        df_new_tracks = pd.DataFrame(new_history_tracks)
+        append_to_hist_file(df_new_tracks)
     else:
         logger.info(
             f'[+] No new tracks to add to the playlist: "{persistent_playlist_name}"'
         )
 
-    df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
-
-    if len(persistent_track_ids) > 0:
-        save_hist_dataframe(df_hist_pl_tracks)
-
-    return df_hist_pl_tracks
+    return
 
 
 def _get_or_create_genre_playlists(
@@ -638,287 +588,24 @@ def _get_or_create_genre_playlists(
     for playlist in playlists:
         if not playlist["id"]:
             logger.warning(
-                '\t[!] Playlist "{}" does not exist, creating it.'.format(
-                    playlist["name"]
-                )
+                f'\t[!] Playlist "{playlist["name"]}" does not exist, creating it.'
             )
             playlist["id"] = create_playlist(playlist["name"])
     return playlists
 
 
-def _get_genre_local_history_dataframes(
-    df_hist_pl_tracks: pd.DataFrame, playlists: list[dict], digging_mode: str
-) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
-    # Create local hist for top 100 playlist
-    if digging_mode == "playlist":
-        df_local_hist = df_hist_pl_tracks.loc[
-            df_hist_pl_tracks["playlist_id"] == playlists[0]["id"]
-        ]
-    elif digging_mode == "all":
-        df_local_hist = df_hist_pl_tracks
-    else:
-        df_local_hist = pd.DataFrame(
-            columns=[
-                "playlist_id",
-                "playlist_name",
-                "track_id",
-                "datetime_added",
-                "artist_name",
-            ]
-        )
-    playlist_track_ids = df_hist_pl_tracks.loc[
-        df_hist_pl_tracks["playlist_id"] == playlists[0]["id"], "track_id"
-    ]
-
-    df_local_hist_daily = pd.DataFrame(
-        columns=[
-            "playlist_id",
-            "playlist_name",
-            "track_id",
-            "datetime_added",
-            "artist_name",
-        ]
-    )
-    playlist_track_ids_daily = pd.Series([], name="track_id", dtype=object)
-
-    if playlists[1]["id"] and digging_mode != "":
-        if digging_mode == "playlist":
-            df_local_hist_daily = df_hist_pl_tracks.loc[
-                df_hist_pl_tracks["playlist_id"] == playlists[1]["id"]
-            ]
-        elif digging_mode == "all":
-            df_local_hist_daily = df_hist_pl_tracks
-        playlist_track_ids_daily = df_hist_pl_tracks.loc[
-            df_hist_pl_tracks["playlist_id"] == playlists[1]["id"], "track_id"
-        ]
-    return (
-        df_local_hist,
-        playlist_track_ids,
-        df_local_hist_daily,
-        playlist_track_ids_daily,
-    )
-
-
-def _safe_track_search(track: BeatportTrack, track_artist_name: str) -> str | None:
-    try:
-        track_id = search_track_function(track)
-    except ReadTimeout:
-        try:
-            track_id = search_track_function(track)
-        except Exception as e:
-            logger.warning(f"Track {track_artist_name} failed with error {e}")
-            track_id = None
-    except spotipy.exceptions.SpotifyException:
-        try:
-            track_id = search_track_function(track)
-        except Exception as e:
-            logger.warning(f"Track {track_artist_name} failed with error {e}")
-            track_id = None
-    return track_id
-
-
-def _update_playlists_and_history(
-    persistent_track_ids: list[str],
-    daily_top_n_track_ids: list[str],
-    persistent_top_100_playlist_name: str,
-    daily_top_n_playlist_name: str,
-    playlists: list[dict],
-    df_hist_pl_tracks: pd.DataFrame,
-) -> pd.DataFrame:
-    """Update playlists and history with new tracks."""
-    if persistent_track_ids:
-        logger.warning(
-            f"[+] Adding {len(persistent_track_ids)} new tracks to the"
-            f' playlist: "{persistent_top_100_playlist_name}"'
-        )
-        add_tracks_to_playlist(playlists[0]["id"], persistent_track_ids)
-        update_playlist_description_with_date(playlists[0])
-        df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlists[0])
-    else:
-        logger.info(
-            f"[+] No new tracks to add to the playlist: "
-            f'"{persistent_top_100_playlist_name}"'
-        )
-
-    if daily_top_n_track_ids:
-        if len(daily_top_n_track_ids) > daily_n_track:
-            daily_top_n_track_ids = daily_top_n_track_ids[:daily_n_track]
-        logger.warning(
-            f"[+] Adding {len(daily_top_n_track_ids)} new tracks to the playlist:"
-            f' "{daily_top_n_playlist_name}"'
-        )
-        add_tracks_to_playlist(playlists[1]["id"], daily_top_n_track_ids)
-        update_playlist_description_with_date(playlists[1])
-        df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlists[1])
-    else:
-        logger.info(
-            f'[+] No new tracks to add to the playlist: "{daily_top_n_playlist_name}"'
-        )
-
-    return df_hist_pl_tracks
-
-
-def _add_more_daily_genre(
-    playlists: list[dict],
-    df_local_hist_daily: pd.DataFrame,
-    playlist_track_ids: pd.Series,
-    daily_top_n_track_ids: list[str],
-    playlist_track_ids_daily: pd.Series,
-    n_daily_tracks: int,
-    daily_top_n_playlist_name: str,
-) -> None:
-    """Add more tracks to daily genre playlist if not enough found."""
-    # TODO check to add to _update_playlists_and_history
-    playlist_track_ids = playlist_track_ids[::-1]  # Reverse order to get freshest first
-    extra_daily_top_n_track_ids = list()
-    for track_id in playlist_track_ids:  # Full playlist tracks ID
-        if (
-            n_daily_tracks < daily_n_track
-            and track_id not in playlist_track_ids_daily.values
-        ) and (
-            track_id not in df_local_hist_daily.values
-            and track_id not in daily_top_n_track_ids
-        ):
-            extra_daily_top_n_track_ids.append(track_id)
-            n_daily_tracks += 1
-
-    logger.warning(
-        f"[+] Adding {len(extra_daily_top_n_track_ids)} extra new "
-        f'tracks to the playlist: "{daily_top_n_playlist_name}"'
-    )
-    add_tracks_to_playlist(playlists[1]["id"], extra_daily_top_n_track_ids)
-    update_playlist_description_with_date(playlists[1])
-
-
-def _process_genre_track(
-    track: BeatportTrack,
-    df_local_hist: pd.DataFrame,
-    playlist_track_ids: pd.Series,
-    df_local_hist_daily: pd.DataFrame,
-    playlist_track_ids_daily: pd.Series,
-    silent: bool,
-    n_daily_tracks: int,
-) -> tuple[str | None, bool, bool, int]:
-    track_id = None
-    added_to_persistent = False
-    added_to_daily = False
-    track_artist_name = track.artists[0] + " - " + track.name + " - " + track.mix
-
-    if track_artist_name not in df_local_hist.values:
-        track_id = _safe_track_search(track, track_artist_name)
-
-        if track_id:
-            if (
-                track_id not in playlist_track_ids.values
-                and track_id not in df_local_hist.values
-            ):
-                if not silent:
-                    logger.info(
-                        f"  [Done] Adding track {get_track_detail(track_id)} - {track_id}"
-                    )
-                added_to_persistent = True
-
-            if (
-                n_daily_tracks < daily_n_track
-                and track_id not in playlist_track_ids_daily.values
-                and track_id not in df_local_hist_daily.values
-            ):
-                added_to_daily = True
-        else:
-            if not silent:
-                logger.info("  [Done] Similar track id already found")
-    else:
-        if not silent:
-            logger.info("  [Done] Similar track name already found")
-    return track_id, added_to_persistent, added_to_daily, n_daily_tracks
-
-
-def _initialize_daily_history_dataframes(
-    df_hist_pl_tracks: pd.DataFrame, playlists: list[dict], digging_mode: str
-) -> tuple[pd.DataFrame, pd.Series]:
-    if digging_mode == "":
-        # Clear daily playlist if digging mode is not using hist
-        # otherwise will delete tracks not yet listened
-        clear_playlist(playlists[1]["id"])
-        df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlists[1])
-        playlist_track_ids_daily = pd.Series([], name="track_id", dtype=object)
-        df_local_hist_daily = pd.DataFrame(
-            columns=[
-                "playlist_id",
-                "playlist_name",
-                "track_id",
-                "datetime_added",
-                "artist_name",
-            ]
-        )
-    else:
-        # Create local hist for daily top n playlist
-        if digging_mode == "playlist":
-            df_local_hist_daily = df_hist_pl_tracks.loc[
-                df_hist_pl_tracks["playlist_id"] == playlists[1]["id"]
-            ]
-        elif digging_mode == "all":
-            df_local_hist_daily = df_hist_pl_tracks
-        playlist_track_ids_daily = df_hist_pl_tracks.loc[
-            df_hist_pl_tracks["playlist_id"] == playlists[1]["id"], "track_id"
-        ]
-    return df_local_hist_daily, playlist_track_ids_daily
-
-
-def add_new_tracks_to_playlist_genre(
-    genre: str,
+def _process_genre_tracks(
     top_100_chart: list[BeatportTrack],
-    df_hist_pl_tracks: pd.DataFrame,
-    silent: bool = silent_search,
-) -> pd.DataFrame:
-    """Add Beatport tracks from genre category to Spotify playlist.
-
-    Args:
-        genre (str): Genre name.
-        top_100_chart (list): List of tracks to add.
-        df_hist_pl_tracks (pd.DataFrame): DataFrame of history of track.
-        silent (bool): If true do not display searching details except errors.
-
-    Returns:
-        pd.DataFrame: Updated DataFrame.
-
-    """
-    persistent_top_100_playlist_name = f"{playlist_prefix}{genre} - Top 100"
-    daily_top_n_playlist_name = f"{playlist_prefix}{genre} - Daily Top"
-
-    logger.info(
-        f'[+] Identifying new tracks for playlist: "{persistent_top_100_playlist_name}"'
-    )
-
-    playlists = _get_or_create_genre_playlists(genre, playlist_prefix, daily_mode)
-    for playlist in playlists:
-        df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
-
-    (
-        df_local_hist,
-        playlist_track_ids,
-        df_local_hist_daily,
-        playlist_track_ids_daily,
-    ) = _get_genre_local_history_dataframes(df_hist_pl_tracks, playlists, digging_mode)
-
-    if daily_mode:
-        df_local_hist_daily, playlist_track_ids_daily = (
-            _initialize_daily_history_dataframes(
-                df_hist_pl_tracks, playlists, digging_mode
-            )
-        )
-
-    persistent_track_ids = list()
-    daily_top_n_track_ids = list()
-    track_count = 0
-
-    if daily_mode:
-        # Get the number of tracks in the daily playlist
-        spotify_ins = spotify_auth()
-        daily_playlist = spotify_ins.playlist(playlist_id=playlists[1]["id"])
-        n_daily_tracks = len(daily_playlist["tracks"]["items"])
-    else:
-        n_daily_tracks = 0
+    df_persistent_hist: pd.DataFrame,
+    df_daily_hist: pd.DataFrame,
+    n_daily_tracks: int,
+    playlists: list[dict],
+    silent: bool,
+) -> tuple[list[str], list[str], list[dict], list[dict]]:
+    persistent_track_ids = []
+    daily_top_n_track_ids = []
+    new_persistent_history_tracks = []
+    new_daily_history_tracks = []
 
     for track_count_tot, track in enumerate(top_100_chart):
         if not silent:
@@ -928,53 +615,156 @@ def add_new_tracks_to_playlist_genre(
                 f": nb {track_count_tot} out of {len(top_100_chart)}"
             )
 
-        (
-            track_id,
-            added_to_persistent,
-            added_to_daily,
-            n_daily_tracks,
-        ) = _process_genre_track(
-            track,
-            df_local_hist,
-            playlist_track_ids,
-            df_local_hist_daily,
-            playlist_track_ids_daily,
-            silent,
-            n_daily_tracks,
-        )
+        track_id = search_track_function(track)
 
-        if added_to_persistent and track_id:
-            persistent_track_ids.append(track_id)
-            track_count += 1
-        if added_to_daily and track_id:
-            daily_top_n_track_ids.append(track_id)
-            n_daily_tracks += 1
+        if track_id:
+            if track_id not in df_persistent_hist["track_id"].values:
+                persistent_track_ids.append(track_id)
+                new_persistent_history_tracks.append(
+                    {
+                        "playlist_id": playlists[0]["id"],
+                        "playlist_name": playlists[0]["name"],
+                        "track_id": track_id,
+                        "datetime_added": pd.Timestamp.now(tz="UTC"),
+                        "artist_name": track.artists[0],
+                    }
+                )
 
-    df_hist_pl_tracks = _update_playlists_and_history(
+            if (
+                daily_mode
+                and n_daily_tracks < daily_n_track
+                and track_id not in df_daily_hist["track_id"].values
+            ):
+                daily_top_n_track_ids.append(track_id)
+                new_daily_history_tracks.append(
+                    {
+                        "playlist_id": playlists[1]["id"],
+                        "playlist_name": playlists[1]["name"],
+                        "track_id": track_id,
+                        "datetime_added": pd.Timestamp.now(tz="UTC"),
+                        "artist_name": track.artists[0],
+                    }
+                )
+                n_daily_tracks += 1
+    return (
         persistent_track_ids,
         daily_top_n_track_ids,
-        persistent_top_100_playlist_name,
-        daily_top_n_playlist_name,
-        playlists,
-        df_hist_pl_tracks,
+        new_persistent_history_tracks,
+        new_daily_history_tracks,
     )
 
-    if daily_mode and n_daily_tracks < daily_n_track:
-        # Add more to daily playlist if not full
-        _add_more_daily_genre(
-            playlists,
-            df_local_hist_daily,
-            playlist_track_ids,
-            daily_top_n_track_ids,
-            playlist_track_ids_daily,
+
+def _backfill_daily_playlist(
+    n_daily_tracks: int,
+    df_persistent_hist: pd.DataFrame,
+    df_daily_hist: pd.DataFrame,
+    daily_top_n_track_ids: list[str],
+    daily_top_n_playlist_name: str,
+    playlists: list[dict],
+) -> None:
+    """Add more tracks to daily genre playlist if not enough found."""
+    if n_daily_tracks < daily_n_track:
+        extra_daily_top_n_track_ids = []
+        reversed_persistent_ids = df_persistent_hist["track_id"].values[
+            ::-1
+        ]  # Freshest first
+
+        for track_id in reversed_persistent_ids:
+            if n_daily_tracks >= daily_n_track:
+                break
+
+            if (
+                track_id not in df_daily_hist["track_id"].values
+                and track_id not in daily_top_n_track_ids
+                and track_id not in extra_daily_top_n_track_ids
+            ):
+                extra_daily_top_n_track_ids.append(track_id)
+                n_daily_tracks += 1
+
+        if extra_daily_top_n_track_ids:
+            logger.warning(
+                f"[+] Adding {len(extra_daily_top_n_track_ids)} extra new "
+                f'tracks to the playlist: "{daily_top_n_playlist_name}"'
+            )
+            add_tracks_to_playlist(playlists[1]["id"], extra_daily_top_n_track_ids)
+            update_playlist_description_with_date(playlists[1])
+
+
+def add_new_tracks_to_playlist_genre(
+    genre: str,
+    top_100_chart: list[BeatportTrack],
+    silent: bool = silent_search,
+) -> None:
+    """Add Beatport tracks from genre category to Spotify playlist.
+
+    Args:
+        genre (str): Genre name.
+        top_100_chart (list): List of tracks to add.
+        silent (bool): If true do not display searching details except errors.
+    """
+    persistent_top_100_playlist_name = f"{playlist_prefix}{genre} - Top 100"
+    daily_top_n_playlist_name = f"{playlist_prefix}{genre} - Daily Top"
+
+    logger.info(
+        f'[+] Identifying new tracks for playlist: "{persistent_top_100_playlist_name}"'
+    )
+
+    playlists = _get_or_create_genre_playlists(genre, playlist_prefix, daily_mode)
+    df_persistent_hist = _get_history_for_digging(digging_mode, playlists[0]["id"])
+
+    df_daily_hist = pd.DataFrame()
+    if daily_mode:
+        df_daily_hist = _get_history_for_digging(digging_mode, playlists[1]["id"])
+
+    n_daily_tracks = 0
+    if daily_mode:
+        spotify_ins = spotify_auth()
+        daily_playlist = spotify_ins.playlist(playlist_id=playlists[1]["id"])
+        n_daily_tracks = len(daily_playlist["tracks"]["items"])
+
+    (
+        persistent_track_ids,
+        daily_top_n_track_ids,
+        new_persistent_history_tracks,
+        new_daily_history_tracks,
+    ) = _process_genre_tracks(
+        top_100_chart,
+        df_persistent_hist,
+        df_daily_hist,
+        n_daily_tracks,
+        playlists,
+        silent,
+    )
+
+    if persistent_track_ids:
+        logger.warning(
+            f"[+] Adding {len(persistent_track_ids)} new tracks to the"
+            f' playlist: "{persistent_top_100_playlist_name}"'
+        )
+        add_tracks_to_playlist(playlists[0]["id"], persistent_track_ids)
+        update_playlist_description_with_date(playlists[0])
+        append_to_hist_file(pd.DataFrame(new_persistent_history_tracks))
+
+    if daily_mode and daily_top_n_track_ids:
+        logger.warning(
+            f"[+] Adding {len(daily_top_n_track_ids)} new tracks to the playlist:"
+            f' "{daily_top_n_playlist_name}"'
+        )
+        add_tracks_to_playlist(playlists[1]["id"], daily_top_n_track_ids)
+        update_playlist_description_with_date(playlists[1])
+        append_to_hist_file(pd.DataFrame(new_daily_history_tracks))
+
+    if daily_mode:
+        _backfill_daily_playlist(
             n_daily_tracks,
+            df_persistent_hist,
+            df_daily_hist,
+            daily_top_n_track_ids,
             daily_top_n_playlist_name,
+            playlists,
         )
 
-    if (len(persistent_track_ids) > 0) or (len(daily_top_n_track_ids) > 0):
-        save_hist_dataframe(df_hist_pl_tracks)
-
-    return df_hist_pl_tracks
+    return
 
 
 # Annex testing tracks with known issues

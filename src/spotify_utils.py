@@ -1048,7 +1048,6 @@ def update_hist_pl_tracks(
     # Expand the 'track' column (which contains dicts) into a DataFrame
     track_details = pd.json_normalize(df_playlist_tracks["track"])
 
-    # Create a temporary DataFrame with the new tracks to be added to history
     df_temp = pd.DataFrame(
         {
             "playlist_id": playlist["id"],
@@ -1064,12 +1063,10 @@ def update_hist_pl_tracks(
             ),
         }
     )
-    # Make sure columns are in the correct order
     df_temp = df_temp[
         ["playlist_id", "playlist_name", "track_id", "datetime_added", "artist_name"]
     ]
 
-    # Combine with the main history DataFrame, remove duplicates, and reset index
     df_hist_pl_tracks = pd.concat([df_hist_pl_tracks, df_temp], ignore_index=True)
     df_hist_pl_tracks = df_hist_pl_tracks.drop_duplicates(inplace=False)
     df_hist_pl_tracks = df_hist_pl_tracks.reset_index(drop=True, inplace=False)

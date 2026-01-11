@@ -6,7 +6,7 @@ import logging
 import re
 import socket
 import webbrowser
-from datetime import datetime
+from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from typing import TypedDict, cast
 
@@ -1169,7 +1169,9 @@ def add_new_tracks_to_playlist_id(
                     "playlist_id": playlist["id"],
                     "playlist_name": playlist["name"],
                     "track_id": track_id,
-                    "datetime_added": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "datetime_added": datetime.now(tz=timezone.utc).strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    ),
                     "artist_name": get_track_detail(track_id),
                 }
             )

@@ -1178,8 +1178,8 @@ def add_new_tracks_to_playlist_id(
 
     if persistent_track_ids:
         logger.warning(
-            f"\t[+] Transferring {len(persistent_track_ids)} new tracks to backup "
-            f"playlist '{playlist['name']}'"
+            f"\t[+] Adding {len(persistent_track_ids)} new tracks to the "
+            f'playlist "{playlist["name"]}"'
         )
         add_tracks_to_playlist(playlist["id"], persistent_track_ids)
         update_playlist_description_with_date(playlist)

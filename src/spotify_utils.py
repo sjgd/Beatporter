@@ -6,7 +6,7 @@ import logging
 import re
 import socket
 import webbrowser
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from difflib import SequenceMatcher
 from typing import TypedDict, cast
 
@@ -488,6 +488,7 @@ def search_wrapper(query: str, logger: logging.Logger = logger) -> dict:
     """
     spotify_ins = spotify_auth()
     logger.setLevel(logging.FATAL)
+    result: dict = {"tracks": {"items": []}}
     try:
         result = spotify_ins.search(query)
     except SpotifyException as e:
@@ -1169,9 +1170,7 @@ def add_new_tracks_to_playlist_id(
                     "playlist_id": playlist["id"],
                     "playlist_name": playlist["name"],
                     "track_id": track_id,
-                    "datetime_added": datetime.now(tz=timezone.utc).strftime(
-                        "%Y-%m-%d %H:%M:%S"
-                    ),
+                    "datetime_added": datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M:%S"),
                     "artist_name": get_track_detail(track_id),
                 }
             )

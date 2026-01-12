@@ -37,7 +37,7 @@ from src.spotify_utils import (
     get_all_playlists,
     update_hist_pl_tracks,
 )
-from src.utils import FILE_NAME_HIST, PATH_HIST_LOCAL, deduplicate_hist_file
+from src.utils import FILE_NAME_HIST, PATH_HIST_LOCAL, HistoryCache, deduplicate_hist_file
 
 logger = logging.getLogger("beatporter")
 
@@ -82,6 +82,7 @@ def _handle_backups(args: list[str], spotify_bkp: dict[str, str]) -> None:
                     f"***** {playlist_name} : {org_playlist_id} ***** "
                     f"with error: {e}"
                 )
+            HistoryCache.clear()
             gc.collect()
 
 
@@ -113,6 +114,11 @@ def _handle_charts(
             else:
                 logger.info(f"\t[+] Chart {chart} not found")
 
+            chart_url = None
+            tracks_dicts = None
+            HistoryCache.clear()
+            gc.collect()
+
 
 def _handle_genres(args: list[str], genres: dict[str, str]) -> None:
     if "genres" in args:
@@ -128,6 +134,9 @@ def _handle_genres(args: list[str], genres: dict[str, str]) -> None:
                 logger.warning(
                     f"FAILED getting genre: ***** {genre} ***** with error: {e}"
                 )
+            top_100_chart = None
+            HistoryCache.clear()
+            gc.collect()
 
 
 def _handle_labels(
@@ -154,6 +163,9 @@ def _handle_labels(
                     f"***** {label} : {label_bp_url_code} ***** "
                     f"with error: {e}"
                 )
+            tracks_dict = None
+            HistoryCache.clear()
+            gc.collect()
 
 
 def main(

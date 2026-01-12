@@ -37,6 +37,11 @@ class HistoryCache:
         """Set dataframe in cache."""
         cls._cache[file_path] = df
 
+    @classmethod
+    def clear(cls) -> None:
+        """Clear the cache."""
+        cls._cache.clear()
+
 
 def load_hist_file(
     file_path: str = PATH_HIST_LOCAL + FILE_NAME_HIST,
@@ -186,8 +191,8 @@ def append_to_hist_file(
     try:
         df_history = load_hist_file(file_path=file_path, allow_empty=True)
         df_updated = pd.concat([df_history, df_new_tracks], ignore_index=True)
-        HistoryCache.set(file_path, df_updated)
         save_hist_dataframe(df_updated)
+        HistoryCache.set(file_path, df_updated)
     except Exception as e:
         logger.error(f"Failed to append to hist file: {e}", exc_info=True)
 
@@ -216,6 +221,7 @@ def deduplicate_hist_file(
         if n_rows_before > n_rows_after:
             logger.info(f"Removed {n_rows_before - n_rows_after} duplicate tracks.")
             save_hist_dataframe(df_history)
+            HistoryCache.clear()
         else:
             logger.info("No duplicate tracks found.")
     except Exception as e:

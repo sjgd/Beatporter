@@ -13,7 +13,7 @@ logger = logging.getLogger("test_search_tracks")
 
 file_name_hist = "hist_playlists_tracks.pkl"
 curr_date = datetime.today().strftime("%Y-%m-%d")
-option_parse = ["backup", "chart", "genre", "label"]
+valid_arguments = ["backup", "chart", "genre", "label"]
 
 # Use https://open.spotify.com/track/4zC9MjbIIHJoBpny7Sh35s to explore a track
 
@@ -42,7 +42,7 @@ def test_track_blondish() -> None:
         "duration_ms": 395040,
     }
     track_search = BeatportTrack(**track_search)
-    track_id = search_track_function(track_search)
+    track_id = search_track_function(track_search, silent=True)
     logger.info(track_search)
     assert track_id == "4u3XiAwJ2U9Kxgy57gcAPB"
 

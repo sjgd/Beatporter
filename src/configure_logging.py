@@ -30,7 +30,8 @@ def configure_logging() -> None:
         delay=False,
     )
     formatter = logging.Formatter(
-        "%(asctime)s - %(message)s [%(filename)s:%(lineno)d] %(name)s: %(pathname)s"
+        "%(asctime)s %(levelname)s %(message)s [%(filename)s:%(lineno)d]",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
     fileh.setFormatter(formatter)
     fileh.setLevel(logging.INFO)
@@ -44,15 +45,36 @@ def configure_logging() -> None:
         encoding=None,
         delay=False,
     )
-    formatter = logging.Formatter("%(asctime)s - %(message)s [%(filename)s:%(lineno)d]")
+    formatter = logging.Formatter(
+        "%(asctime)s - %(message)s [%(filename)s:%(lineno)d]", datefmt="%Y-%m-%d %H:%M:%S"
+    )
     fileh.setFormatter(formatter)
     fileh.setLevel(logging.DEBUG)
     logging.getLogger().addHandler(fileh)
+
+    # Add a dedicated warnings file (captures WARNING and above)
+    warn_fileh = RotatingFileHandler(
+        ROOT_PATH + "logs/runtime-beatporter-warnings.log",
+        mode="w",
+        maxBytes=50 * 1024 * 1024,
+        backupCount=1,
+        encoding=None,
+        delay=False,
+    )
+    warn_formatter = logging.Formatter(
+        "%(asctime)s %(levelname)s %(message)s [%(filename)s:%(lineno)d]",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    warn_fileh.setFormatter(warn_formatter)
+    warn_fileh.setLevel(logging.WARNING)
+    logging.getLogger().addHandler(warn_fileh)
 
     coloredlogs.install(
         level="INFO",
         fmt="%(asctime)s %(levelname)s %(message)s",
         # fmt="%(asctime)s %(levelname)s %(message)s [%(filename)s:%(lineno)d]",
+        isatty=True,
+        stream=sys.stdout,
     )
 
     # Remove spotify util.py logs

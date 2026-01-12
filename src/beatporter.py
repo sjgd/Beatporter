@@ -1,11 +1,15 @@
 """Main module to run Beatporter."""
 
+import gc
 import logging
+import os
 import random
 import sys
 import traceback
 from datetime import datetime
 from time import sleep
+
+import pandas as pd
 
 from src.beatport import (
     find_chart,
@@ -15,81 +19,153 @@ from src.beatport import (
     parse_chart_url_datetime,
 )
 from src.config import (
-    ROOT_PATH,
     charts,
     genres,
     labels,
     shuffle_label,
     spotify_bkp,
+    use_gcp,
     username,
 )
+from src.gcp import download_file_to_gcs, upload_file_to_gcs
 from src.spotify_search import (
     add_new_tracks_to_playlist_chart_label,
     add_new_tracks_to_playlist_genre,
-    update_hist_pl_tracks,
 )
 from src.spotify_utils import (
     back_up_spotify_playlist,
     get_all_playlists,
-    update_hist_from_playlist,
+    update_hist_pl_tracks,
 )
-from src.utils import load_hist_file, save_hist_dataframe
+from src.utils import FILE_NAME_HIST, PATH_HIST_LOCAL, HistoryCache, deduplicate_hist_file
 
 logger = logging.getLogger("beatporter")
 
 curr_date = datetime.today().strftime("%Y-%m-%d")
-option_parse = ["backup", "chart", "genre", "label"]
+valid_arguments = ["backups", "charts", "genres", "labels", "refresh-hist"]
 
 
-def dump_tracks(tracks: dict) -> None:
-    """Util function to print all tracks in list."""
-    i = 1
-    for track in tracks:
-        logger.info(
-            "{}: {} ({}) - {} ({})".format(
-                i,
-                track.name,
-                track.mix,
-                ", ".join(track.artists),
-                track.duration,
+def refresh_all_playlists_history() -> None:
+    """Refresh history for all playlists of user."""
+    all_playlists = get_all_playlists()
+    for playlist in all_playlists:
+        if playlist["owner"]["id"] == username:
+            logger.info(f"Refreshing history for playlist: {playlist['name']}")
+            update_hist_pl_tracks(playlist)
+
+
+def _transfer_excel_to_parquet_if_needed() -> None:
+    """Transfer excel file to parquet if it not exists and the excel does."""
+    excel_path = f"{PATH_HIST_LOCAL}hist_playlists_tracks.xlsx"
+    parquet_path = f"{PATH_HIST_LOCAL}{FILE_NAME_HIST}"
+
+    if not os.path.exists(parquet_path) and os.path.exists(excel_path):
+        logger.info("Transferring excel file to parquet...")
+        df = pd.read_excel(excel_path)
+        df.to_parquet(parquet_path, compression="gzip", index=False)
+        logger.info("Transfer complete.")
+
+
+def _handle_backups(args: list[str], spotify_bkp: dict[str, str]) -> None:
+    if "backups" in args:
+        for playlist_name, org_playlist_id in spotify_bkp.items():
+            logger.info(" ")
+            logger.info(
+                f"-Backing up playlist : ***** {playlist_name} : {org_playlist_id} *****"
             )
-        )
-        i += 1
+            try:
+                back_up_spotify_playlist(playlist_name, org_playlist_id)
+            except Exception as e:
+                traceback.print_exc()
+                logger.warning(
+                    "FAILED backing up playlist: "
+                    f"***** {playlist_name} : {org_playlist_id} ***** "
+                    f"with error: {e}"
+                )
+            HistoryCache.clear()
+            gc.collect()
 
 
-def update_hist(master_refresh: bool = False) -> None:
-    """Update hist file with configs.
+def _handle_charts(
+    args: list[str],
+    parsed_charts: dict[str, str],
+) -> None:
+    if "charts" in args:
+        for chart, chart_bp_url_code in parsed_charts.items():
+            # TODO check if chart are working, otherwise do as genre and label
+            # TODO handle return None, handle chart_bp_url_code has ID already or not
+            logger.info(" ")
+            logger.info(f" Getting chart : ***** {chart} : {chart_bp_url_code} *****")
+            chart_url = find_chart(chart, chart_bp_url_code)
 
-    Args:
-        master_refresh: Refresh hist for all playlist of user?
+            if chart_url:
+                try:
+                    tracks_dicts = get_chart(chart_url)
+                    logger.debug(chart_bp_url_code + ":" + str(tracks_dicts))
+                    logger.info(f"\t[+] Found {len(tracks_dicts)} tracks for {chart}")
+                    add_new_tracks_to_playlist_chart_label(chart, tracks_dicts)
+                except Exception as e:
+                    traceback.print_exc()
+                    logger.warning(
+                        "FAILED getting chart: "
+                        f"***** {chart} : {chart_bp_url_code} ***** "
+                        f"with error: {e}"
+                    )
+            else:
+                logger.info(f"\t[+] Chart {chart} not found")
 
-    """
-    # TODO: testing, to refine usage, include in first init ?
+            chart_url = None
+            tracks_dicts = None
+            HistoryCache.clear()
+            gc.collect()
 
-    df_hist_pl_tracks = load_hist_file()
 
-    charts = {
-        parse_chart_url_datetime(k): parse_chart_url_datetime(v)
-        for k, v in charts.items()
-    }
+def _handle_genres(args: list[str], genres: dict[str, str]) -> None:
+    if "genres" in args:
+        for genre, genre_bp_url_code in genres.items():
+            logger.info(" ")
+            logger.info(f" Getting genre : ***** {genre} *****")
+            top_100_chart = get_top_100_tracks(genre)
+            logger.debug(genre + ":" + str(top_100_chart))
+            try:
+                add_new_tracks_to_playlist_genre(genre, top_100_chart)
+            except Exception as e:
+                traceback.print_exc()
+                logger.warning(
+                    f"FAILED getting genre: ***** {genre} ***** with error: {e}"
+                )
+            top_100_chart = None
+            HistoryCache.clear()
+            gc.collect()
 
-    for chart, chart_bp_url_code in charts.items():
-        df_hist_pl_tracks = update_hist_from_playlist(chart, df_hist_pl_tracks)
 
-    for label, label_bp_url_code in labels.items():
-        df_hist_pl_tracks = update_hist_from_playlist(label, df_hist_pl_tracks)
-
-    if master_refresh:
-        # Get track ids from all playlists from username from config
-        all_playlists = get_all_playlists()
-        for playlist in all_playlists:
-            # logger.info(playlist['name'])
-            if playlist["owner"]["id"] == username:
-                logger.info(playlist["name"])
-                playlist = {"name": playlist["name"], "id": playlist["id"]}
-                df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
-
-    save_hist_dataframe(df_hist_pl_tracks)
+def _handle_labels(
+    args: list[str],
+    labels: dict[str, str],
+    shuffle_label: bool,
+) -> None:
+    if "labels" in args:
+        for label, label_bp_url_code in labels.items():
+            # TODO avoid looping through all pages if already parsed before ?
+            # TODO Add tracks per EP rather than track by track ?
+            logger.info(" ")
+            logger.info(f"Getting label : ***** {label} : {label_bp_url_code} *****")
+            try:
+                tracks_dict = get_label_tracks(label, label_bp_url_code)
+                logger.info(f"Found {len(tracks_dict)} tracks for {label}")
+                if shuffle_label:
+                    random.shuffle(tracks_dict)
+                add_new_tracks_to_playlist_chart_label(label, tracks_dict)
+            except Exception as e:
+                traceback.print_exc()
+                logger.warning(
+                    "FAILED getting label: "
+                    f"***** {label} : {label_bp_url_code} ***** "
+                    f"with error: {e}"
+                )
+            tracks_dict = None
+            HistoryCache.clear()
+            gc.collect()
 
 
 def main(
@@ -111,8 +187,13 @@ def main(
     start_time = datetime.now()
     logger.info(" ")
     logger.info(f"[!] Starting @ {start_time}")
-    df_hist_pl_tracks = load_hist_file()
-    charts = {
+
+    _transfer_excel_to_parquet_if_needed()
+
+    if use_gcp:
+        download_file_to_gcs(file_name=FILE_NAME_HIST, local_folder=PATH_HIST_LOCAL)
+
+    parsed_charts = {
         parse_chart_url_datetime(k): parse_chart_url_datetime(v)
         for k, v in charts.items()
     }
@@ -120,103 +201,26 @@ def main(
     # Load arguments
     args = sys.argv[1:]
     args = [arg.replace("-", "") for arg in args]
+
+    if "refresh-hist" in args:
+        refresh_all_playlists_history()
+
     if len(args) == 0:
         # If not argument passed then parse all
-        args = option_parse
-    logger.info(f"Using arguments: {args}")
+        args = valid_arguments
+    logger.info(f"Using arguments: {args} of available {valid_arguments}")
 
-    if "backup" in args:
-        for playlist_name, org_playlist_id in spotify_bkp.items():
-            logger.info(" ")
-            logger.info(
-                f"-Backing up playlist : ***** {playlist_name} : {org_playlist_id} *****"
-            )
-            try:
-                df_hist_pl_tracks = back_up_spotify_playlist(
-                    playlist_name, org_playlist_id, df_hist_pl_tracks
-                )
-            except Exception as e:
-                traceback.print_exc()
-                logger.warning(
-                    "FAILED backing up playlist: "
-                    f"***** {playlist_name} : {org_playlist_id} ***** "
-                    f"with error: {e}"
-                )
-
-    # Parse lists
-    if "chart" in args:
-        for chart, chart_bp_url_code in charts.items():
-            # TODO check if chart are working, otherwise do as genre and label
-            # TODO handle return None, handle chart_bp_url_code has ID already or not
-            logger.info(" ")
-            logger.info(f" Getting chart : ***** {chart} : {chart_bp_url_code} *****")
-            chart_url = find_chart(chart, chart_bp_url_code)
-
-            if chart_url:
-                try:
-                    tracks_dicts = get_chart(chart_url)
-                    logger.debug(chart_bp_url_code + ":" + str(tracks_dicts))
-                    logger.info(f"\t[+] Found {len(tracks_dicts)} tracks for {chart}")
-                    df_hist_pl_tracks = add_new_tracks_to_playlist_chart_label(
-                        chart, tracks_dicts, df_hist_pl_tracks
-                    )
-                except Exception as e:
-                    traceback.print_exc()
-                    logger.warning(
-                        "FAILED getting chart: "
-                        f"***** {chart} : {chart_bp_url_code} ***** "
-                        f"with error: {e}"
-                    )
-            else:
-                logger.info(f"\t[+] Chart {chart} not found")
-
-    if "genre" in args:
-        for genre, genre_bp_url_code in genres.items():
-            logger.info(" ")
-            logger.info(f" Getting genre : ***** {genre} *****")
-            top_100_chart = get_top_100_tracks(genre)
-            logger.debug(genre + ":" + str(top_100_chart))
-            try:
-                df_hist_pl_tracks = add_new_tracks_to_playlist_genre(
-                    genre, top_100_chart, df_hist_pl_tracks
-                )
-            except Exception as e:
-                traceback.print_exc()
-                logger.warning(
-                    f"FAILED getting genre: ***** {genre} ***** with error: {e}"
-                )
-
-    if "label" in args:
-        for label, label_bp_url_code in labels.items():
-            # TODO avoid looping through all pages if already parsed before ?
-            # TODO Add tracks per EP rather than track by track ?
-            logger.info(" ")
-            logger.info(f"Getting label : ***** {label} : {label_bp_url_code} *****")
-            try:
-                tracks_dict = get_label_tracks(
-                    label, label_bp_url_code, df_hist_pl_tracks
-                )
-                logger.info(f"Found {len(tracks_dict)} tracks for {label}")
-                if shuffle_label:
-                    random.shuffle(tracks_dict)
-                df_hist_pl_tracks = add_new_tracks_to_playlist_chart_label(
-                    label, tracks_dict, df_hist_pl_tracks
-                )
-            except Exception as e:
-                traceback.print_exc()
-                logger.warning(
-                    "FAILED getting label: "
-                    f"***** {label} : {label_bp_url_code} ***** "
-                    f"with error: {e}"
-                )
+    _handle_backups(args, spotify_bkp)
+    _handle_charts(args, parsed_charts)
+    _handle_genres(args, genres)
+    _handle_labels(args, labels, shuffle_label)
 
     # Output
     sleep(5)
-    save_hist_dataframe(df_hist_pl_tracks)
-    # Save bkp
-    df_hist_pl_tracks.to_excel(
-        ROOT_PATH + f"data/hist_playlists_tracks_{curr_date}.xlsx", index=False
-    )
+    deduplicate_hist_file()
+    if use_gcp:
+        upload_file_to_gcs(file_name=FILE_NAME_HIST, local_folder=PATH_HIST_LOCAL)
+    # TODO add back option to save to excel for manual checking
     end_time = datetime.now()
     logger.info(f"[!] Done @ {end_time} (Ran for: {end_time - start_time})")
 

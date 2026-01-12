@@ -14,4 +14,17 @@ stop:
 	./bin/dev/docker-stop.sh
 
 ruff:
-	uv run ruff check --fix 
+	uv run ruff check --fix
+
+tests:
+	export PYTHONPATH="$(pwd):$(pwd)/src" && uv run pytest ./tests/core/ --cov=./src --cov-report=term-missing
+
+# Run code quality commands
+lint:
+	uv run ruff check --fix ./src || true && \
+	uv run ruff format ./src || true && \
+	uv run mypy --config-file pyproject.toml ./src ./tests || true && \
+	uv run pydocstyle ./src ./tests
+
+
+

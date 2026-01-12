@@ -4,9 +4,7 @@ import json
 import logging
 import re
 from datetime import datetime, timedelta
-from typing import Any
 
-import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from pandas import to_datetime
@@ -14,6 +12,7 @@ from pandas import to_datetime
 from src.config import genres, overwrite_label, silent_search
 from src.models import BeatportTrack
 from src.spotify_utils import find_playlist_chart_label, update_hist_pl_tracks
+from src.utils import load_hist_file
 
 logger = logging.getLogger("beatport")
 
@@ -50,7 +49,7 @@ def get_beatport_page_script_queries(url: str) -> dict:
 
 def scrape_beatport_charts(
     url: str, max_wait: int = 20, chart_bp_url_code: str = ""
-) -> list[dict]:
+) -> list[str]:
     """Scrape Beatport artist page for chart links using Selenium.
 
     This function uses Selenium WebDriver to load the given Beatport artist page URL,
@@ -66,7 +65,7 @@ def scrape_beatport_charts(
         containing this code will be returned. Defaults to "" (all charts).
 
     Returns:
-        list[dict]: A list of chart URLs (as strings) found on the artist
+        list[str]: A list of chart URLs (as strings) found on the artist
         page. If chart_bp_url_code is provided, only matching charts are included.
 
     Notes:
@@ -92,7 +91,7 @@ def scrape_beatport_charts(
     )
 
     driver = webdriver.Chrome(options=chrome_options)
-    charts = []
+    charts: list[str] = []
 
     logger.info(f"Loading URL: {url}")
     driver.get(url)
@@ -123,11 +122,11 @@ def scrape_beatport_charts(
             if chart_bp_url_code and chart_bp_url_code in chart_data["href"]:
                 logger.info(
                     f"Matched requested chart: {chart_data['href']}"
-                    f"at rank {idx}, with title {chart_data['title']}"
+                    f" at rank {idx}, with title {chart_data['title']}"
                 )
-                charts.append(chart_data["href"])
+                charts.append(chart_data["full_url"])
             elif not chart_bp_url_code:
-                charts.append(chart_data["href"])
+                charts.append(chart_data["full_url"])
 
         except Exception as e:
             logger.error(f"Error extracting chart {idx}: {e!s}")
@@ -170,30 +169,36 @@ def parse_tracks(raw_tracks_dicts: list[dict]) -> list:
     """
     tracks = list()
     for track in raw_tracks_dicts:
-        tracks.append(
-            BeatportTrack.model_validate(
-                {
-                    # "title": track["title"],
-                    "name": track["name"],
-                    "mix": track["mix_name"],
-                    "artists": [artist["name"] for artist in track["artists"]],
-                    "remixers": [remixer["name"] for remixer in track["remixers"]],
-                    "release": track["release"]["name"],
-                    "label": track["release"]["label"]["name"],
-                    "published_date": track["publish_date"],
-                    # "released_date": track["date"]["released"],
-                    "duration": track[
-                        "length"
-                    ],  # TODO was ["duration"]["minutes"] before, to check if the same
-                    "duration_ms": track["length_ms"],
-                    "genres": track["genre"][
-                        "name"
-                    ],  # Used to be track["genres"] as list
-                    "bpm": track["bpm"],
-                    "key": track["key"]["name"],  # Was only track["key"] before, but dict
-                }
+        try:
+            tracks.append(
+                BeatportTrack.model_validate(
+                    {
+                        # "title": track["title"],
+                        "name": track["name"],
+                        "mix": track["mix_name"],
+                        "artists": [artist["name"] for artist in track["artists"]],
+                        "remixers": [remixer["name"] for remixer in track["remixers"]],
+                        "release": track["release"]["name"],
+                        "label": track["release"]["label"]["name"],
+                        "published_date": track["publish_date"],
+                        # "released_date": track["date"]["released"],
+                        "duration": track[
+                            "length"
+                        ],  # TODO was ["duration"]["minutes"] before,
+                        # to check if the same
+                        "duration_ms": track["length_ms"],
+                        "genres": track["genre"][
+                            "name"
+                        ],  # Used to be track["genres"] as list
+                        "bpm": track["bpm"],
+                        "key": track["key"][
+                            "name"
+                        ],  # Was only track["key"] before, but dict
+                    }
+                )
             )
-        )
+        except Exception as e:
+            logger.warning(f"Failed to parse track {track}: {e}")
     return tracks
 
 
@@ -212,7 +217,7 @@ def get_top_100_tracks(genre: str) -> list[BeatportTrack]:
     return parse_tracks(raw_tracks_dicts)
 
 
-def find_chart(chart: str, chart_bp_url_code: str) -> Any | str | None:
+def find_chart(chart: str, chart_bp_url_code: str) -> str | None:
     """Find Beatport chart URL from chart name or URL code.
 
     Finds Beatport chart URL from Beatport chart name or URL code.
@@ -257,8 +262,10 @@ def find_chart(chart: str, chart_bp_url_code: str) -> Any | str | None:
             )
             charts[i]["url_tentative"] = charts[i]["url_tentative"].replace("--", "-")
 
+        charts.sort(
+            key=lambda x: x["chart_id"], reverse=True
+        )  # That way larger ID is on top = newest chart
         chart_urls = [chart["url_tentative"] for chart in charts]
-        chart_urls.sort(reverse=True)  # That way larger ID is on top = newest chart
         # TODO reverse above not necessary charts have release date now
     elif re.match(r".*(\/[0-9]{6})", chart_bp_url_code) is not None:
         # Direct chart ID
@@ -271,10 +278,10 @@ def find_chart(chart: str, chart_bp_url_code: str) -> Any | str | None:
         # Checking if '(2XXX)' year is present
         # in chart name and matching chart release year
         match_year_name = re.match(r".*(\(2[0-9]{3}\))", chart)
-        if match_year_name is not None:
-            match_year_name = match_year_name.group(1)
+        if match_year_name:
+            match_year_name_str = match_year_name.group(1)
             logger.info(
-                f"Found year {match_year_name} in chart name,"
+                f"Found year {match_year_name_str} in chart name,"
                 " checking if release is matching"
             )
             results_data = get_beatport_page_script_queries(chart_urls[0])
@@ -289,22 +296,25 @@ def find_chart(chart: str, chart_bp_url_code: str) -> Any | str | None:
                     " does not seem to be a date, aborting"
                 )
             else:
-                release_year = re.match(r"2[0-9]{3}", change_date_chart).group(0)
-                if (
-                    f"({release_year})" == match_year_name
-                    and chart_bp_url_code in chart_urls[0]
-                ):
-                    logger.info(
-                        f"Years match ({release_year}), returning chart {chart_urls[0]}"
-                    )
-                    return chart_urls[0]
-                else:
-                    logger.warning(
-                        f"ERROR - Release date: {change_date_chart}, "
-                        f"does not match requeried date: {match_year_name},"
-                        f" aborting chart: {chart_urls[0]}"
-                    )
-                    return None
+                release_year_match = re.match(r"2[0-9]{3}", change_date_chart)
+                if release_year_match:
+                    release_year = release_year_match.group(0)
+                    if (
+                        f"({release_year})" == match_year_name_str
+                        and chart_bp_url_code in chart_urls[0]
+                    ):
+                        logger.info(
+                            f"Years match ({release_year}), returning chart "
+                            f"{chart_urls[0]}"
+                        )
+                        return chart_urls[0]
+                    else:
+                        logger.warning(
+                            f"ERROR - Release date: {change_date_chart}, "
+                            f"does not match requeried date: {match_year_name_str},"
+                            f" aborting chart: {chart_urls[0]}"
+                        )
+                        return None
         else:
             logger.info(f"No year found in chart name, returning {chart_urls[0]}")
             return chart_urls[0]
@@ -331,26 +341,25 @@ def get_chart(url: str) -> list[BeatportTrack]:
     return tracks_dicts
 
 
-def parse_chart_url_datetime(str: str) -> str:
+def parse_chart_url_datetime(date_str: str) -> str:
     """Format date string; if Sunday, return previous week.
 
     Args:
-        str: string to format.
+        date_str: string to format.
 
     Returns:
         datetime object.
 
     """
     if datetime.today().weekday() > 5:
-        return (datetime.today() - timedelta(days=6)).strftime(str)
+        return (datetime.today() - timedelta(days=6)).strftime(date_str)
     else:
-        return datetime.today().strftime(str)
+        return datetime.today().strftime(date_str)
 
 
 def get_label_tracks(
     label: str,
     label_bp_url_code: str,
-    df_hist_pl_tracks: pd.DataFrame,
     overwrite: bool = overwrite_label,
     silent: bool = silent_search,
 ) -> list[BeatportTrack]:
@@ -359,7 +368,6 @@ def get_label_tracks(
     Args:
         label: label name.
         label_bp_url_code: label url code.
-        df_hist_pl_tracks: dataframe of historic track.
         overwrite: If True, reload all tracks; otherwise, stop once the date
                      of the last playlist refresh is reached.
         silent: If True, suppress logging messages.
@@ -381,10 +389,8 @@ def get_label_tracks(
     # Load history
     playlist = find_playlist_chart_label(label)
     if playlist["id"]:
-        df_hist_pl_tracks = update_hist_pl_tracks(df_hist_pl_tracks, playlist)
-        df_loc_hist = df_hist_pl_tracks.loc[
-            df_hist_pl_tracks.playlist_id == playlist["id"]
-        ]
+        update_hist_pl_tracks(playlist)
+        df_loc_hist = load_hist_file(playlist_id=playlist["id"], allow_empty=True)
         if len(df_loc_hist.index) > 0:
             last_update = max(df_loc_hist.loc[:, "datetime_added"])
             if isinstance(last_update, str):

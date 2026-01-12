@@ -19,15 +19,13 @@ redirect_uri = "http://localhost:65000"
 use_gcp = False
 
 # Save as well at the folder_path below?
-use_local = False
+use_local = True
 
 # Root path
 ROOT_PATH = str(Path(__file__).parent.parent) + "/"
 
-# Save as well at the folder_path below?
-use_local = True
 # Folder path where to save the history
-folder_path = ROOT_PATH + "/data"
+folder_path = ROOT_PATH + "data/"
 
 # Add at top of playlist, if True will add at top, otherwise append
 add_at_top_playlist = True

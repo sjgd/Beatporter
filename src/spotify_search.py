@@ -754,7 +754,7 @@ def add_new_tracks_to_playlist_genre(
 
     if daily_mode:
         _backfill_daily_playlist(
-            n_daily_tracks,
+            n_daily_tracks + len(daily_top_n_track_ids),
             df_persistent_hist,
             df_daily_hist,
             daily_top_n_track_ids,

@@ -141,7 +141,7 @@ def listen_for_callback_code() -> str:
 
     """
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind(("localhost", int(redirect_uri.split(":")[-1])))
+    s.bind(("127.0.0.1", int(redirect_uri.split(":")[-1])))
     s.listen(1)
     while True:
         connection, _ = s.accept()
@@ -1253,6 +1253,115 @@ def update_playlist_description_with_date(playlist: dict) -> None:
         description=current_description
         + " Updated on {}.".format(datetime.today().strftime("%Y-%m-%d")),
     )
+
+
+def get_playlist_tracks_df(
+    playlist_id: str, prefixed_playlist_name: str
+) -> pd.DataFrame | None:
+    """Get all tracks from a playlist and return them as a DataFrame."""
+    all_tracks = get_all_tracks_in_playlist(playlist_id)
+
+    if not all_tracks:
+        logger.info(f"Playlist '{prefixed_playlist_name}' is empty.")
+        return None
+
+    tracks_with_indices = []
+    for index, item in enumerate(all_tracks):
+        if item and item.get("track") and item.get("track").get("id"):
+            tracks_with_indices.append(
+                {
+                    "track_id": item["track"]["id"],
+                    "added_at": item["added_at"],
+                    "uri": item["track"]["uri"],
+                    "position": index,
+                }
+            )
+
+    if not tracks_with_indices:
+        logger.info(f"Playlist '{prefixed_playlist_name}' has no processable tracks.")
+        return None
+
+    tracks_df = pd.DataFrame(tracks_with_indices)
+    tracks_df["added_at"] = pd.to_datetime(tracks_df["added_at"])
+    return tracks_df.sort_values("added_at", ascending=True)
+
+
+def remove_playlist_duplicates(
+    playlist_id: str, tracks_df: pd.DataFrame, prefixed_playlist_name: str
+) -> None:
+    """Remove duplicate tracks from a playlist."""
+    duplicated_df = tracks_df[tracks_df.duplicated(subset=["track_id"], keep="last")]
+
+    if not duplicated_df.empty:
+        logger.warning(
+            f"Found {len(duplicated_df)} duplicates in playlist "
+            f"'{prefixed_playlist_name}'."
+        )
+
+        duplicated_df = duplicated_df.sort_values("position", ascending=True)
+
+        items_to_remove = [
+            {"uri": row["uri"], "positions": [row["position"] + 1]}
+            for _, row in duplicated_df.iterrows()
+        ]
+
+        spotify_ins = spotify_auth()
+        removed_count = 0
+        for item in items_to_remove:
+            track_name = get_track_detail(item["uri"].split(":")[-1])
+            logger.info(f"Removing duplicate track {track_name}, uri {item['uri']}")
+            try:
+                spotify_ins.playlist_remove_specific_occurrences_of_items(
+                    playlist_id, [item]
+                )
+                # Add back because Spotify API remove all occurences
+                spotify_ins.playlist_add_items(
+                    playlist_id=playlist_id, items=[item["uri"]]
+                )
+                removed_count += 1
+            except Exception as e:
+                logger.error(
+                    f"Failed to remove track {item['uri']} at position "
+                    f"{item['positions'][0]} from playlist "
+                    f"{prefixed_playlist_name}: {e}"
+                )
+
+    else:
+        logger.info(f"No duplicates found in playlist '{prefixed_playlist_name}'.")
+
+
+def dedup_playlists(playlist_names: list[str]) -> None:
+    """Deduplicate playlists."""
+    from src.config import playlist_prefix
+
+    logger.info("Deduplicating playlists...")
+
+    unique_playlist_names = set(playlist_names)
+
+    for playlist_name in unique_playlist_names:
+        prefixed_playlist_name = f"{playlist_prefix}{playlist_name}"
+        logger.info(f"Deduplicating playlist: {prefixed_playlist_name}")
+
+        playlist_id = get_playlist_id(prefixed_playlist_name)
+
+        if not playlist_id:
+            logger.info(f"Playlist '{prefixed_playlist_name}' not found, skipping.")
+            logger.info(" ")
+            continue
+
+        try:
+            tracks_df = get_playlist_tracks_df(playlist_id, prefixed_playlist_name)
+            if tracks_df is not None:
+                remove_playlist_duplicates(playlist_id, tracks_df, prefixed_playlist_name)
+        except Exception as e:
+            import traceback
+
+            traceback.print_exc()
+            logger.error(
+                "FAILED to deduplicate playlist: "
+                f"'{prefixed_playlist_name}' with error: {e}"
+            )
+        logger.info(" ")
 
 
 # Annex testing tracks with known issues

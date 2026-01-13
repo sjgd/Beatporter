@@ -13,7 +13,7 @@ scope = "playlist-read-private playlist-modify-private playlist-modify-public"
 # Spotify Application Details
 client_id = "CHANGE_ME"
 client_secret = "CHANGE_ME"
-redirect_uri = "http://localhost:65000"
+redirect_uri = "http://127.0.0.1:65000"
 
 # Use gcp?
 use_gcp = False

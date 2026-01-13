@@ -20,6 +20,7 @@ from src.beatport import (
 )
 from src.config import (
     charts,
+    daily_mode,
     genres,
     labels,
     shuffle_label,
@@ -34,6 +35,7 @@ from src.spotify_search import (
 )
 from src.spotify_utils import (
     back_up_spotify_playlist,
+    dedup_playlists,
     get_all_playlists,
     update_hist_pl_tracks,
 )
@@ -42,7 +44,14 @@ from src.utils import FILE_NAME_HIST, PATH_HIST_LOCAL, HistoryCache, deduplicate
 logger = logging.getLogger("beatporter")
 
 curr_date = datetime.today().strftime("%Y-%m-%d")
-valid_arguments = ["backups", "charts", "genres", "labels", "refresh-hist"]
+valid_arguments = [
+    "backups",
+    "charts",
+    "genres",
+    "labels",
+    "refresh_hist",
+    "dedup_playlists",
+]
 
 
 def refresh_all_playlists_history() -> None:
@@ -202,8 +211,16 @@ def main(
     args = sys.argv[1:]
     args = [arg.replace("-", "") for arg in args]
 
-    if "refresh-hist" in args:
+    if "refresh_hist" in args:
         refresh_all_playlists_history()
+
+    if "dedup_playlists" in args:
+        dedup_playlists(
+            list(charts.keys())
+            + list(labels.keys())
+            + [f"{genre} - Top 100" for genre in genres]
+            + [f"{genre} - Daily Top" for genre in genres if daily_mode]
+        )
 
     if len(args) == 0:
         # If not argument passed then parse all

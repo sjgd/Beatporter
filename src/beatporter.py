@@ -49,8 +49,8 @@ valid_arguments = [
     "charts",
     "genres",
     "labels",
-    "refresh-hist",
-    "dedup-playlists",
+    "refresh_hist",
+    "dedup_playlists",
 ]
 
 
@@ -211,10 +211,10 @@ def main(
     args = sys.argv[1:]
     args = [arg.replace("-", "") for arg in args]
 
-    if "refresh-hist" in args:
+    if "refresh_hist" in args:
         refresh_all_playlists_history()
 
-    if "dedup-playlists" in args:
+    if "dedup_playlists" in args:
         dedup_playlists(
             list(charts.keys())
             + list(labels.keys())

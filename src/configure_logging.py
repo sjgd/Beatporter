@@ -40,7 +40,7 @@ def configure_logging() -> None:
     fileh = RotatingFileHandler(
         ROOT_PATH + "logs/runtime-beatporter-debug.log",
         "w",
-        maxBytes=50 * 1024 * 1024,
+        maxBytes=150 * 1024 * 1024,
         backupCount=1,
         encoding=None,
         delay=False,

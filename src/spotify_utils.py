@@ -1293,7 +1293,7 @@ def remove_playlist_duplicates(
     duplicated_df = tracks_df[tracks_df.duplicated(subset=["track_id"], keep="last")]
 
     if not duplicated_df.empty:
-        logger.info(
+        logger.warning(
             f"Found {len(duplicated_df)} duplicates in playlist "
             f"'{prefixed_playlist_name}'."
         )
@@ -1309,12 +1309,7 @@ def remove_playlist_duplicates(
         removed_count = 0
         for item in items_to_remove:
             track_name = get_track_detail(item["uri"].split(":")[-1])
-            logger.info(
-                f"Removing duplicate track {track_name}, uri "
-                f"{item['uri']} at position "
-                f"{item['positions'][0]} ({track_name}) from playlist "
-                f"{prefixed_playlist_name}."
-            )
+            logger.info(f"Removing duplicate track {track_name}, uri {item['uri']}")
             try:
                 spotify_ins.playlist_remove_specific_occurrences_of_items(
                     playlist_id, [item]
@@ -1351,6 +1346,7 @@ def dedup_playlists(playlist_names: list[str]) -> None:
 
         if not playlist_id:
             logger.info(f"Playlist '{prefixed_playlist_name}' not found, skipping.")
+            logger.info(" ")
             continue
 
         try:
@@ -1361,7 +1357,7 @@ def dedup_playlists(playlist_names: list[str]) -> None:
             import traceback
 
             traceback.print_exc()
-            logger.warning(
+            logger.error(
                 "FAILED to deduplicate playlist: "
                 f"'{prefixed_playlist_name}' with error: {e}"
             )

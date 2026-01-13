@@ -1298,19 +1298,30 @@ def remove_playlist_duplicates(
             f"'{prefixed_playlist_name}'."
         )
 
-        duplicated_df = duplicated_df.sort_values("position", ascending=False)
+        duplicated_df = duplicated_df.sort_values("position", ascending=True)
 
         items_to_remove = [
-            {"uri": row["uri"], "positions": [row["position"]]}
+            {"uri": row["uri"], "positions": [row["position"] + 1]}
             for _, row in duplicated_df.iterrows()
         ]
 
         spotify_ins = spotify_auth()
         removed_count = 0
         for item in items_to_remove:
+            track_name = get_track_detail(item["uri"].split(":")[-1])
+            logger.info(
+                f"Removing duplicate track {track_name}, uri "
+                f"{item['uri']} at position "
+                f"{item['positions'][0]} ({track_name}) from playlist "
+                f"{prefixed_playlist_name}."
+            )
             try:
                 spotify_ins.playlist_remove_specific_occurrences_of_items(
                     playlist_id, [item]
+                )
+                # Add back because Spotify API remove all occurences
+                spotify_ins.playlist_add_items(
+                    playlist_id=playlist_id, items=[item["uri"]]
                 )
                 removed_count += 1
             except Exception as e:
@@ -1319,29 +1330,6 @@ def remove_playlist_duplicates(
                     f"{item['positions'][0]} from playlist "
                     f"{prefixed_playlist_name}: {e}"
                 )
-
-        if removed_count > 0:
-            logger.info(
-                f"Removed {removed_count} duplicates from playlist "
-                f"'{prefixed_playlist_name}'."
-            )
-            # TEMP check that the track IDs are still in the playlist
-            updated_tracks_df = get_playlist_tracks_df(
-                playlist_id, prefixed_playlist_name
-            )
-            track_ids_to_check = duplicated_df["track_id"].tolist()
-            if updated_tracks_df is not None:
-                for track_id in track_ids_to_check:
-                    if track_id in updated_tracks_df["track_id"].values:
-                        logger.info(
-                            f"Track ID {track_id} still present in playlist "
-                            f"'{prefixed_playlist_name}' after duplicate removal."
-                        )
-                    else:
-                        logger.info(
-                            f"Track ID {track_id} successfully removed from playlist "
-                            f"'{prefixed_playlist_name}'."
-                        )
 
     else:
         logger.info(f"No duplicates found in playlist '{prefixed_playlist_name}'.")
@@ -1368,9 +1356,7 @@ def dedup_playlists(playlist_names: list[str]) -> None:
         try:
             tracks_df = get_playlist_tracks_df(playlist_id, prefixed_playlist_name)
             if tracks_df is not None:
-                remove_playlist_duplicates(
-                    playlist_id, tracks_df, prefixed_playlist_name
-                )
+                remove_playlist_duplicates(playlist_id, tracks_df, prefixed_playlist_name)
         except Exception as e:
             import traceback
 
@@ -1379,6 +1365,7 @@ def dedup_playlists(playlist_names: list[str]) -> None:
                 "FAILED to deduplicate playlist: "
                 f"'{prefixed_playlist_name}' with error: {e}"
             )
+        logger.info(" ")
 
 
 # Annex testing tracks with known issues

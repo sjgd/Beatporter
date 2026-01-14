@@ -703,7 +703,21 @@ def add_new_tracks_to_playlist_genre(
 
     df_daily_hist = pd.DataFrame()
     if daily_mode:
-        df_daily_hist = sync_playlist_history(playlists[1], digging_mode)
+        if digging_mode == "":
+            # If digging_mode is empty, clear daily playlist and start fresh
+            logger.info(f"Clearing daily playlist for {genre} as digging_mode is empty")
+            clear_playlist(playlists[1]["id"])
+            df_daily_hist = pd.DataFrame(
+                columns=[
+                    "playlist_id",
+                    "playlist_name",
+                    "track_id",
+                    "datetime_added",
+                    "artist_name",
+                ]
+            )
+        else:
+            df_daily_hist = sync_playlist_history(playlists[1], digging_mode)
 
     n_daily_tracks = 0
     if daily_mode:

@@ -6,7 +6,11 @@ from logging.handlers import RotatingFileHandler
 
 import coloredlogs
 
-from src.config import ROOT_PATH
+from src.config import (
+    ROOT_PATH,
+    max_debug_log_filesize_mb,
+    max_log_filesize_mb,
+)
 
 
 def configure_logging() -> None:
@@ -24,7 +28,7 @@ def configure_logging() -> None:
     fileh = RotatingFileHandler(
         logFile,
         mode="w",
-        maxBytes=50 * 1024 * 1024,
+        maxBytes=max_log_filesize_mb * 1024 * 1024,
         backupCount=1,
         encoding=None,
         delay=False,
@@ -40,13 +44,14 @@ def configure_logging() -> None:
     fileh = RotatingFileHandler(
         ROOT_PATH + "logs/runtime-beatporter-debug.log",
         "w",
-        maxBytes=150 * 1024 * 1024,
+        maxBytes=max_debug_log_filesize_mb * 1024 * 1024,
         backupCount=1,
         encoding=None,
         delay=False,
     )
     formatter = logging.Formatter(
-        "%(asctime)s - %(message)s [%(filename)s:%(lineno)d]", datefmt="%Y-%m-%d %H:%M:%S"
+        "%(asctime)s - %(message)s [%(filename)s:%(lineno)d]",
+        datefmt="%Y-%m-%d %H:%M:%S",
     )
     fileh.setFormatter(formatter)
     fileh.setLevel(logging.DEBUG)

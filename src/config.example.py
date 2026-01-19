@@ -68,6 +68,10 @@ playlist_prefix = "Beatport: "
 # Playlist description
 playlist_description = "Created using github.com/sjgd/Beatporter."
 
+# Logs
+max_log_filesize_mb = 15  # 15 MB
+max_debug_log_filesize_mb = 50  # 50 MB
+
 # Genres on Beatport ("Arbitrary name": "URL path for genre")
 genres = {
     "All Genres": "",
@@ -110,7 +114,10 @@ genres = {
 }
 
 # Charts on Beatport ("Arbitrary name": "URL path for genre, without chart ID")
-charts = {"Kalambo Bontan": "kalambo", "Weekend Picks %U (%Y)": "weekend-picks-%U"}
+charts = {
+    "Kalambo Bontan": "kalambo",
+    "Weekend Picks %U (%Y)": "weekend-picks-%U",
+}
 
 # Labels on Beatport ("Arbitrary name": "URL path for genre, with chart ID")
 labels = {"8Bit Releases": "8bit/3248"}

@@ -105,24 +105,22 @@ def _handle_charts(
             # TODO handle return None, handle chart_bp_url_code has ID already or not
             logger.info(" ")
             logger.info(f" Getting chart : ***** {chart} : {chart_bp_url_code} *****")
-            chart_url = find_chart(chart, chart_bp_url_code)
-
-            if chart_url:
-                try:
+            try:
+                chart_url = find_chart(chart, chart_bp_url_code)
+                if chart_url:
                     tracks_dicts = get_chart(chart_url)
                     logger.debug(chart_bp_url_code + ":" + str(tracks_dicts))
                     logger.info(f"\t[+] Found {len(tracks_dicts)} tracks for {chart}")
                     add_new_tracks_to_playlist_chart_label(chart, tracks_dicts)
-                except Exception as e:
-                    traceback.print_exc()
-                    logger.warning(
-                        "FAILED getting chart: "
-                        f"***** {chart} : {chart_bp_url_code} ***** "
-                        f"with error: {e}"
-                    )
-            else:
-                logger.info(f"\t[+] Chart {chart} not found")
-
+                else:
+                    logger.info(f"\t[+] Chart {chart} not found")
+            except Exception as e:
+                traceback.print_exc()
+                logger.warning(
+                    "FAILED getting chart: "
+                    f"***** {chart} : {chart_bp_url_code} ***** "
+                    f"with error: {e}"
+                )
             chart_url = None
             tracks_dicts = None
             HistoryCache.clear()

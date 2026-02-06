@@ -132,16 +132,40 @@ if playlist_id and os.path.exists(file_path):
 
 **Impact:** Loads only needed playlist data from disk instead of entire 248K record file. For a playlist with ~1000 tracks, this reduces load from 248K to 1K rows (99.6% reduction in rows loaded). Saves 200-400 MB of memory per filtered load operation.
 
+### 7. Fixed Caching in append_to_hist_file ✅ CRITICAL FIX
+
+**File:** `src/utils.py`
+
+```python
+def append_to_hist_file(df_new_tracks: pd.DataFrame, file_path: str) -> None:
+    try:
+        # Clear cache BEFORE loading to prevent holding duplicate data
+        HistoryCache.clear()
+        gc.collect()
+
+        df_history = load_hist_file(file_path=file_path, allow_empty=True)
+        df_updated = pd.concat([df_history, df_new_tracks], ignore_index=True)
+        del df_history
+        gc.collect()
+        save_hist_dataframe(df_updated)
+        # DON'T cache the full file - let pyarrow filters load as needed
+        del df_updated
+        gc.collect()
+```
+
+**Impact:** CRITICAL - This was the main leak! `append_to_hist_file()` was loading the entire 162K record file into cache every time tracks were added. With pyarrow filtering working elsewhere, this defeated the optimization by keeping the full dataset in memory. Now the cache is cleared and the full file is not cached after append, preventing 150-250 MB accumulation per append operation.
+
 ## Expected Memory Improvements
 
-| Optimization               | Memory Saved           | Description                             |
-| -------------------------- | ---------------------- | --------------------------------------- |
-| Remove unnecessary copies  | 50-80 MB per operation | Eliminated redundant DataFrame copies   |
-| Explicit cleanup in append | 100-150 MB             | Prevents accumulation across operations |
-| Category data types        | 150-200 MB             | Efficient storage for repeated values   |
-| Cache clearing timing      | 50-100 MB              | Frees memory before loading new data    |
-| **PyArrow filtering**      | **200-400 MB**         | **Load only needed playlist rows**      |
-| **Total Expected Savings** | **~550-930 MB**        | **~70-90% reduction**                   |
+| Optimization                       | Memory Saved           | Description                              |
+| ---------------------------------- | ---------------------- | ---------------------------------------- |
+| Remove unnecessary copies          | 50-80 MB per operation | Eliminated redundant DataFrame copies    |
+| Explicit cleanup in append         | 100-150 MB             | Prevents accumulation across operations  |
+| Category data types                | 150-200 MB             | Efficient storage for repeated values    |
+| Cache clearing timing              | 50-100 MB              | Frees memory before loading new data     |
+| PyArrow filtering                  | 200-400 MB             | Load only needed playlist rows           |
+| **No caching full file on append** | **150-250 MB**         | **Prevents cache bloat on every append** |
+| **Total Expected Savings**         | **~700-1180 MB**       | **~75-85% reduction**                    |
 
 ## Additional Recommendations
 

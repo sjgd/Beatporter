@@ -219,13 +219,21 @@ def append_to_hist_file(
         return
 
     try:
+        # Load full history without caching (since we're updating it)
+        # Temporarily clear cache to avoid holding duplicate data
+        HistoryCache.clear()
+        gc.collect()
+
         df_history = load_hist_file(file_path=file_path, allow_empty=True)
         df_updated = pd.concat([df_history, df_new_tracks], ignore_index=True)
-        # Delete old references before updating cache to prevent memory leak
+        # Delete old references before saving to prevent memory leak
         del df_history
         gc.collect()
         save_hist_dataframe(df_updated)
-        HistoryCache.set(file_path, df_updated)
+        # Don't cache the full file - it will be loaded with pyarrow filters as needed
+        # This prevents holding 162K+ records in memory
+        del df_updated
+        gc.collect()
     except Exception as e:
         logger.error(f"Failed to append to hist file: {e}", exc_info=True)
 

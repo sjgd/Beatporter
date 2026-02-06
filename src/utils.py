@@ -62,6 +62,25 @@ def load_hist_file(
     Raises:
         ValueError: If the file does not exist and allow_empty is False.
     """
+    # If filtering by playlist_id, try to use pyarrow filters to load only needed rows
+    # This significantly reduces memory usage by not loading the entire file
+    if playlist_id and os.path.exists(file_path):
+        try:
+            # Use pyarrow filters to load only the needed playlist data
+            df_hist_pl_tracks = pd.read_parquet(
+                file_path,
+                filters=[("playlist_id", "=", playlist_id)],
+            )
+            logger.info(
+                f"Loaded {df_hist_pl_tracks.shape[0]} records for "
+                f"playlist_id={playlist_id} using pyarrow filters"
+            )
+            # Don't cache filtered results - they're playlist-specific
+            return df_hist_pl_tracks
+        except Exception as e:
+            # Fallback to normal loading if pyarrow filtering fails
+            logger.warning(f"PyArrow filtering failed ({e}), falling back to full load")
+
     df_hist_pl_tracks = HistoryCache.get(file_path)
 
     if df_hist_pl_tracks is None:

@@ -130,6 +130,10 @@ def _handle_charts(
 def _handle_genres(args: list[str], genres: dict[str, str]) -> None:
     if "genres" in args:
         for genre, genre_bp_url_code in genres.items():
+            # Clear cache BEFORE processing to free memory from previous iteration
+            HistoryCache.clear()
+            gc.collect()
+
             logger.info(" ")
             logger.info(f" Getting genre : ***** {genre} *****")
             top_100_chart = get_top_100_tracks(genre)
@@ -141,9 +145,10 @@ def _handle_genres(args: list[str], genres: dict[str, str]) -> None:
                 logger.warning(
                     f"FAILED getting genre: ***** {genre} ***** with error: {e}"
                 )
-            top_100_chart = None
-            HistoryCache.clear()
-            gc.collect()
+            finally:
+                # Ensure cleanup even if there's an error
+                del top_100_chart
+                gc.collect()
 
 
 def _handle_labels(

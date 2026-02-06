@@ -1102,9 +1102,14 @@ def sync_playlist_history(playlist: dict, digging_mode: str) -> pd.DataFrame:
             f"'{playlist['name']}' (missing from history)"
         )
         append_to_hist_file(new_tracks_from_spotify)
-        df_playlist_hist = pd.concat(
+        # Store concatenated result in temp variable for cleanup
+        df_updated = pd.concat(
             [df_playlist_hist, new_tracks_from_spotify], ignore_index=True
         )
+        # Clean up old reference to prevent memory leak
+        del df_playlist_hist
+        gc.collect()
+        df_playlist_hist = df_updated
     return df_playlist_hist
 
 

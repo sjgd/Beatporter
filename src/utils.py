@@ -98,13 +98,22 @@ def load_hist_file(
                     f"{df_hist_pl_tracks.shape[0]} records"
                 )
                 gc.collect()
+                # Optimize memory usage by using categorical types for repeated values
+                # This can reduce memory by 50-80% for columns with many repeated values
                 for col in df_hist_pl_tracks.columns:
                     if col == "datetime_added":
                         continue
                     try:
-                        df_hist_pl_tracks[col] = df_hist_pl_tracks[col].astype(
-                            pd.StringDtype()
-                        )
+                        # Use category type for playlist_id, playlist_name which have
+                        # limited unique values but many repetitions
+                        if col in ["playlist_id", "playlist_name"]:
+                            df_hist_pl_tracks[col] = df_hist_pl_tracks[col].astype(
+                                "category"
+                            )
+                        else:
+                            df_hist_pl_tracks[col] = df_hist_pl_tracks[col].astype(
+                                pd.StringDtype()
+                            )
                     except Exception as e:
                         logger.warning(e)
                 HistoryCache.set(file_path, df_hist_pl_tracks)
@@ -126,7 +135,8 @@ def load_hist_file(
                     raise
 
     if playlist_id:
-        return df_hist_pl_tracks[df_hist_pl_tracks["playlist_id"] == playlist_id].copy()
+        # Return filtered view without copying to save memory
+        return df_hist_pl_tracks[df_hist_pl_tracks["playlist_id"] == playlist_id]
 
     return df_hist_pl_tracks
 
@@ -191,6 +201,9 @@ def append_to_hist_file(
     try:
         df_history = load_hist_file(file_path=file_path, allow_empty=True)
         df_updated = pd.concat([df_history, df_new_tracks], ignore_index=True)
+        # Delete old references before updating cache to prevent memory leak
+        del df_history
+        gc.collect()
         save_hist_dataframe(df_updated)
         HistoryCache.set(file_path, df_updated)
     except Exception as e:

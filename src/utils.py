@@ -75,6 +75,7 @@ def load_hist_file(
                 f"Loaded {df_hist_pl_tracks.shape[0]} records for "
                 f"playlist_id={playlist_id} using pyarrow filters"
             )
+            print_memory_usage_readable()
             # Don't cache filtered results - they're playlist-specific
             return df_hist_pl_tracks
         except Exception as e:

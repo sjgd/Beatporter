@@ -1049,6 +1049,9 @@ def _get_new_spotify_tracks(
 ) -> pd.DataFrame:
     spotify_tracks = get_all_tracks_in_playlist(playlist["id"])
     df_from_spotify = pd.DataFrame.from_records(spotify_tracks)
+    # Clean up raw Spotify data immediately
+    del spotify_tracks
+    gc.collect()
 
     if not df_from_spotify.empty and "track" in df_from_spotify.columns:
         df_from_spotify.dropna(subset=["track"], inplace=True)
@@ -1059,7 +1062,7 @@ def _get_new_spotify_tracks(
             logger.info(f"Playlist {playlist['name']} is empty, no tracks to sync.")
             return pd.DataFrame()
 
-        df_from_spotify = pd.DataFrame(
+        df_result = pd.DataFrame(
             {
                 "playlist_id": playlist["id"],
                 "playlist_name": playlist["name"],
@@ -1076,9 +1079,15 @@ def _get_new_spotify_tracks(
                 ),
             }
         )
-        new_tracks_from_spotify = df_from_spotify[
-            ~df_from_spotify["track_id"].isin(df_playlist_hist["track_id"])
+        # Clean up intermediate DataFrames
+        del df_from_spotify, track_details
+        gc.collect()
+
+        new_tracks_from_spotify = df_result[
+            ~df_result["track_id"].isin(df_playlist_hist["track_id"])
         ]
+        del df_result
+        gc.collect()
         return new_tracks_from_spotify
     return pd.DataFrame()
 

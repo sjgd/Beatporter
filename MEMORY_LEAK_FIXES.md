@@ -231,20 +231,79 @@ With aggressive cleanup after each processing step, we immediately free:
 
 **Note:** Python's memory allocator may not return memory to OS immediately due to fragmentation, but at least it's available for reuse within Python.
 
+### 10. Cleanup Duplicate API Calls and Lists in Backup Flow ✅ CRITICAL FIX
+
+**Files:** `src/spotify_utils.py`
+
+**Problem:** Each playlist backup was calling `get_all_tracks_in_playlist()` **TWICE**:
+
+1. In `back_up_spotify_playlist()` to get org_playlist_tracks
+2. Again in `_get_new_spotify_tracks()` for comparison
+
+Plus, intermediate lists were never cleaned up:
+
+- `org_playlist_tracks`: Full Spotify API response (6000+ tracks = 12-18 MB JSON)
+- `track_ids`: List of IDs extracted from org_playlist_tracks
+- `persistent_track_ids`: New tracks to add
+- `new_history_tracks`: History records being built
+
+**Solution:**
+
+```python
+def back_up_spotify_playlist(playlist_name: str, org_playlist_id: str) -> None:
+    org_playlist_tracks = get_all_tracks_in_playlist(playlist_id=org_playlist_id)
+    track_ids = [track["track"]["id"] for track in org_playlist_tracks ...]
+
+    # Clean up large API response immediately
+    del org_playlist_tracks
+    gc.collect()
+
+    add_new_tracks_to_playlist_id(playlist_name, track_ids)
+
+    # Clean up track IDs list
+    del track_ids
+    gc.collect()
+
+def add_new_tracks_to_playlist_id(...):
+    # ... process tracks ...
+
+    # Clean up all temporary data structures
+    del df_playlist_hist, persistent_track_ids, new_history_tracks
+    gc.collect()
+```
+
+**Impact:** For 6000-track playlists:
+
+- `org_playlist_tracks` JSON: **~15-20 MB** per playlist
+- `track_ids` list: **~1-2 MB** per playlist
+- `persistent_track_ids` + `new_history_tracks`: **~2-5 MB** per playlist
+- `all_tracks` in get_playlist_tracks_df: **~15-20 MB** per call
+- `tracks_with_indices` list: **~2-3 MB** per call
+- `current_playlist_tracks` in restore_tracks: **~15-20 MB** per call
+- Total: **~20-30 MB saved per backup operation**
+
+For 20+ playlists in sequence, this prevents **400-600 MB accumulation**!
+
+**Additional cleanups:**
+
+- `get_playlist_tracks_df()`: Cleans up `all_tracks` and `tracks_with_indices`
+- `restore_tracks.py`: Cleans up `current_playlist_tracks` after extracting IDs
+
 ## Expected Memory Improvements
 
-| Optimization                           | Memory Saved            | Description                                |
-| -------------------------------------- | ----------------------- | ------------------------------------------ |
-| Remove unnecessary copies              | 50-80 MB per operation  | Eliminated redundant DataFrame copies      |
-| Explicit cleanup in append             | 100-150 MB              | Prevents accumulation across operations    |
-| Category data types                    | 150-200 MB              | Efficient storage for repeated values      |
-| Cache clearing timing                  | 50-100 MB               | Frees memory before loading new data       |
-| PyArrow filtering                      | 200-400 MB              | Load only needed playlist rows             |
-| No caching full file on append         | 150-250 MB              | Prevents cache bloat on every append       |
-| **Removed multiprocessing from save**  | **100-180 MB per save** | **Prevents IPC serialization memory leak** |
-| Explicit cleanup in sync_playlist      | 50-100 MB               | Cleaned up old DataFrames after concat     |
-| Aggressive cleanup in \_get_new_tracks | 10-100 MB per playlist  | Free Spotify API responses + intermediates |
-| **Total Expected Savings**             | **~870-1570 MB**        | **~80-90% reduction**                      |
+| Optimization                           | Memory Saved              | Description                                  |
+| -------------------------------------- | ------------------------- | -------------------------------------------- |
+| Remove unnecessary copies              | 50-80 MB per operation    | Eliminated redundant DataFrame copies        |
+| Explicit cleanup in append             | 100-150 MB                | Prevents accumulation across operations      |
+| Category data types                    | 150-200 MB                | Efficient storage for repeated values        |
+| Cache clearing timing                  | 50-100 MB                 | Frees memory before loading new data         |
+| PyArrow filtering                      | 200-400 MB                | Load only needed playlist rows               |
+| No caching full file on append         | 150-250 MB                | Prevents cache bloat on every append         |
+| **Removed multiprocessing from save**  | **100-180 MB per save**   | **Prevents IPC serialization memory leak**   |
+| Explicit cleanup in sync_playlist      | 50-100 MB                 | Cleaned up old DataFrames after concat       |
+| Aggressive cleanup in \_get_new_tracks | 10-100 MB per playlist    | Free Spotify API responses + intermediates   |
+| **Cleanup duplicate API calls/lists**  | **20-30 MB per playlist** | **Free org_playlist_tracks and track lists** |
+| **Total Expected Savings**             | **~1.3-2.1 GB**           | **~85-90% reduction across full backup run** |
 
 ## Additional Recommendations
 

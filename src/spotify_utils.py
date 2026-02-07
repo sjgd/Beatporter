@@ -1202,7 +1202,8 @@ def add_new_tracks_to_playlist_id(
             f'[+] No new tracks to add to the playlist: "{persistent_playlist_name}"'
         )
 
-    del df_playlist_hist
+    # Clean up all temporary data structures
+    del df_playlist_hist, persistent_track_ids, new_history_tracks
     gc.collect()
 
     return
@@ -1225,8 +1226,16 @@ def back_up_spotify_playlist(playlist_name: str, org_playlist_id: str) -> None:
         if track["track"] and track["track"]["id"]
     ]
 
+    # Clean up large API response immediately
+    del org_playlist_tracks
+    gc.collect()
+
     # Add the tracks to the backup playlist
     add_new_tracks_to_playlist_id(playlist_name, track_ids)
+
+    # Clean up track IDs list
+    del track_ids
+    gc.collect()
 
 
 def get_track_detail(track_id: str) -> str:
@@ -1291,11 +1300,18 @@ def get_playlist_tracks_df(
                 }
             )
 
+    # Clean up large API response
+    del all_tracks
+    gc.collect()
+
     if not tracks_with_indices:
         logger.info(f"Playlist '{prefixed_playlist_name}' has no processable tracks.")
         return None
 
     tracks_df = pd.DataFrame(tracks_with_indices)
+    del tracks_with_indices
+    gc.collect()
+
     tracks_df["added_at"] = pd.to_datetime(tracks_df["added_at"])
     return tracks_df.sort_values("added_at", ascending=True)
 

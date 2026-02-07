@@ -8,7 +8,7 @@ import socket
 import webbrowser
 from datetime import UTC, datetime
 from difflib import SequenceMatcher
-from typing import TypedDict, cast
+from typing import ClassVar, TypedDict, cast
 
 import numpy as np
 import pandas as pd
@@ -105,8 +105,26 @@ sp_oauth = oauth2.SpotifyOAuth(
 # spotify_ins = spotipy.Spotify(
 #     auth=token_info["access_token"], requests_timeout=15, retries=3, backoff_factor=15
 # )
+class SpotifyClient:
+    """Singleton for Spotify client to ensure session reuse without global variables."""
+
+    _instance: ClassVar[spotipy.Spotify | None] = None
+
+    @classmethod
+    def get_instance(cls) -> spotipy.Spotify:
+        """Get the shared Spotify client instance, creating it if necessary."""
+        if cls._instance is None:
+            cls._instance = spotipy.Spotify(
+                auth_manager=sp_oauth,
+                requests_timeout=15,
+                retries=3,
+                backoff_factor=15,
+            )
+        return cls._instance
+
+
 def spotify_auth(verbose_aut: bool = False) -> spotipy.Spotify:
-    """Authenticate to Spotify.
+    """Authenticate to Spotify and return a shared instance.
 
     Args:
         verbose_aut (bool): Whether to enable verbose logging.
@@ -114,9 +132,7 @@ def spotify_auth(verbose_aut: bool = False) -> spotipy.Spotify:
     Returns:
         spotipy.Spotify: The Spotify instance.
     """
-    return spotipy.Spotify(
-        auth_manager=sp_oauth, requests_timeout=15, retries=3, backoff_factor=15
-    )
+    return SpotifyClient.get_instance()
 
 
 def similar(a: str, b: str) -> float:
@@ -937,8 +953,9 @@ def track_in_playlist(playlist_id: str, track_id: str) -> bool:
         bool: True if track is in playlist, otherwise False.
 
     """
-    for track in get_all_tracks_in_playlist(playlist_id):
-        if track["track"]["id"] == track_id:
+    fields = "items(track(id)),next"
+    for track in get_all_tracks_in_playlist(playlist_id, fields=fields):
+        if track.get("track") and track["track"].get("id") == track_id:
             return True
     return False
 
@@ -963,11 +980,12 @@ def add_tracks_to_playlist(playlist_id: str, track_ids: list) -> None:
         )
 
 
-def get_all_tracks_in_playlist(playlist_id: str) -> list:
+def get_all_tracks_in_playlist(playlist_id: str, fields: str | None = None) -> list:
     """Get all tracks in a playlist.
 
     Args:
         playlist_id (str): Playlist ID.
+        fields (str, optional): Fields to fetch from Spotify API.
 
     Returns:
         list: List of tracks.
@@ -975,7 +993,7 @@ def get_all_tracks_in_playlist(playlist_id: str) -> list:
     """
     spotify_ins = spotify_auth()
     playlist_tracks_pager = spotify_ins.playlist_items(
-        playlist_id=playlist_id, additional_types=("track",)
+        playlist_id=playlist_id, additional_types=("track",), fields=fields
     )
     playlist_tracks = playlist_tracks_pager["items"]
     while playlist_tracks_pager.get("next"):
@@ -994,14 +1012,29 @@ def clear_playlist(playlist_id: str) -> None:
 
     """
     spotify_ins = spotify_auth()
-    for track in get_all_tracks_in_playlist(playlist_id):
+    # Fetch only track IDs
+    fields = "items(track(id)),next"
+    all_tracks = get_all_tracks_in_playlist(playlist_id, fields=fields)
+    track_ids = [
+        item["track"]["id"]
+        for item in all_tracks
+        if item.get("track") and item["track"].get("id")
+    ]
+    del all_tracks
+    gc.collect()
+
+    if not track_ids:
+        return
+
+    # Remove tracks in chunks of 100 (Spotify API limit)
+    for i in range(0, len(track_ids), 100):
+        chunk = track_ids[i : i + 100]
         spotify_ins.user_playlist_remove_all_occurrences_of_tracks(
-            username,
-            playlist_id,
-            [
-                track["track"]["id"],
-            ],
+            username, playlist_id, chunk
         )
+
+    del track_ids
+    gc.collect()
 
 
 def parse_tracks_spotify(tracks_json: dict) -> list[BeatportTrack]:
@@ -1047,49 +1080,57 @@ def parse_tracks_spotify(tracks_json: dict) -> list[BeatportTrack]:
 def _get_new_spotify_tracks(
     playlist: dict, df_playlist_hist: pd.DataFrame
 ) -> pd.DataFrame:
-    spotify_tracks = get_all_tracks_in_playlist(playlist["id"])
-    df_from_spotify = pd.DataFrame.from_records(spotify_tracks)
+    # Fetch only necessary fields to save memory
+    fields = "items(added_at,track(id,name,artists(name))),next"
+    spotify_tracks = get_all_tracks_in_playlist(playlist["id"], fields=fields)
+
+    if not spotify_tracks:
+        logger.info(f"Playlist {playlist['name']} is empty, no tracks to sync.")
+        return pd.DataFrame()
+
+    extracted_data = []
+    for item in spotify_tracks:
+        track = item.get("track")
+        if not track or not track.get("id"):
+            continue
+
+        added_at = item.get("added_at")
+        track_id = track.get("id")
+        track_name = track.get("name", "Unknown Track")
+        artists = track.get("artists", [])
+        artist_name = artists[0]["name"] if artists else "Unknown Artist"
+
+        extracted_data.append(
+            {
+                "playlist_id": playlist["id"],
+                "playlist_name": playlist["name"],
+                "track_id": track_id,
+                "datetime_added": (
+                    pd.to_datetime(added_at).strftime("%Y-%m-%d %H:%M:%S")
+                    if added_at
+                    else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                ),
+                "artist_name": f"{artist_name} - {track_name}",
+            }
+        )
+
     # Clean up raw Spotify data immediately
     del spotify_tracks
     gc.collect()
 
-    if not df_from_spotify.empty and "track" in df_from_spotify.columns:
-        df_from_spotify.dropna(subset=["track"], inplace=True)
-        df_from_spotify.reset_index(drop=True, inplace=True)
-        track_details = pd.json_normalize(df_from_spotify["track"])
+    if not extracted_data:
+        return pd.DataFrame()
 
-        if "id" not in track_details.columns:
-            logger.info(f"Playlist {playlist['name']} is empty, no tracks to sync.")
-            return pd.DataFrame()
+    df_result = pd.DataFrame(extracted_data)
+    del extracted_data
+    gc.collect()
 
-        df_result = pd.DataFrame(
-            {
-                "playlist_id": playlist["id"],
-                "playlist_name": playlist["name"],
-                "track_id": track_details["id"],
-                "datetime_added": pd.to_datetime(df_from_spotify["added_at"]).dt.strftime(
-                    "%Y-%m-%d %H:%M:%S"
-                ),
-                "artist_name": (
-                    track_details["artists"].apply(
-                        lambda a: a[0]["name"] if a and len(a) > 0 else "Unknown Artist"
-                    )
-                    + " - "
-                    + track_details["name"]
-                ),
-            }
-        )
-        # Clean up intermediate DataFrames
-        del df_from_spotify, track_details
-        gc.collect()
-
-        new_tracks_from_spotify = df_result[
-            ~df_result["track_id"].isin(df_playlist_hist["track_id"])
-        ]
-        del df_result
-        gc.collect()
-        return new_tracks_from_spotify
-    return pd.DataFrame()
+    new_tracks_from_spotify = df_result[
+        ~df_result["track_id"].isin(df_playlist_hist["track_id"])
+    ]
+    del df_result
+    gc.collect()
+    return new_tracks_from_spotify
 
 
 def sync_playlist_history(playlist: dict, digging_mode: str) -> pd.DataFrame:
@@ -1218,12 +1259,15 @@ def back_up_spotify_playlist(playlist_name: str, org_playlist_id: str) -> None:
     """
     logger.info(f"Backing up playlist {playlist_name}...")
 
-    # Get the tracks from the original playlist
-    org_playlist_tracks = get_all_tracks_in_playlist(playlist_id=org_playlist_id)
+    # Fetch only IDs to save memory
+    fields = "items(track(id)),next"
+    org_playlist_tracks = get_all_tracks_in_playlist(
+        playlist_id=org_playlist_id, fields=fields
+    )
     track_ids = [
         track["track"]["id"]
         for track in org_playlist_tracks
-        if track["track"] and track["track"]["id"]
+        if track.get("track") and track["track"].get("id")
     ]
 
     # Clean up large API response immediately
@@ -1282,7 +1326,9 @@ def get_playlist_tracks_df(
     playlist_id: str, prefixed_playlist_name: str
 ) -> pd.DataFrame | None:
     """Get all tracks from a playlist and return them as a DataFrame."""
-    all_tracks = get_all_tracks_in_playlist(playlist_id)
+    # Fetch only necessary fields
+    fields = "items(added_at,track(id,uri)),next"
+    all_tracks = get_all_tracks_in_playlist(playlist_id, fields=fields)
 
     if not all_tracks:
         logger.info(f"Playlist '{prefixed_playlist_name}' is empty.")
@@ -1383,6 +1429,8 @@ def dedup_playlists(playlist_names: list[str]) -> None:
             tracks_df = get_playlist_tracks_df(playlist_id, prefixed_playlist_name)
             if tracks_df is not None:
                 remove_playlist_duplicates(playlist_id, tracks_df, prefixed_playlist_name)
+            del tracks_df
+            gc.collect()
         except Exception as e:
             import traceback
 

@@ -41,10 +41,68 @@ class HistoryCache:
         cls._cache.clear()
 
 
+def _load_and_optimize_parquet(file_path: str) -> pd.DataFrame:
+    """Load Parquet file and optimize it with categorical types."""
+    df_hist_pl_tracks = pd.read_parquet(file_path)
+    logger.info(
+        f"Successfully loaded hist file with {df_hist_pl_tracks.shape[0]} records"
+    )
+    gc.collect()
+    # Optimize memory usage by using categorical types for repeated values
+    # This can reduce memory by 50-80% for columns with many repeated values
+    for col in df_hist_pl_tracks.columns:
+        if col == "datetime_added":
+            continue
+        try:
+            # Use category type for playlist_id, playlist_name which have
+            # limited unique values but many repetitions
+            if col in ["playlist_id", "playlist_name"]:
+                df_hist_pl_tracks[col] = df_hist_pl_tracks[col].astype("category")
+            else:
+                df_hist_pl_tracks[col] = df_hist_pl_tracks[col].astype(pd.StringDtype())
+        except Exception as e:
+            logger.warning(e)
+    return df_hist_pl_tracks
+
+
+def _handle_missing_history_file(
+    file_path: str, allow_empty: bool, cache: bool
+) -> pd.DataFrame:
+    """Handle the case where the history file does not exist."""
+    if allow_empty:
+        df_hist_pl_tracks = pd.DataFrame(
+            columns=[
+                "playlist_id",
+                "playlist_name",
+                "track_id",
+                "datetime_added",
+                "artist_name",
+            ]
+        )
+        if cache:
+            HistoryCache.set(file_path, df_hist_pl_tracks)
+        return df_hist_pl_tracks
+
+    # Try to load excel file if it exists
+    excel_path = file_path.replace(".parquet.gz", ".xlsx")
+    if os.path.exists(excel_path):
+        logger.info("Found excel history file, loading it.")
+        df_hist_pl_tracks = pd.read_excel(excel_path)
+        if cache:
+            HistoryCache.set(file_path, df_hist_pl_tracks)
+        return df_hist_pl_tracks
+
+    raise ValueError(
+        f"File does not exist at the expected path: {file_path}. "
+        "Creating an empty DataFrame is not allowed (allow_empty=False)."
+    )
+
+
 def load_hist_file(
     file_path: str = PATH_HIST_LOCAL + FILE_NAME_HIST,
     playlist_id: str | None = None,
     allow_empty: bool = False,
+    cache: bool = True,
 ) -> pd.DataFrame:
     """Load the hist file according to folder path in configs.
 
@@ -53,6 +111,7 @@ def load_hist_file(
         playlist_id (str, optional): If provided, only load data for this playlist.
         allow_empty (bool): If True, returns an empty DataFrame
          when the file does not exist; otherwise, raises an error.
+        cache (bool): If True, caches the loaded DataFrame in HistoryCache.
 
     Returns:
         pd.DataFrame: Existing history file of track ID per playlist.
@@ -84,57 +143,15 @@ def load_hist_file(
 
     if df_hist_pl_tracks is None:
         if not os.path.exists(file_path):
-            if allow_empty:
-                df_hist_pl_tracks = pd.DataFrame(
-                    columns=[
-                        "playlist_id",
-                        "playlist_name",
-                        "track_id",
-                        "datetime_added",
-                        "artist_name",
-                    ]
-                )
-                HistoryCache.set(file_path, df_hist_pl_tracks)
-            else:
-                # Try to load excel file if it exists
-                excel_path = file_path.replace(".parquet.gz", ".xlsx")
-                if os.path.exists(excel_path):
-                    logger.info("Found excel history file, loading it.")
-                    df_hist_pl_tracks = pd.read_excel(excel_path)
-                    HistoryCache.set(file_path, df_hist_pl_tracks)
-                else:
-                    raise ValueError(
-                        f"File does not exist at the expected path: {file_path}. "
-                        "Creating an empty DataFrame is not allowed (allow_empty=False)."
-                    )
+            df_hist_pl_tracks = _handle_missing_history_file(
+                file_path, allow_empty, cache
+            )
         else:
             try:
                 # We load the full file to cache it
-                df_hist_pl_tracks = pd.read_parquet(file_path)
-                logger.info(
-                    f"Successfully loaded hist file with "
-                    f"{df_hist_pl_tracks.shape[0]} records"
-                )
-                gc.collect()
-                # Optimize memory usage by using categorical types for repeated values
-                # This can reduce memory by 50-80% for columns with many repeated values
-                for col in df_hist_pl_tracks.columns:
-                    if col == "datetime_added":
-                        continue
-                    try:
-                        # Use category type for playlist_id, playlist_name which have
-                        # limited unique values but many repetitions
-                        if col in ["playlist_id", "playlist_name"]:
-                            df_hist_pl_tracks[col] = df_hist_pl_tracks[col].astype(
-                                "category"
-                            )
-                        else:
-                            df_hist_pl_tracks[col] = df_hist_pl_tracks[col].astype(
-                                pd.StringDtype()
-                            )
-                    except Exception as e:
-                        logger.warning(e)
-                HistoryCache.set(file_path, df_hist_pl_tracks)
+                df_hist_pl_tracks = _load_and_optimize_parquet(file_path)
+                if cache:
+                    HistoryCache.set(file_path, df_hist_pl_tracks)
                 print_memory_usage_readable()
             except Exception as e:
                 logger.error(f"Failed to load Parquet file: {e}", exc_info=True)
@@ -148,7 +165,8 @@ def load_hist_file(
                             "artist_name",
                         ]
                     )
-                    HistoryCache.set(file_path, df_hist_pl_tracks)
+                    if cache:
+                        HistoryCache.set(file_path, df_hist_pl_tracks)
                 else:
                     raise
 
@@ -210,7 +228,7 @@ def append_to_hist_file(
         HistoryCache.clear()
         gc.collect()
 
-        df_history = load_hist_file(file_path=file_path, allow_empty=True)
+        df_history = load_hist_file(file_path=file_path, allow_empty=True, cache=False)
         df_updated = pd.concat([df_history, df_new_tracks], ignore_index=True)
         # Delete old references before saving to prevent memory leak
         del df_history
@@ -218,6 +236,7 @@ def append_to_hist_file(
         save_hist_dataframe(df_updated)
         # Don't cache the full file - it will be loaded with pyarrow filters as needed
         # This prevents holding 162K+ records in memory
+        HistoryCache.clear()
         del df_updated
         gc.collect()
     except Exception as e:
@@ -251,6 +270,9 @@ def deduplicate_hist_file(
             HistoryCache.clear()
         else:
             logger.info("No duplicate tracks found.")
+
+        del df_history
+        gc.collect()
     except Exception as e:
         logger.error(f"Failed to de-duplicate hist file: {e}", exc_info=True)
 
@@ -287,6 +309,8 @@ def transfer_to_excel(
 
         df_history.to_excel(excel_path, index=False)
         logger.info("Transfer complete.")
+        del df_history
+        gc.collect()
     except Exception as e:
         logger.error(f"Failed to transfer hist file to Excel: {e}", exc_info=True)
 

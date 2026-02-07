@@ -2,6 +2,7 @@
 
 import logging
 import re
+from datetime import UTC, datetime
 
 import pandas as pd
 import spotipy
@@ -509,7 +510,9 @@ def add_new_tracks_to_playlist_chart_label(
                         "playlist_id": playlist["id"],
                         "playlist_name": playlist["name"],
                         "track_id": track_id,
-                        "datetime_added": pd.Timestamp.now(tz="UTC"),
+                        "datetime_added": datetime.now(tz=UTC).strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        ),
                         "artist_name": track.artists[0],
                     }
                 )
@@ -614,7 +617,9 @@ def _process_genre_tracks(
                         "playlist_id": playlists[0]["id"],
                         "playlist_name": playlists[0]["name"],
                         "track_id": track_id,
-                        "datetime_added": pd.Timestamp.now(tz="UTC"),
+                        "datetime_added": datetime.now(tz=UTC).strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        ),
                         "artist_name": track.artists[0],
                     }
                 )
@@ -630,7 +635,9 @@ def _process_genre_tracks(
                         "playlist_id": playlists[1]["id"],
                         "playlist_name": playlists[1]["name"],
                         "track_id": track_id,
-                        "datetime_added": pd.Timestamp.now(tz="UTC"),
+                        "datetime_added": datetime.now(tz=UTC).strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        ),
                         "artist_name": track.artists[0],
                     }
                 )
@@ -721,9 +728,14 @@ def add_new_tracks_to_playlist_genre(
 
     n_daily_tracks = 0
     if daily_mode:
-        spotify_ins = spotify_auth()
-        daily_playlist = spotify_ins.playlist(playlist_id=playlists[1]["id"])
-        n_daily_tracks = len(daily_playlist["tracks"]["items"])
+        if not df_daily_hist.empty:
+            n_daily_tracks = len(df_daily_hist)
+        else:
+            spotify_ins = spotify_auth()
+            daily_playlist = spotify_ins.playlist(
+                playlist_id=playlists[1]["id"], fields="tracks(total)"
+            )
+            n_daily_tracks = daily_playlist["tracks"]["total"]
 
     (
         persistent_track_ids,

@@ -2,10 +2,8 @@
 
 import gc
 import logging
-import multiprocessing
 import os
 from datetime import datetime
-from time import sleep
 from typing import ClassVar
 
 import pandas as pd
@@ -161,9 +159,15 @@ def load_hist_file(
     return df_hist_pl_tracks
 
 
-def _save_hist_file_proc(df_hist_pl_tracks: pd.DataFrame) -> None:
-    """Save the history dataframe in a separate process."""
-    proc_logger = logging.getLogger("proc_saver")
+def save_hist_dataframe(df_hist_pl_tracks: pd.DataFrame) -> None:
+    """Save the history dataframe directly without multiprocessing.
+
+    Note: Previously used multiprocessing which actually CAUSED memory leaks
+    due to DataFrame serialization for IPC. Direct save is faster and more
+    memory-efficient.
+    """
+    logger.info("Saving history file...")
+    print_memory_usage_readable()
 
     try:
         if "datetime_added" in df_hist_pl_tracks.columns:
@@ -175,33 +179,15 @@ def _save_hist_file_proc(df_hist_pl_tracks: pd.DataFrame) -> None:
         )
         if use_gcp:
             upload_file_to_gcs(file_name=FILE_NAME_HIST, local_folder=PATH_HIST_LOCAL)
-        proc_logger.info(
+        logger.info(
             f"Successfully saved hist file with {df_hist_pl_tracks.shape[0]:,} records"
         )
     except Exception as e:
-        proc_logger.error(f"Failed to save hist file in subprocess: {e}", exc_info=True)
-
-
-def save_hist_dataframe(df_hist_pl_tracks: pd.DataFrame) -> None:
-    """Save the history dataframe according to configs in a separate process."""
-    logger.info("Saving history file in a separate process to manage memory.")
-    print_memory_usage_readable()
-    sleep(1)
-
-    if os.name == "nt":
-        ctx = multiprocessing.get_context("spawn")
-    else:
-        ctx = multiprocessing.get_context()
-    p = ctx.Process(target=_save_hist_file_proc, args=(df_hist_pl_tracks,))
-    p.start()
-    p.join()
-
-    if p.exitcode != 0:
-        logger.error("Subprocess for saving history file failed.")
+        logger.error(f"Failed to save hist file: {e}", exc_info=True)
+        raise
 
     gc.collect()
-
-    logger.info("Subprocess finished. Memory usage in main process:")
+    logger.info("Save complete. Memory usage:")
     print_memory_usage_readable()
 
 

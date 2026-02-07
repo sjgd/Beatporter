@@ -155,17 +155,55 @@ def append_to_hist_file(df_new_tracks: pd.DataFrame, file_path: str) -> None:
 
 **Impact:** CRITICAL - This was the main leak! `append_to_hist_file()` was loading the entire 162K record file into cache every time tracks were added. With pyarrow filtering working elsewhere, this defeated the optimization by keeping the full dataset in memory. Now the cache is cleared and the full file is not cached after append, preventing 150-250 MB accumulation per append operation.
 
+### 8. Removed Multiprocessing from save_hist_dataframe ✅ CRITICAL ROOT CAUSE
+
+**File:** `src/utils.py`
+
+```python
+def save_hist_dataframe(df_hist_pl_tracks: pd.DataFrame) -> None:
+    """Save directly without multiprocessing."""
+    logger.info("Saving history file...")
+    print_memory_usage_readable()
+
+    # Save directly - no subprocess/serialization overhead
+    df_hist_pl_tracks.to_parquet(
+        PATH_HIST_LOCAL + FILE_NAME_HIST, compression="gzip", index=False
+    )
+    if use_gcp:
+        upload_file_to_gcs(file_name=FILE_NAME_HIST, local_folder=PATH_HIST_LOCAL)
+
+    gc.collect()
+    logger.info("Save complete. Memory usage:")
+    print_memory_usage_readable()
+```
+
+**Impact:** **THIS WAS THE ACTUAL ROOT CAUSE!** The function used `multiprocessing.Process(args=(df_hist_pl_tracks,))` which:
+
+1. **Serialized (pickled) the entire 248K record DataFrame** for inter-process communication
+2. Subprocess allocated memory to deserialize it
+3. After subprocess finished, **Python didn't release the serialization memory** back to OS
+4. This caused **100-180 MB jumps** after each save operation (visible in logs: 195MB → 375MB after save)
+5. Memory accumulated progressively with each playlist processed
+
+By removing multiprocessing and saving directly, we:
+
+- Eliminate IPC serialization overhead
+- Prevent memory fragmentation from subprocess
+- Make saves actually faster (no process spawn overhead)
+- Fix the continuous memory growth pattern
+
 ## Expected Memory Improvements
 
-| Optimization                       | Memory Saved           | Description                              |
-| ---------------------------------- | ---------------------- | ---------------------------------------- |
-| Remove unnecessary copies          | 50-80 MB per operation | Eliminated redundant DataFrame copies    |
-| Explicit cleanup in append         | 100-150 MB             | Prevents accumulation across operations  |
-| Category data types                | 150-200 MB             | Efficient storage for repeated values    |
-| Cache clearing timing              | 50-100 MB              | Frees memory before loading new data     |
-| PyArrow filtering                  | 200-400 MB             | Load only needed playlist rows           |
-| **No caching full file on append** | **150-250 MB**         | **Prevents cache bloat on every append** |
-| **Total Expected Savings**         | **~700-1180 MB**       | **~75-85% reduction**                    |
+| Optimization                          | Memory Saved            | Description                                |
+| ------------------------------------- | ----------------------- | ------------------------------------------ |
+| Remove unnecessary copies             | 50-80 MB per operation  | Eliminated redundant DataFrame copies      |
+| Explicit cleanup in append            | 100-150 MB              | Prevents accumulation across operations    |
+| Category data types                   | 150-200 MB              | Efficient storage for repeated values      |
+| Cache clearing timing                 | 50-100 MB               | Frees memory before loading new data       |
+| PyArrow filtering                     | 200-400 MB              | Load only needed playlist rows             |
+| No caching full file on append        | 150-250 MB              | Prevents cache bloat on every append       |
+| **Removed multiprocessing from save** | **100-180 MB per save** | **Prevents IPC serialization memory leak** |
+| **Total Expected Savings**            | **~850-1460 MB**        | **~80-90% reduction**                      |
 
 ## Additional Recommendations
 

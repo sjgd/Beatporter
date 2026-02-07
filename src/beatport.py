@@ -1,10 +1,12 @@
 """Module to manage Beatport."""
 
+import gc
 import json
 import logging
 import re
 from datetime import datetime, timedelta
 
+import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from pandas import to_datetime
@@ -43,6 +45,10 @@ def get_beatport_page_script_queries(url: str) -> dict:
     results_data_queries = results_data["props"]["pageProps"]["dehydratedState"][
         "queries"
     ]
+
+    # Clean up large JSON data
+    del results_data
+    gc.collect()
 
     return results_data_queries
 
@@ -338,6 +344,10 @@ def get_chart(url: str) -> list[BeatportTrack]:
 
     tracks_dicts = parse_tracks(raw_tracks_dicts)
 
+    # Clean up large JSON data
+    del results_data, raw_tracks_dicts
+    gc.collect()
+
     return tracks_dicts
 
 
@@ -388,6 +398,7 @@ def get_label_tracks(
 
     # Load history
     playlist = find_playlist_chart_label(label)
+    df_loc_hist = pd.DataFrame()
     if playlist["id"]:
         update_hist_pl_tracks(playlist)
         df_loc_hist = load_hist_file(playlist_id=playlist["id"], allow_empty=True)
@@ -430,10 +441,19 @@ def get_label_tracks(
                 for track in raw_tracks
             ]
         )
+
+        # Clean up per page
+        del results_data, raw_tracks_dicts, raw_tracks
+        gc.collect()
+
         if reached_last_update > 0 and not overwrite:
             logger.info("\t[+] Reached last updated date, stopping")
             break
 
     label_tracks.reverse()
+
+    # Final cleanup
+    del df_loc_hist
+    gc.collect()
 
     return label_tracks

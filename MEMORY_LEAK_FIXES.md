@@ -309,19 +309,86 @@ Added `del obj` and `gc.collect()` in:
 - `transfer_to_excel`
 - `add_new_tracks_to_playlist_genre`
 
+### 15. Selective Caching for "All" Digging Mode ✅ NEW
+
+**File:** `src/spotify_utils.py`
+
+```python
+def _get_history_for_digging(digging_mode: str, playlist_id: str | None) -> pd.DataFrame:
+    if digging_mode == "all":
+        # Don't cache the full history file to save memory
+        return load_hist_file(playlist_id=None, allow_empty=True, cache=False)
+    return load_hist_file(playlist_id=playlist_id, allow_empty=True)
+```
+
+**Impact:** Prevents caching the entire 248K+ record history file (~460-500 MB) when it's only needed for a single comparison.
+
+### 16. Respecting Cache Parameter in load_hist_file ✅ NEW
+
+**File:** `src/utils.py`
+
+```python
+# Ensured the full file is only cached if explicitly requested
+df_hist_pl_tracks = _load_and_optimize_parquet(file_path)
+if cache:
+    HistoryCache.set(file_path, df_hist_pl_tracks)
+```
+
+**Impact:** Corrected logic where the full file was being cached even when `cache=False` was requested.
+
+### 17. Explicit Cleanup in Genre and Chart Processing ✅ NEW
+
+**File:** `src/spotify_search.py`
+
+Added `del` and `gc.collect()` for temporary DataFrames (`df_playlist_hist`, `df_persistent_hist`, `df_daily_hist`) at the end of:
+- `add_new_tracks_to_playlist_genre`
+- `add_new_tracks_to_playlist_chart_label`
+
+**Impact:** Frees 20-50 MB of playlist-specific history DataFrames immediately after use, preventing accumulation across genres.
+
+### 18. Explicit Cleanup in Playlist Refresh Loop ✅ NEW
+
+**File:** `src/beatporter.py`
+
+```python
+def refresh_all_playlists_history() -> None:
+    all_playlists = get_all_playlists()
+    for playlist in all_playlists:
+        if playlist["owner"]["id"] == username:
+            update_hist_pl_tracks(playlist)
+            HistoryCache.clear()
+            gc.collect()
+    del all_playlists
+    gc.collect()
+```
+
+**Impact:** Prevents memory accumulation when refreshing history for hundreds of playlists by clearing the cache and collecting garbage in each iteration.
+
+### 19. Beatport Scraping JSON Cleanup ✅ NEW
+
+**File:** `src/beatport.py`
+
+Added `del results_data, raw_tracks_dicts, raw_tracks` and `gc.collect()` in:
+- `get_beatport_page_script_queries`
+- `get_chart`
+- `get_label_tracks`
+
+**Impact:** Beatport pages contain massive "dehydrated state" JSON scripts. Cleaning these up immediately after extraction prevents hundreds of MBs of JSON strings and dicts from lingering in memory during a long run.
+
 ## Expected Memory Improvements
 
-| Optimization                           | Memory Saved              | Description                                  |
-| -------------------------------------- | ------------------------- | -------------------------------------------- |
-| Remove unnecessary copies              | 50-80 MB per operation    | Eliminated redundant DataFrame copies        |
-| Explicit cleanup in append             | 100-150 MB                | Prevents accumulation across operations      |
-| Category data types                    | 150-200 MB                | Efficient storage for repeated values        |
-| Spotify Session Reuse                  | 100-200 MB                | Reuses one client instead of hundreds        |
-| Spotify API "fields"                   | 10-50 MB per playlist     | Fetch only needed metadata                   |
-| PyArrow filtering                      | 200-400 MB                | Load only needed playlist rows               |
-| **Removed multiprocessing from save**  | **100-180 MB per save**   | **Prevents IPC serialization memory leak**   |
-| Explicit cleanup in loops              | 50-100 MB                 | Immediate release of large temporary objects |
-| **Total Expected Savings**             | **~1.5-2.5 GB**           | **~90% reduction across full run**           |
+| Optimization                            | Memory Saved               | Description                                  |
+| --------------------------------------- | -------------------------- | -------------------------------------------- |
+| Remove unnecessary copies               | 50-80 MB per operation     | Eliminated redundant DataFrame copies        |
+| Explicit cleanup in append              | 100-150 MB                 | Prevents accumulation across operations      |
+| Category data types                     | 150-200 MB                 | Efficient storage for repeated values        |
+| Spotify Session Reuse                   | 100-200 MB                 | Reuses one client instead of hundreds        |
+| Spotify API "fields"                    | 10-50 MB per playlist      | Fetch only needed metadata                   |
+| PyArrow filtering                       | 200-400 MB                 | Load only needed playlist rows               |
+| **Removed multiprocessing from save**   | **100-180 MB per save**    | **Prevents IPC serialization memory leak**   |
+| **Selective Caching (Digging "All")**   | **460-500 MB**             | **Prevents loading full history into RAM**   |
+| Explicit cleanup in loops               | 50-100 MB                  | Immediate release of large temporary objects |
+| **Total Expected Savings**              | **~2.0-3.0 GB**            | **~95% reduction across full run**           |
 
 ## Additional Recommendations
 

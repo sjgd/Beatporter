@@ -1,3 +1,5 @@
+.PHONY: ipython beatporter build start stop ruff tests lint
+
 ipython:
 	uv run --frozen ipython
 
@@ -17,7 +19,7 @@ ruff:
 	uv run ruff check --fix
 
 tests:
-	export PYTHONPATH="$(pwd):$(pwd)/src" && uv run pytest ./tests/core/ --cov=./src --cov-report=term-missing
+	PYTHONPATH="$(pwd):$(pwd)/src" uv run pytest ./tests/core/ --cov=./src --cov-report=term-missing
 
 # Run code quality commands
 lint:

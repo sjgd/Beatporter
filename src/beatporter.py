@@ -39,7 +39,7 @@ from src.spotify_utils import (
     get_all_playlists,
     update_hist_pl_tracks,
 )
-from src.utils import FILE_NAME_HIST, PATH_HIST_LOCAL, HistoryCache, deduplicate_hist_file
+from src.utils import FILE_NAME_HIST, PATH_HIST_LOCAL, deduplicate_hist_file
 
 logger = logging.getLogger("beatporter")
 
@@ -61,6 +61,10 @@ def refresh_all_playlists_history() -> None:
         if playlist["owner"]["id"] == username:
             logger.info(f"Refreshing history for playlist: {playlist['name']}")
             update_hist_pl_tracks(playlist)
+            gc.collect()
+
+    del all_playlists
+    gc.collect()
 
 
 def _transfer_excel_to_parquet_if_needed() -> None:
@@ -91,7 +95,6 @@ def _handle_backups(args: list[str], spotify_bkp: dict[str, str]) -> None:
                     f"***** {playlist_name} : {org_playlist_id} ***** "
                     f"with error: {e}"
                 )
-            HistoryCache.clear()
             gc.collect()
 
 
@@ -123,7 +126,6 @@ def _handle_charts(
                 )
             chart_url = None
             tracks_dicts = None
-            HistoryCache.clear()
             gc.collect()
 
 
@@ -131,7 +133,6 @@ def _handle_genres(args: list[str], genres: dict[str, str]) -> None:
     if "genres" in args:
         for genre, genre_bp_url_code in genres.items():
             # Clear cache BEFORE processing to free memory from previous iteration
-            HistoryCache.clear()
             gc.collect()
 
             logger.info(" ")
@@ -176,7 +177,6 @@ def _handle_labels(
                     f"with error: {e}"
                 )
             tracks_dict = None
-            HistoryCache.clear()
             gc.collect()
 
 

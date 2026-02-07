@@ -1,5 +1,6 @@
 """Module to manage Spotify queries."""
 
+import gc
 import logging
 import re
 from datetime import UTC, datetime
@@ -549,6 +550,10 @@ def add_new_tracks_to_playlist_chart_label(
             f'[+] No new tracks to add to the playlist: "{persistent_playlist_name}"'
         )
 
+    # Clean up all temporary data structures
+    del df_playlist_hist, persistent_track_ids, new_history_tracks
+    gc.collect()
+
     return
 
 
@@ -787,6 +792,12 @@ def add_new_tracks_to_playlist_genre(
             daily_top_n_playlist_name,
             playlists,
         )
+
+    # Clean up all temporary data structures
+    del df_persistent_hist, df_daily_hist
+    del persistent_track_ids, daily_top_n_track_ids
+    del new_persistent_history_tracks, new_daily_history_tracks
+    gc.collect()
 
     return
 

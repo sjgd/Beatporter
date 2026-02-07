@@ -36,7 +36,8 @@ from src.utils import append_to_hist_file, load_hist_file
 def _get_history_for_digging(digging_mode: str, playlist_id: str | None) -> pd.DataFrame:
     """Get history for digging mode."""
     if digging_mode == "all":
-        return load_hist_file(playlist_id=None, allow_empty=True)
+        # Don't cache the full history file to save memory
+        return load_hist_file(playlist_id=None, allow_empty=True, cache=False)
     return load_hist_file(playlist_id=playlist_id, allow_empty=True)
 
 

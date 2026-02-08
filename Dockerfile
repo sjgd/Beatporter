@@ -1,16 +1,8 @@
 # Stage 1: Builder
-FROM python:3.13.2 AS builder
+FROM python:3.13.2-slim AS builder
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV UV_COMPILE_BYTECODE=1
-
-# Install uv using the installer script
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates
-ADD https://astral.sh/uv/install.sh /uv-installer.sh
-RUN sh /uv-installer.sh && rm /uv-installer.sh
-ENV PATH="/root/.local/bin/:$PATH"
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Set working directory
 WORKDIR /app
@@ -19,8 +11,11 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 
 # Install dependencies
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-install-project --no-dev
+ENV UV_COMPILE_BYTECODE=1
+RUN mkdir -p /app/tmp
+ENV TMPDIR=/app/tmp
+RUN uv sync --frozen --no-install-project --no-dev --no-cache
+RUN rm -rf /app/tmp
 
 # Stage 2: Runner
 FROM python:3.13.2-slim AS runner

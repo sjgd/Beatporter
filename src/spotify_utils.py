@@ -21,6 +21,7 @@ from src.config import (
     client_id,
     client_secret,
     digging_mode,
+    folder_path,
     playlist_description,
     redirect_uri,
     scope,
@@ -55,7 +56,7 @@ configure_logging()
 logger = logging.getLogger("spotify_utils")
 
 TRACKS_DICT_NAMES = ["id", "duration_ms", "href", "name", "popularity", "uri", "artists"]
-handler = CacheFileHandler(username=username)
+handler = CacheFileHandler(cache_path=f"{folder_path}/.spotify_cache")
 sp_oauth = oauth2.SpotifyOAuth(
     client_id, client_secret, redirect_uri, cache_handler=handler, scope=scope
 )

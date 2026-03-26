@@ -62,6 +62,7 @@ def refresh_all_playlists_history() -> None:
             logger.info(f"Refreshing history for playlist: {playlist['name']}")
             update_hist_pl_tracks(playlist)
             gc.collect()
+            logger.info("")
 
     del all_playlists
     gc.collect()

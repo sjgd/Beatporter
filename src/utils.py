@@ -23,7 +23,7 @@ def _load_and_optimize_parquet(file_path: str) -> pd.DataFrame:
     """Load Parquet file and optimize it with categorical types."""
     df_hist_pl_tracks = pd.read_parquet(file_path)
     logger.info(
-        f"Successfully loaded hist file with {df_hist_pl_tracks.shape[0]} records"
+        f"Successfully loaded hist file with {df_hist_pl_tracks.shape[0]:,} records"
     )
     gc.collect()
     # Optimize memory usage by using categorical types for repeated values
@@ -99,7 +99,7 @@ def load_hist_file(
                 filters=[("playlist_id", "=", playlist_id)],
             )
             logger.info(
-                f"Loaded {df_hist_pl_tracks.shape[0]} records for "
+                f"Loaded {df_hist_pl_tracks.shape[0]:,} records for "
                 f"playlist_id={playlist_id} using pyarrow filters"
             )
             print_memory_usage_readable()

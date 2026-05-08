@@ -504,6 +504,9 @@ def search_wrapper(query: str, logger: logging.Logger = logger) -> dict:
         dict: Search results.
 
     """
+    if len(query) > 250:
+        logger.debug(f"Skipping search — query exceeds 250 chars: {query[:80]}...")
+        return {"tracks": {"items": []}}
     spotify_ins = spotify_auth()
     logger.setLevel(logging.FATAL)
     result: dict = {"tracks": {"items": []}}

@@ -25,6 +25,7 @@ dependencies = [
     "psutil>=7.2.2",
     "undetected-chromedriver>=3.5.5",
     "selenium>=4.40.0",
+    "setuptools>=82.0.1",
 ]
 
 [dependency-groups]

@@ -6,10 +6,14 @@ import logging
 import re
 from datetime import datetime, timedelta
 from time import sleep
+from typing import Any
 
 import pandas as pd
 from bs4 import BeautifulSoup
 from pandas import to_datetime
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 from src.config import genres, overwrite_label, silent_search
 from src.models import BeatportTrack
@@ -17,6 +21,21 @@ from src.spotify_utils import find_playlist_chart_label, update_hist_pl_tracks
 from src.utils import load_hist_file
 
 logger = logging.getLogger("beatport")
+
+
+def _accept_cookies(driver: Any) -> None:
+    """Attempt to accept cookies if a banner is present."""
+    try:
+        # Beatport typically uses OneTrust
+        cookie_button_selector = "#onetrust-accept-btn-handler"
+        WebDriverWait(driver, 5).until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, cookie_button_selector))
+        ).click()
+        logger.debug("Accepted cookies.")
+    except Exception:
+        # Banner might not be present or different selector
+        pass
+
 
 # Reduce noise from third-party libraries
 logging.getLogger("undetected_chromedriver").setLevel(logging.WARNING)
@@ -48,6 +67,8 @@ def get_beatport_page_script_queries(url: str) -> dict:
     driver = uc.Chrome(use_subprocess=True)
     try:
         driver.get(url)
+        sleep(3)  # Wait for page to load
+        _accept_cookies(driver)
         # Wait for dehydratedState to appear
         for _ in range(60):
             if "dehydratedState" in driver.page_source:
@@ -105,6 +126,8 @@ def scrape_beatport_charts(
     try:
         logger.info(f"Loading URL: {url}")
         driver.get(url)
+        sleep(3)  # Wait for page to load
+        _accept_cookies(driver)
 
         # Wait for chart links or dehydratedState
         for _ in range(max_wait):

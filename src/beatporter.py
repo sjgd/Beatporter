@@ -91,7 +91,7 @@ def _handle_backups(args: list[str], spotify_bkp: dict[str, str]) -> None:
                 back_up_spotify_playlist(playlist_name, org_playlist_id)
             except Exception as e:
                 traceback.print_exc()
-                logger.warning(
+                logger.error(
                     "FAILED backing up playlist: "
                     f"***** {playlist_name} : {org_playlist_id} ***** "
                     f"with error: {e}"
@@ -120,7 +120,7 @@ def _handle_charts(
                     logger.info(f"\t[+] Chart {chart} not found")
             except Exception as e:
                 traceback.print_exc()
-                logger.warning(
+                logger.error(
                     "FAILED getting chart: "
                     f"***** {chart} : {chart_bp_url_code} ***** "
                     f"with error: {e}"
@@ -144,9 +144,7 @@ def _handle_genres(args: list[str], genres: dict[str, str]) -> None:
                 add_new_tracks_to_playlist_genre(genre, top_100_chart)
             except Exception as e:
                 traceback.print_exc()
-                logger.warning(
-                    f"FAILED getting genre: ***** {genre} ***** with error: {e}"
-                )
+                logger.error(f"FAILED getting genre: ***** {genre} ***** with error: {e}")
             finally:
                 # Ensure cleanup even if there's an error
                 del top_100_chart
@@ -172,7 +170,7 @@ def _handle_labels(
                 add_new_tracks_to_playlist_chart_label(label, tracks_dict)
             except Exception as e:
                 traceback.print_exc()
-                logger.warning(
+                logger.error(
                     "FAILED getting label: "
                     f"***** {label} : {label_bp_url_code} ***** "
                     f"with error: {e}"

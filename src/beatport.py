@@ -38,8 +38,14 @@ def get_beatport_page_script_queries(url: str) -> dict:
     r = requests.get(url, headers=HEADERS)
     soup = BeautifulSoup(r.text, features="html.parser")
     all_scripts = soup.find_all("script", type="application/json")
-    assert len(all_scripts) == 1, "Found too many scripts in the result page"
-    script = all_scripts[0]
+    script = None
+    for s in all_scripts:
+        if "dehydratedState" in s.text:
+            script = s
+            break
+
+    if script is None:
+        raise ValueError(f"Could not find script with dehydratedState in {url}")
 
     results_data = json.loads(script.text)
     results_data_queries = results_data["props"]["pageProps"]["dehydratedState"][
@@ -98,47 +104,48 @@ def scrape_beatport_charts(
 
     driver = webdriver.Chrome(options=chrome_options)
     charts: list[str] = []
+    try:
+        logger.info(f"Loading URL: {url}")
+        driver.get(url)
 
-    logger.info(f"Loading URL: {url}")
-    driver.get(url)
+        # Wait for the page to load
+        _ = WebDriverWait(driver, max_wait).until(
+            lambda d: d.find_element(By.CSS_SELECTOR, '.artwork[href*="/chart/"]')
+        )
 
-    # Wait for the page to load
-    _ = WebDriverWait(driver, max_wait).until(
-        lambda d: d.find_element(By.CSS_SELECTOR, '.artwork[href*="/chart/"]')
-    )
+        # Try to find chart elements - you may need to inspect the page
+        # to find the correct selectors
+        chart_links = driver.find_elements(By.CSS_SELECTOR, '.artwork[href*="/chart/"]')
 
-    # Try to find chart elements - you may need to inspect the page
-    # to find the correct selectors
-    chart_links = driver.find_elements(By.CSS_SELECTOR, '.artwork[href*="/chart/"]')
+        logger.info(f"Found {len(chart_links)} chart links")
 
-    logger.info(f"Found {len(chart_links)} chart links")
+        for idx, link in enumerate(chart_links, 1):
+            try:
+                href = link.get_attribute("href")
+                chart_data = {
+                    "rank": idx,
+                    "title": link.get_attribute("title"),
+                    "href": href,
+                    "full_url": href
+                    if href.startswith("http")
+                    else f"https://www.beatport.com{href}",
+                }
 
-    for idx, link in enumerate(chart_links, 1):
-        try:
-            href = link.get_attribute("href")
-            chart_data = {
-                "rank": idx,
-                "title": link.get_attribute("title"),
-                "href": href,
-                "full_url": href
-                if href.startswith("http")
-                else f"https://www.beatport.com{href}",
-            }
+                if chart_bp_url_code and chart_bp_url_code in chart_data["href"]:
+                    logger.info(
+                        f"Matched requested chart: {chart_data['href']}"
+                        f" at rank {idx}, with title {chart_data['title']}"
+                    )
+                    charts.append(chart_data["full_url"])
+                elif not chart_bp_url_code:
+                    charts.append(chart_data["full_url"])
 
-            if chart_bp_url_code and chart_bp_url_code in chart_data["href"]:
-                logger.info(
-                    f"Matched requested chart: {chart_data['href']}"
-                    f" at rank {idx}, with title {chart_data['title']}"
-                )
-                charts.append(chart_data["full_url"])
-            elif not chart_bp_url_code:
-                charts.append(chart_data["full_url"])
+            except Exception as e:
+                logger.error(f"Error extracting chart {idx}: {e!s}")
+                continue
+    finally:
+        driver.quit()
 
-        except Exception as e:
-            logger.error(f"Error extracting chart {idx}: {e!s}")
-            continue
-
-    driver.quit()
     return charts
 
 

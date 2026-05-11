@@ -24,7 +24,7 @@ dependencies = [
     "google-crc32c>=1.8.0",
     "psutil>=7.2.2",
     "undetected-chromedriver>=3.5.5",
-    "curl-cffi>=0.15.0",
+    "selenium>=4.40.0",
 ]
 
 [dependency-groups]
@@ -34,7 +34,6 @@ dev = [
     "pydocstyle>=6.3.0",
     "pytest-cov>=7.0.0",
     "ruff>=0.9.10",
-    "selenium>=4.38.0",
 ]
 
 

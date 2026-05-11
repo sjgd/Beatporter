@@ -83,9 +83,8 @@ def _transfer_excel_to_parquet_if_needed() -> None:
 def _handle_backups(args: list[str], spotify_bkp: dict[str, str]) -> None:
     if "backups" in args:
         for playlist_name, org_playlist_id in spotify_bkp.items():
-            logger.info(" ")
             logger.info(
-                f"-Backing up playlist : ***** {playlist_name} : {org_playlist_id} *****"
+                f"Backing up playlist : ***** {playlist_name} : {org_playlist_id} *****"
             )
             try:
                 back_up_spotify_playlist(playlist_name, org_playlist_id)
@@ -105,10 +104,8 @@ def _handle_charts(
 ) -> None:
     if "charts" in args:
         for chart, chart_bp_url_code in parsed_charts.items():
-            # TODO check if chart are working, otherwise do as genre and label
-            # TODO handle return None, handle chart_bp_url_code has ID already or not
             logger.info(" ")
-            logger.info(f" Getting chart : ***** {chart} : {chart_bp_url_code} *****")
+            logger.info(f"Getting chart : ***** {chart} : {chart_bp_url_code} *****")
             try:
                 chart_url = find_chart(chart, chart_bp_url_code)
                 if chart_url:
@@ -143,13 +140,15 @@ def _handle_genres(args: list[str], genres: dict[str, str]) -> None:
             top_100_chart = get_top_100_tracks(genre)
             logger.debug(genre + ":" + str(top_100_chart))
             try:
+                top_100_chart = get_top_100_tracks(genre)
+                logger.debug(genre + ":" + str(top_100_chart))
                 add_new_tracks_to_playlist_genre(genre, top_100_chart)
             except Exception as e:
                 traceback.print_exc()
                 logger.error(f"FAILED getting genre: ***** {genre} ***** with error: {e}")
             finally:
-                # Ensure cleanup even if there's an error
-                del top_100_chart
+                if "top_100_chart" in locals():
+                    del top_100_chart
                 gc.collect()
 
 
@@ -259,10 +258,6 @@ if __name__ == "__main__":
 # Check to include original mix then remove
 # TODO review imports
 # TODO modify read me
-# TODO shuffle playlist option
-# TODO add config to create playlist private per default
-# TODO improve search with parsing names contains brackets, commas or special characters :
-#  (feat. Aliz Smith) and feat. Griz-O and Feat. Denzel Curry, Pell
 # TODO shuffle playlist option
 # TODO add config to create playlist private per default
 # TODO improve search with parsing names contains brackets, commas or special characters :

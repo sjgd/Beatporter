@@ -5,9 +5,9 @@ import json
 import logging
 import re
 from datetime import datetime, timedelta
+from time import sleep
 
 import pandas as pd
-import requests
 from bs4 import BeautifulSoup
 from pandas import to_datetime
 
@@ -35,16 +35,84 @@ def get_beatport_page_script_queries(url: str) -> dict:
         JSON of the script queries.
 
     """
-    r = requests.get(url, headers=HEADERS)
-    soup = BeautifulSoup(r.text, features="html.parser")
-    all_scripts = soup.find_all("script", type="application/json")
+    from curl_cffi import requests as curl_requests
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,"
+        "image/avif,image/webp,image/apng,*/*;q=0.8,application/"
+        "signed-exchange;v=b3;q=0.7",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "Referer": "https://www.google.com/",
+        "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"macOS"',
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "cross-site",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1",
+    }
+
+    try:
+        logger.debug(f"Fetching {url} with curl_cffi Chrome 120 session...")
+        with curl_requests.Session() as s:
+            # Visit home page first to get cookies
+            s.get(
+                "https://www.beatport.com/",
+                headers=headers,
+                impersonate="chrome120",
+                timeout=20,
+            )
+            sleep(5)
+
+            # Now visit the actual URL
+            r = s.get(url, headers=headers, impersonate="chrome120", timeout=30)
+            r.raise_for_status()
+            soup = BeautifulSoup(r.text, features="html.parser")
+    except Exception as e:
+        logger.debug(
+            f"curl_requests failed: {e}. Falling back to undetected-chromedriver."
+        )
+        import undetected_chromedriver as uc
+
+        try:
+            driver = uc.Chrome(headless=True, use_subprocess=True)
+            driver.get(url)
+            # Wait for the challenge to potentially complete and the real page to load
+            max_retries = 30
+            for i in range(max_retries):
+                if "dehydratedState" in driver.page_source:
+                    break
+                logger.debug(
+                    f"Waiting for dehydratedState... (attempt {i + 1}/{max_retries})"
+                )
+                sleep(2)
+            soup = BeautifulSoup(driver.page_source, features="html.parser")
+        finally:
+            if "driver" in locals():
+                driver.quit()
+
+    all_scripts = soup.find_all("script")
+    logger.debug(f"Found {len(all_scripts)} script tags")
+
     script = None
     for s in all_scripts:
-        if "dehydratedState" in s.text:
+        if s.get("type") == "application/json" and "dehydratedState" in s.text:
+            script = s
+            break
+        elif "dehydratedState" in s.text:
+            logger.debug(f"Found dehydratedState in script with type: {s.get('type')}")
             script = s
             break
 
     if script is None:
+        # Log the types of application/json scripts found
+        json_scripts = soup.find_all("script", type="application/json")
+        json_types = [s.get("type") for s in json_scripts]
+        logger.debug(f"JSON scripts found: {len(json_scripts)}, types: {json_types}")
         raise ValueError(f"Could not find script with dehydratedState in {url}")
 
     results_data = json.loads(script.text)
@@ -62,11 +130,11 @@ def get_beatport_page_script_queries(url: str) -> dict:
 def scrape_beatport_charts(
     url: str, max_wait: int = 20, chart_bp_url_code: str = ""
 ) -> list[str]:
-    """Scrape Beatport artist page for chart links using Selenium.
+    """Scrape Beatport artist page for chart links using undetected-chromedriver.
 
-    This function uses Selenium WebDriver to load the given Beatport artist page URL,
-    waits for the page and dynamic content to load, and extracts chart links
-     from the page.
+    This function uses undetected-chromedriver to load the given Beatport artist
+     page URL, waits for the page and dynamic content to load, and extracts
+     chart links from the page.
     It can optionally filter for a specific chart code.
 
     Args:
@@ -81,40 +149,35 @@ def scrape_beatport_charts(
         page. If chart_bp_url_code is provided, only matching charts are included.
 
     Notes:
-        - This function relies on Selenium WebDriver (Chrome) to render
-        and scrape dynamic content from Beatport.
+        - This function relies on undetected-chromedriver to bypass
+        bot detection.
         - The function assumes that chart links can be found using the CSS
         selector '.artwork[href*="/chart/"]'.
-        - Make sure the appropriate Selenium WebDriver and browser are
-        installed and configured.
 
     """
-    from selenium import webdriver
-    from selenium.webdriver.chrome.options import Options
+    import undetected_chromedriver as uc
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support.ui import WebDriverWait
 
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")  # Run in background
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument(
-        "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    )
+    options = uc.ChromeOptions()
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
 
-    driver = webdriver.Chrome(options=chrome_options)
+    driver = uc.Chrome(options=options, headless=True)
     charts: list[str] = []
     try:
         logger.info(f"Loading URL: {url}")
         driver.get(url)
 
-        # Wait for the page to load
+        # Wait for the page to load or challenge to complete
         _ = WebDriverWait(driver, max_wait).until(
-            lambda d: d.find_element(By.CSS_SELECTOR, '.artwork[href*="/chart/"]')
+            lambda d: (
+                d.find_elements(By.CSS_SELECTOR, '.artwork[href*="/chart/"]')
+                or "dehydratedState" in d.page_source
+            )
         )
 
-        # Try to find chart elements - you may need to inspect the page
-        # to find the correct selectors
+        # Try to find chart elements
         chart_links = driver.find_elements(By.CSS_SELECTOR, '.artwork[href*="/chart/"]')
 
         logger.info(f"Found {len(chart_links)} chart links")

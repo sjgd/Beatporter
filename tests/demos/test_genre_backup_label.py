@@ -120,6 +120,7 @@ def test_chart(chart: dict[str, str]) -> None:
                 f"***** {chart} : {chart_bp_url_code} ***** "
                 f"with error: {e}"
             )
+            pytest.fail(f"Failed to get chart {chart}: {e}")
     else:
         logger.info(f"\t[+] Chart {chart} not found")
 

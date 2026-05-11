@@ -41,9 +41,11 @@ def _accept_cookies(driver: Any) -> None:
 
 
 # Reduce noise from third-party libraries
-logging.getLogger("undetected_chromedriver").setLevel(logging.WARNING)
-logging.getLogger("selenium").setLevel(logging.WARNING)
-logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("undetected_chromedriver").setLevel(logging.ERROR)
+logging.getLogger("undetected_chromedriver.patcher").setLevel(logging.ERROR)
+logging.getLogger("uc").setLevel(logging.ERROR)
+logging.getLogger("selenium").setLevel(logging.ERROR)
+logging.getLogger("urllib3").setLevel(logging.ERROR)
 
 HEADERS = {
     "User-Agent": (

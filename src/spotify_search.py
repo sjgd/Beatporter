@@ -460,6 +460,7 @@ def add_new_tracks_to_playlist_chart_label(
     tracks_dict: list[BeatportTrack],
     use_prefix: bool = True,
     silent: bool = silent_search,
+    uri: str | None = None,
 ) -> None:
     """Add tracks from Beatport to a Spotify playlist.
 
@@ -468,6 +469,7 @@ def add_new_tracks_to_playlist_chart_label(
         tracks_dict (list): Dictionary of tracks to add.
         use_prefix (bool): Add a prefix to the playlist name as defined in config.
         silent (bool): If True, do not display searching details except errors.
+        uri (str): Optional Beatport URI/code for logging.
     """
     persistent_playlist_name = f"{playlist_prefix}{title}" if use_prefix else title
     logger.info(f'[+] Identifying new tracks for playlist: "{persistent_playlist_name}"')
@@ -478,9 +480,13 @@ def add_new_tracks_to_playlist_chart_label(
     }
 
     if not playlist["id"]:
-        logger.warning(
-            f'\t[!] Playlist "{playlist["name"]}" does not exist, creating it.'
-        )
+        log_msg = f'\t[!] Playlist "{playlist["name"]}" does not exist, creating it.'
+        if uri:
+            log_msg = (
+                f'\t[!] Playlist "{playlist["name"]}" ({uri}) '
+                "does not exist, creating it."
+            )
+        logger.warning(log_msg)
         playlist["id"] = create_playlist(playlist["name"])
 
     df_playlist_hist = sync_playlist_history(playlist, digging_mode)

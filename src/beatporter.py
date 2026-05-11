@@ -115,7 +115,9 @@ def _handle_charts(
                     tracks_dicts = get_chart(chart_url)
                     logger.debug(chart_bp_url_code + ":" + str(tracks_dicts))
                     logger.info(f"\t[+] Found {len(tracks_dicts)} tracks for {chart}")
-                    add_new_tracks_to_playlist_chart_label(chart, tracks_dicts)
+                    add_new_tracks_to_playlist_chart_label(
+                        chart, tracks_dicts, uri=chart_bp_url_code
+                    )
                 else:
                     logger.info(f"\t[+] Chart {chart} not found")
             except Exception as e:
@@ -167,7 +169,9 @@ def _handle_labels(
                 logger.info(f"Found {len(tracks_dict)} tracks for {label}")
                 if shuffle_label:
                     random.shuffle(tracks_dict)
-                add_new_tracks_to_playlist_chart_label(label, tracks_dict)
+                add_new_tracks_to_playlist_chart_label(
+                    label, tracks_dict, uri=label_bp_url_code
+                )
             except Exception as e:
                 traceback.print_exc()
                 logger.error(

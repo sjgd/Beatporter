@@ -247,6 +247,18 @@ def get_playlist_id(playlist_name: str) -> str | None:
         # check if more pages exist
         playlists = spotify_ins.next(playlists) if playlists["next"] else None
 
+    # Double check by searching if not found in current user's direct list
+    # This helps if there are many playlists and pagination is inconsistent
+    logger.debug(f"Playlist '{playlist_name}' not found in direct list, double-checking...")
+    search_results = spotify_ins.search(q=f'"{playlist_name}"', type="playlist", limit=10)
+    if search_results and "playlists" in search_results:
+        for playlist in search_results["playlists"]["items"]:
+            if (playlist["owner"]["id"] == username) and (
+                playlist["name"] == playlist_name
+            ):
+                logger.info(f"Found playlist '{playlist_name}' in search results.")
+                return playlist["id"]
+
     return None
 
 

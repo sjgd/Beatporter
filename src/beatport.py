@@ -5,6 +5,7 @@ import json
 import logging
 import re
 from datetime import datetime, timedelta
+from functools import lru_cache
 from time import sleep
 from typing import Any
 
@@ -21,6 +22,8 @@ from src.spotify_utils import find_playlist_chart_label, update_hist_pl_tracks
 from src.utils import load_hist_file
 
 logger = logging.getLogger("beatport")
+
+SLEEP_LOAD_PAGE = 7
 
 
 def _accept_cookies(driver: Any) -> None:
@@ -51,6 +54,7 @@ HEADERS = {
 }
 
 
+@lru_cache(maxsize=16)
 def get_beatport_page_script_queries(url: str) -> dict:
     """Extract script queries results from the Beatport URL using undetected-chromedriver.
 
@@ -63,11 +67,11 @@ def get_beatport_page_script_queries(url: str) -> dict:
     """
     import undetected_chromedriver as uc
 
-    # Using non-headless mode as it is the only one bypassing Cloudflare consistently
-    driver = uc.Chrome(use_subprocess=True)
+    # Using headless mode with longer sleep to avoid obstructing the user
+    driver = uc.Chrome(headless=True, use_subprocess=True)
     try:
         driver.get(url)
-        sleep(3)  # Wait for page to load
+        sleep(SLEEP_LOAD_PAGE)  # Wait for page to load
         _accept_cookies(driver)
         # Wait for dehydratedState to appear
         for _ in range(60):
@@ -94,10 +98,6 @@ def get_beatport_page_script_queries(url: str) -> dict:
         "queries"
     ]
 
-    # Clean up large JSON data
-    del results_data
-    gc.collect()
-
     return results_data_queries
 
 
@@ -121,12 +121,12 @@ def scrape_beatport_charts(
     import undetected_chromedriver as uc
     from selenium.webdriver.common.by import By
 
-    driver = uc.Chrome(use_subprocess=True)
+    driver = uc.Chrome(headless=True, use_subprocess=True)
     charts: list[str] = []
     try:
         logger.info(f"Loading URL: {url}")
         driver.get(url)
-        sleep(3)  # Wait for page to load
+        sleep(SLEEP_LOAD_PAGE)  # Wait for page to load
         _accept_cookies(driver)
 
         # Wait for chart links or dehydratedState

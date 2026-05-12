@@ -13,6 +13,7 @@ from typing import Any
 import pandas as pd
 from bs4 import BeautifulSoup
 from pandas import to_datetime
+from selenium.common.exceptions import NoSuchWindowException, WebDriverException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
@@ -22,6 +23,13 @@ from src.models import BeatportTrack
 from src.spotify_utils import find_playlist_chart_label, update_hist_pl_tracks
 from src.utils import load_hist_file
 
+# Reduce noise from third-party libraries - move to the very top
+logging.getLogger("undetected_chromedriver").setLevel(logging.ERROR)
+logging.getLogger("undetected_chromedriver.patcher").setLevel(logging.ERROR)
+logging.getLogger("uc").setLevel(logging.ERROR)
+logging.getLogger("selenium").setLevel(logging.ERROR)
+logging.getLogger("urllib3").setLevel(logging.ERROR)
+
 logger = logging.getLogger("beatport")
 
 SLEEP_LOAD_PAGE = 10
@@ -30,23 +38,22 @@ SLEEP_LOAD_PAGE = 10
 def _accept_cookies(driver: Any) -> None:
     """Attempt to accept cookies if a banner is present."""
     try:
+        # Check if window still exists
+        if not driver.window_handles:
+            return
+
         # Beatport typically uses OneTrust
         cookie_button_selector = "#onetrust-accept-btn-handler"
         WebDriverWait(driver, 5).until(
             EC.element_to_be_clickable((By.CSS_SELECTOR, cookie_button_selector))
         ).click()
         logger.debug("Accepted cookies.")
+    except (NoSuchWindowException, WebDriverException):
+        pass
     except Exception:
         # Banner might not be present or different selector
         pass
 
-
-# Reduce noise from third-party libraries
-logging.getLogger("undetected_chromedriver").setLevel(logging.ERROR)
-logging.getLogger("undetected_chromedriver.patcher").setLevel(logging.ERROR)
-logging.getLogger("uc").setLevel(logging.ERROR)
-logging.getLogger("selenium").setLevel(logging.ERROR)
-logging.getLogger("urllib3").setLevel(logging.ERROR)
 
 HEADERS = {
     "User-Agent": (
@@ -61,16 +68,17 @@ def _get_driver(max_retries: int = 3) -> Any:
     """Create a new undetected_chromedriver instance with retries."""
     import undetected_chromedriver as uc
 
-    options = uc.ChromeOptions()
-    options.add_argument("--disable-gpu")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--window-size=1920,1080")
-    options.add_argument("--disable-extensions")
-    options.add_argument("--disable-popup-blocking")
-
     for i in range(max_retries):
         try:
+            # Create fresh options for each attempt to avoid 'cannot reuse' error
+            options = uc.ChromeOptions()
+            options.add_argument("--disable-gpu")
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
+            options.add_argument("--window-size=1920,1080")
+            options.add_argument("--disable-extensions")
+            options.add_argument("--disable-popup-blocking")
+
             # Use standard headless=True which is better integrated in uc
             driver = uc.Chrome(options=options, headless=True)
             # Give it a moment to settle
@@ -83,6 +91,30 @@ def _get_driver(max_retries: int = 3) -> Any:
             if i == max_retries - 1:
                 raise
             sleep(5)
+
+
+def _wait_for_dehydrated_state(driver: Any, url: str) -> str:
+    """Wait for dehydratedState to appear in page source and return it."""
+    page_source = ""
+    for _ in range(60):
+        try:
+            # Check if window still exists before accessing
+            if not driver.window_handles:
+                raise ValueError("Browser window closed unexpectedly")
+
+            page_source = driver.page_source
+            if "dehydratedState" in page_source:
+                break
+        except (NoSuchWindowException, WebDriverException) as e:
+            logger.warning(f"Browser window lost during wait: {e}")
+            raise
+        except Exception as e:
+            logger.debug(f"Transient error getting page source: {e}")
+        sleep(1)
+
+    if not page_source or "dehydratedState" not in page_source:
+        raise ValueError(f"Failed to find dehydratedState in {url}")
+    return page_source
 
 
 @lru_cache(maxsize=16)
@@ -107,23 +139,7 @@ def get_beatport_page_script_queries(url: str) -> dict:
             sleep(SLEEP_LOAD_PAGE)  # Wait for page to load
             _accept_cookies(driver)
 
-            # Wait for dehydratedState to appear
-            page_source = ""
-            for _ in range(60):
-                try:
-                    # Check if window still exists before accessing
-                    if not driver.window_handles:
-                        raise ValueError("Browser window closed unexpectedly")
-
-                    page_source = driver.page_source
-                    if "dehydratedState" in page_source:
-                        break
-                except Exception as e:
-                    logger.debug(f"Transient error getting page source: {e}")
-                sleep(1)
-
-            if not page_source or "dehydratedState" not in page_source:
-                raise ValueError(f"Failed to find dehydratedState in {url}")
+            page_source = _wait_for_dehydrated_state(driver, url)
 
             soup = BeautifulSoup(page_source, features="html.parser")
             all_scripts = soup.find_all("script", type="application/json")
@@ -160,6 +176,40 @@ def get_beatport_page_script_queries(url: str) -> dict:
     )
 
 
+def _wait_for_charts(driver: Any, max_wait: int) -> None:
+    """Wait for chart links or dehydratedState to appear."""
+    for _ in range(max_wait):
+        try:
+            if not driver.window_handles:
+                raise ValueError("Browser window closed unexpectedly")
+
+            if (
+                driver.find_elements(By.CSS_SELECTOR, 'a[href*="/chart/"]')
+                or "dehydratedState" in driver.page_source
+            ):
+                break
+        except (NoSuchWindowException, WebDriverException) as e:
+            logger.warning(f"Browser window lost during charts wait: {e}")
+            raise
+        except Exception as e:
+            logger.debug(f"Transient error in scrape_beatport_charts wait: {e}")
+        sleep(1)
+
+
+def _extract_links(driver: Any) -> list:
+    """Extract chart links from the page."""
+    try:
+        if not driver.window_handles:
+            raise ValueError("Browser window closed unexpectedly before finding elements")
+        return driver.find_elements(By.CSS_SELECTOR, 'a[href*="/chart/"]')
+    except (NoSuchWindowException, WebDriverException) as e:
+        logger.warning(f"Browser window lost before element find: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Failed to find elements: {e}")
+        return []
+
+
 def scrape_beatport_charts(
     url: str, max_wait: int = 20, chart_bp_url_code: str = ""
 ) -> list[str]:
@@ -190,26 +240,8 @@ def scrape_beatport_charts(
             sleep(SLEEP_LOAD_PAGE)  # Wait for page to load
             _accept_cookies(driver)
 
-            # Wait for chart links or dehydratedState
-            for _ in range(max_wait):
-                try:
-                    if not driver.window_handles:
-                        raise ValueError("Browser window closed unexpectedly")
-
-                    if (
-                        driver.find_elements(By.CSS_SELECTOR, 'a[href*="/chart/"]')
-                        or "dehydratedState" in driver.page_source
-                    ):
-                        break
-                except Exception as e:
-                    logger.debug(f"Transient error in scrape_beatport_charts wait: {e}")
-                sleep(1)
-
-            try:
-                links = driver.find_elements(By.CSS_SELECTOR, 'a[href*="/chart/"]')
-            except Exception as e:
-                logger.error(f"Failed to find elements: {e}")
-                links = []
+            _wait_for_charts(driver, max_wait)
+            links = _extract_links(driver)
 
             for link in links:
                 try:
@@ -326,6 +358,44 @@ def get_top_100_tracks(genre: str) -> list[BeatportTrack]:
     return parse_tracks(raw_tracks_dicts)
 
 
+def _validate_chart_year(
+    chart_url: str, match_year_name_str: str, chart_bp_url_code: str
+) -> str | None:
+    """Validate if the chart's release year matches the requested year."""
+    try:
+        results_data = get_beatport_page_script_queries(chart_url)
+        change_date_chart = results_data[0]["state"]["data"]["change_date"]
+
+        # TODO: better match release year
+        is_year = bool(re.search(r"2[0-9]{3}-[0-9]{2}-[0-9]{2}", change_date_chart))
+        if not is_year:
+            logger.warning(
+                f"ERROR - Release date: {change_date_chart},"
+                " does not seem to be a date, aborting"
+            )
+            return None
+
+        release_year_match = re.match(r"2[0-9]{3}", change_date_chart)
+        if release_year_match:
+            release_year = release_year_match.group(0)
+            if (
+                f"({release_year})" == match_year_name_str
+                and chart_bp_url_code in chart_url
+            ):
+                logger.info(f"Years match ({release_year}), returning chart {chart_url}")
+                return chart_url
+
+            logger.warning(
+                f"ERROR - Release date: {change_date_chart}, "
+                f"does not match requeried date: {match_year_name_str},"
+                f" aborting chart: {chart_url}"
+            )
+        return None
+    except Exception as e:
+        logger.error(f"Error during year validation for {chart_url}: {e}")
+        return None
+
+
 def find_chart(chart: str, chart_bp_url_code: str) -> str | None:
     """Find Beatport chart URL from chart name or URL code.
 
@@ -393,46 +463,12 @@ def find_chart(chart: str, chart_bp_url_code: str) -> str | None:
                 f"Found year {match_year_name_str} in chart name,"
                 " checking if release is matching"
             )
-            try:
-                results_data = get_beatport_page_script_queries(chart_urls[0])
+            return _validate_chart_year(
+                chart_urls[0], match_year_name_str, chart_bp_url_code
+            )
 
-                change_date_chart = results_data[0]["state"]["data"]["change_date"]
-
-                # TODO: better match release year
-                is_year = bool(
-                    re.search(r"2[0-9]{3}-[0-9]{2}-[0-9]{2}", change_date_chart)
-                )
-                if not is_year:
-                    logger.warning(
-                        f"ERROR - Release date: {change_date_chart},"
-                        " does not seem to be a date, aborting"
-                    )
-                else:
-                    release_year_match = re.match(r"2[0-9]{3}", change_date_chart)
-                    if release_year_match:
-                        release_year = release_year_match.group(0)
-                        if (
-                            f"({release_year})" == match_year_name_str
-                            and chart_bp_url_code in chart_urls[0]
-                        ):
-                            logger.info(
-                                f"Years match ({release_year}), returning chart "
-                                f"{chart_urls[0]}"
-                            )
-                            return chart_urls[0]
-                        else:
-                            logger.warning(
-                                f"ERROR - Release date: {change_date_chart}, "
-                                f"does not match requeried date: {match_year_name_str},"
-                                f" aborting chart: {chart_urls[0]}"
-                            )
-                            return None
-            except Exception as e:
-                logger.error(f"Error during year validation for {chart_urls[0]}: {e}")
-                return None
-        else:
-            logger.info(f"No year found in chart name, returning {chart_urls[0]}")
-            return chart_urls[0]
+        logger.info(f"No year found in chart name, returning {chart_urls[0]}")
+        return chart_urls[0]
 
     return None
 

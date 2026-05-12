@@ -137,8 +137,6 @@ def _handle_genres(args: list[str], genres: dict[str, str]) -> None:
 
             logger.info(" ")
             logger.info(f" Getting genre : ***** {genre} *****")
-            top_100_chart = get_top_100_tracks(genre)
-            logger.debug(genre + ":" + str(top_100_chart))
             try:
                 top_100_chart = get_top_100_tracks(genre)
                 logger.debug(genre + ":" + str(top_100_chart))

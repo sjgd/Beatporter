@@ -24,7 +24,7 @@ from src.utils import load_hist_file
 
 logger = logging.getLogger("beatport")
 
-SLEEP_LOAD_PAGE = 7
+SLEEP_LOAD_PAGE = 10
 
 
 def _accept_cookies(driver: Any) -> None:
@@ -61,9 +61,20 @@ def _get_driver(max_retries: int = 3) -> Any:
     """Create a new undetected_chromedriver instance with retries."""
     import undetected_chromedriver as uc
 
+    options = uc.ChromeOptions()
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--window-size=1920,1080")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-popup-blocking")
+
     for i in range(max_retries):
         try:
-            driver = uc.Chrome(headless=True, use_subprocess=True)
+            # Use standard headless=True which is better integrated in uc
+            driver = uc.Chrome(options=options, headless=True)
+            # Give it a moment to settle
+            sleep(2)
             return driver
         except Exception as e:
             logger.warning(
@@ -71,7 +82,7 @@ def _get_driver(max_retries: int = 3) -> Any:
             )
             if i == max_retries - 1:
                 raise
-            sleep(2)
+            sleep(5)
 
 
 @lru_cache(maxsize=16)
@@ -85,12 +96,13 @@ def get_beatport_page_script_queries(url: str) -> dict:
         JSON of the script queries.
 
     """
-    max_load_retries = 2
+    max_load_retries = 3
     last_error = None
 
     for attempt in range(max_load_retries):
-        driver = _get_driver()
+        driver = None
         try:
+            driver = _get_driver()
             driver.get(url)
             sleep(SLEEP_LOAD_PAGE)  # Wait for page to load
             _accept_cookies(driver)
@@ -99,6 +111,10 @@ def get_beatport_page_script_queries(url: str) -> dict:
             page_source = ""
             for _ in range(60):
                 try:
+                    # Check if window still exists before accessing
+                    if not driver.window_handles:
+                        raise ValueError("Browser window closed unexpectedly")
+
                     page_source = driver.page_source
                     if "dehydratedState" in page_source:
                         break
@@ -132,10 +148,12 @@ def get_beatport_page_script_queries(url: str) -> dict:
             logger.warning(
                 f"Attempt {attempt + 1}/{max_load_retries} failed for {url}: {e}"
             )
-            sleep(2)
+            # Extra sleep on failure
+            sleep(5)
         finally:
-            with suppress(Exception):
-                driver.quit()
+            if driver:
+                with suppress(Exception):
+                    driver.quit()
 
     raise last_error or ValueError(
         f"Failed to scrape {url} after {max_load_retries} attempts"
@@ -159,51 +177,72 @@ def scrape_beatport_charts(
         page.
 
     """
-    driver = _get_driver()
-    charts: list[str] = []
-    try:
-        logger.info(f"Loading URL: {url}")
-        driver.get(url)
-        sleep(SLEEP_LOAD_PAGE)  # Wait for page to load
-        _accept_cookies(driver)
+    max_load_retries = 3
+    last_error = None
 
-        # Wait for chart links or dehydratedState
-        for _ in range(max_wait):
-            try:
-                if (
-                    driver.find_elements(By.CSS_SELECTOR, 'a[href*="/chart/"]')
-                    or "dehydratedState" in driver.page_source
-                ):
-                    break
-            except Exception as e:
-                logger.warning(f"Error during wait in scrape_beatport_charts: {e}")
-            sleep(1)
-
+    for attempt in range(max_load_retries):
+        driver = None
+        charts: list[str] = []
         try:
-            links = driver.find_elements(By.CSS_SELECTOR, 'a[href*="/chart/"]')
-        except Exception as e:
-            logger.error(f"Failed to find elements: {e}")
-            links = []
+            driver = _get_driver()
+            logger.info(f"Loading URL: {url}")
+            driver.get(url)
+            sleep(SLEEP_LOAD_PAGE)  # Wait for page to load
+            _accept_cookies(driver)
 
-        for link in links:
+            # Wait for chart links or dehydratedState
+            for _ in range(max_wait):
+                try:
+                    if not driver.window_handles:
+                        raise ValueError("Browser window closed unexpectedly")
+
+                    if (
+                        driver.find_elements(By.CSS_SELECTOR, 'a[href*="/chart/"]')
+                        or "dehydratedState" in driver.page_source
+                    ):
+                        break
+                except Exception as e:
+                    logger.debug(f"Transient error in scrape_beatport_charts wait: {e}")
+                sleep(1)
+
             try:
-                href = link.get_attribute("href")
-                if not href:
-                    continue
-                full_url = (
-                    href if href.startswith("http") else f"https://www.beatport.com{href}"
-                )
-                if (
-                    chart_bp_url_code and chart_bp_url_code in full_url
-                ) or not chart_bp_url_code:
-                    charts.append(full_url)
+                links = driver.find_elements(By.CSS_SELECTOR, 'a[href*="/chart/"]')
             except Exception as e:
-                logger.warning(f"Error extracting link attribute: {e}")
-    finally:
-        with suppress(Exception):
-            driver.quit()
+                logger.error(f"Failed to find elements: {e}")
+                links = []
 
-    return list(set(charts))
+            for link in links:
+                try:
+                    href = link.get_attribute("href")
+                    if not href:
+                        continue
+                    full_url = (
+                        href
+                        if href.startswith("http")
+                        else f"https://www.beatport.com{href}"
+                    )
+                    if (
+                        chart_bp_url_code and chart_bp_url_code in full_url
+                    ) or not chart_bp_url_code:
+                        charts.append(full_url)
+                except Exception as e:
+                    logger.debug(f"Error extracting link attribute: {e}")
+
+            return list(set(charts))
+
+        except Exception as e:
+            last_error = e
+            logger.warning(
+                f"Attempt {attempt + 1}/{max_load_retries} failed for {url}: {e}"
+            )
+            sleep(5)
+        finally:
+            if driver:
+                with suppress(Exception):
+                    driver.quit()
+
+    logger.error(f"Failed to scrape charts from {url}: {last_error}")
+    return []
 
 
 def get_top_100_playables(genre: str) -> list[dict]:

@@ -85,46 +85,61 @@ def get_beatport_page_script_queries(url: str) -> dict:
         JSON of the script queries.
 
     """
-    driver = _get_driver()
-    try:
-        driver.get(url)
-        sleep(SLEEP_LOAD_PAGE)  # Wait for page to load
-        _accept_cookies(driver)
-        # Wait for dehydratedState to appear
-        page_source = ""
-        for _ in range(60):
-            try:
-                page_source = driver.page_source
-                if "dehydratedState" in page_source:
+    max_load_retries = 2
+    last_error = None
+
+    for attempt in range(max_load_retries):
+        driver = _get_driver()
+        try:
+            driver.get(url)
+            sleep(SLEEP_LOAD_PAGE)  # Wait for page to load
+            _accept_cookies(driver)
+
+            # Wait for dehydratedState to appear
+            page_source = ""
+            for _ in range(60):
+                try:
+                    page_source = driver.page_source
+                    if "dehydratedState" in page_source:
+                        break
+                except Exception as e:
+                    logger.debug(f"Transient error getting page source: {e}")
+                sleep(1)
+
+            if not page_source or "dehydratedState" not in page_source:
+                raise ValueError(f"Failed to find dehydratedState in {url}")
+
+            soup = BeautifulSoup(page_source, features="html.parser")
+            all_scripts = soup.find_all("script", type="application/json")
+            script = None
+            for s in all_scripts:
+                if "dehydratedState" in s.text:
+                    script = s
                     break
-            except Exception as e:
-                logger.warning(f"Error getting page source: {e}")
-            sleep(1)
 
-        if not page_source:
-            raise ValueError(f"Failed to get page source from {url}")
+            if script is None:
+                raise ValueError(f"Could not find script with dehydratedState in {url}")
 
-        soup = BeautifulSoup(page_source, features="html.parser")
-    finally:
-        with suppress(Exception):
-            driver.quit()
+            results_data = json.loads(script.text)
+            results_data_queries = results_data["props"]["pageProps"]["dehydratedState"][
+                "queries"
+            ]
 
-    all_scripts = soup.find_all("script", type="application/json")
-    script = None
-    for s in all_scripts:
-        if "dehydratedState" in s.text:
-            script = s
-            break
+            return results_data_queries
 
-    if script is None:
-        raise ValueError(f"Could not find script with dehydratedState in {url}")
+        except Exception as e:
+            last_error = e
+            logger.warning(
+                f"Attempt {attempt + 1}/{max_load_retries} failed for {url}: {e}"
+            )
+            sleep(2)
+        finally:
+            with suppress(Exception):
+                driver.quit()
 
-    results_data = json.loads(script.text)
-    results_data_queries = results_data["props"]["pageProps"]["dehydratedState"][
-        "queries"
-    ]
-
-    return results_data_queries
+    raise last_error or ValueError(
+        f"Failed to scrape {url} after {max_load_retries} attempts"
+    )
 
 
 def scrape_beatport_charts(

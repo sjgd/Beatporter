@@ -5,7 +5,6 @@ import logging
 import os
 import random
 import sys
-import traceback
 from datetime import datetime
 from time import sleep
 
@@ -83,13 +82,13 @@ def _transfer_excel_to_parquet_if_needed() -> None:
 def _handle_backups(args: list[str], spotify_bkp: dict[str, str]) -> None:
     if "backups" in args:
         for playlist_name, org_playlist_id in spotify_bkp.items():
+            logger.info(" ")
             logger.info(
                 f"Backing up playlist : ***** {playlist_name} : {org_playlist_id} *****"
             )
             try:
                 back_up_spotify_playlist(playlist_name, org_playlist_id)
             except Exception as e:
-                traceback.print_exc()
                 logger.error(
                     "FAILED backing up playlist: "
                     f"***** {playlist_name} : {org_playlist_id} ***** "
@@ -118,7 +117,6 @@ def _handle_charts(
                 else:
                     logger.info(f"\t[+] Chart {chart} not found")
             except Exception as e:
-                traceback.print_exc()
                 logger.error(
                     "FAILED getting chart: "
                     f"***** {chart} : {chart_bp_url_code} ***** "
@@ -142,7 +140,6 @@ def _handle_genres(args: list[str], genres: dict[str, str]) -> None:
                 logger.debug(genre + ":" + str(top_100_chart))
                 add_new_tracks_to_playlist_genre(genre, top_100_chart)
             except Exception as e:
-                traceback.print_exc()
                 logger.error(f"FAILED getting genre: ***** {genre} ***** with error: {e}")
             finally:
                 if "top_100_chart" in locals():
@@ -170,7 +167,6 @@ def _handle_labels(
                     label, tracks_dict, uri=label_bp_url_code
                 )
             except Exception as e:
-                traceback.print_exc()
                 logger.error(
                     "FAILED getting label: "
                     f"***** {label} : {label_bp_url_code} ***** "

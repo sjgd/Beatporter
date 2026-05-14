@@ -32,7 +32,7 @@ logging.getLogger("urllib3").setLevel(logging.ERROR)
 
 logger = logging.getLogger("beatport")
 
-SLEEP_LOAD_PAGE = 10
+SLEEP_LOAD_PAGE = 20
 
 
 def _accept_cookies(driver: Any) -> None:
@@ -72,17 +72,16 @@ def _get_driver(max_retries: int = 3) -> Any:
         try:
             # Create fresh options for each attempt to avoid 'cannot reuse' error
             options = uc.ChromeOptions()
-            options.add_argument("--disable-gpu")
-            options.add_argument("--no-sandbox")
-            options.add_argument("--disable-dev-shm-usage")
             options.add_argument("--window-size=1920,1080")
+            options.add_argument("--window-position=2000,2000")
             options.add_argument("--disable-extensions")
             options.add_argument("--disable-popup-blocking")
+            options.add_argument("--disable-blink-features=AutomationControlled")
 
-            # Use standard headless=True which is better integrated in uc
-            driver = uc.Chrome(options=options, headless=True)
-            # Give it a moment to settle
-            sleep(2)
+            # Use standard headless=False to better bypass Cloudflare
+            driver = uc.Chrome(options=options, headless=False)
+            # Give it more time to settle
+            sleep(5)
             return driver
         except Exception as e:
             logger.warning(
@@ -96,7 +95,7 @@ def _get_driver(max_retries: int = 3) -> Any:
 def _wait_for_dehydrated_state(driver: Any, url: str) -> str:
     """Wait for dehydratedState to appear in page source and return it."""
     page_source = ""
-    for _ in range(60):
+    for i in range(60):
         try:
             # Check if window still exists before accessing
             if not driver.window_handles:
@@ -105,6 +104,11 @@ def _wait_for_dehydrated_state(driver: Any, url: str) -> str:
             page_source = driver.page_source
             if "dehydratedState" in page_source:
                 break
+
+            if i % 10 == 0:
+                logger.debug(
+                    f"Still waiting for dehydratedState on {url} (attempt {i}/60)..."
+                )
         except (NoSuchWindowException, WebDriverException) as e:
             logger.warning(f"Browser window lost during wait: {e}")
             raise
@@ -134,12 +138,19 @@ def get_beatport_page_script_queries(url: str) -> dict:
     for attempt in range(max_load_retries):
         driver = None
         try:
+            logger.debug(
+                f"Scraping attempt {attempt + 1}/{max_load_retries} for {url}..."
+            )
             driver = _get_driver()
+            logger.debug(f"Driver created for {url}. Getting URL...")
             driver.get(url)
+            logger.debug(f"URL loaded for {url}. Sleeping {SLEEP_LOAD_PAGE}s...")
             sleep(SLEEP_LOAD_PAGE)  # Wait for page to load
             _accept_cookies(driver)
 
+            logger.debug(f"Waiting for dehydratedState on {url}...")
             page_source = _wait_for_dehydrated_state(driver, url)
+            logger.debug(f"dehydratedState found on {url}.")
 
             soup = BeautifulSoup(page_source, features="html.parser")
             all_scripts = soup.find_all("script", type="application/json")

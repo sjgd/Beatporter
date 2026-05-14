@@ -111,6 +111,7 @@ class SpotifyClient:
     """Singleton for Spotify client to ensure session reuse without global variables."""
 
     _instance: ClassVar[spotipy.Spotify | None] = None
+    _playlists_cache: ClassVar[dict[str, str] | None] = None
 
     @classmethod
     def get_instance(cls) -> spotipy.Spotify:
@@ -118,11 +119,37 @@ class SpotifyClient:
         if cls._instance is None:
             cls._instance = spotipy.Spotify(
                 auth_manager=sp_oauth,
-                requests_timeout=15,
-                retries=3,
-                backoff_factor=15,
+                requests_timeout=20,
+                retries=5,
+                backoff_factor=30,
             )
         return cls._instance
+
+    @classmethod
+    def get_cached_playlist_id(cls, playlist_name: str) -> str | None:
+        """Get playlist ID from cache, fetching all playlists if cache is empty."""
+        if cls._playlists_cache is None:
+            cls.refresh_playlists_cache()
+        return cls._playlists_cache.get(playlist_name) if cls._playlists_cache else None
+
+    @classmethod
+    def refresh_playlists_cache(cls) -> None:
+        """Fetch all user playlists and populate the cache."""
+        logger.debug("Refreshing Spotify playlists cache...")
+        spotify_ins = cls.get_instance()
+        cache = {}
+        try:
+            playlists = spotify_ins.current_user_playlists()
+            while playlists:
+                for playlist in playlists["items"]:
+                    if playlist["owner"]["id"] == username:
+                        cache[playlist["name"]] = playlist["id"]
+                playlists = spotify_ins.next(playlists) if playlists["next"] else None
+            cls._playlists_cache = cache
+            logger.debug(f"Cache refreshed with {len(cache)} playlists.")
+        except Exception as e:
+            logger.warning(f"Failed to refresh playlists cache: {e}")
+            cls._playlists_cache = cache if cache else None
 
 
 def spotify_auth(verbose_aut: bool = False) -> spotipy.Spotify:
@@ -235,31 +262,31 @@ def get_playlist_id(playlist_name: str) -> str | None:
         str: The ID of the playlist or None if not found.
 
     """
-    spotify_ins = spotify_auth()
-    playlists = spotify_ins.current_user_playlists()
+    # Use cache first
+    playlist_id = SpotifyClient.get_cached_playlist_id(playlist_name)
+    if playlist_id:
+        return playlist_id
 
-    while playlists:
-        for playlist in playlists["items"]:
-            if (playlist["owner"]["id"] == username) and (
-                playlist["name"] == playlist_name
-            ):
-                return playlist["id"]
-        # check if more pages exist
-        playlists = spotify_ins.next(playlists) if playlists["next"] else None
-
-    # Double check by searching if not found in current user's direct list
-    # This helps if there are many playlists and pagination is inconsistent
+    # If not found, it might be new, try a targeted search once
+    spotify_ins = SpotifyClient.get_instance()
     logger.debug(
-        f"Playlist '{playlist_name}' not found in direct list, double-checking..."
+        f"Playlist '{playlist_name}' not in cache, double-checking with search..."
     )
-    search_results = spotify_ins.search(q=f'"{playlist_name}"', type="playlist", limit=10)
-    if search_results and "playlists" in search_results:
-        for playlist in search_results["playlists"]["items"]:
-            if (playlist["owner"]["id"] == username) and (
-                playlist["name"] == playlist_name
-            ):
-                logger.info(f"Found playlist '{playlist_name}' in search results.")
-                return playlist["id"]
+    try:
+        search_results = spotify_ins.search(
+            q=f'"{playlist_name}"', type="playlist", limit=10
+        )
+        if search_results and "playlists" in search_results:
+            for playlist in search_results["playlists"]["items"]:
+                if (playlist["owner"]["id"] == username) and (
+                    playlist["name"] == playlist_name
+                ):
+                    # Found it, update cache and return
+                    if SpotifyClient._playlists_cache is not None:
+                        SpotifyClient._playlists_cache[playlist_name] = playlist["id"]
+                    return playlist["id"]
+    except Exception as e:
+        logger.debug(f"Search double-check failed for '{playlist_name}': {e}")
 
     return None
 

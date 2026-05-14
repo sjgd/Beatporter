@@ -2,16 +2,9 @@
 
 Features
 --------
-- Exports playlists to CSV before deletion.
 - Filters playlists by creation date.
 - Supports dry-run mode (default).
 - Allows actual deletion with the --delete flag.
-- Exports playlist metadata:
-    - Playlist ID
-    - Title
-    - Creation date
-    - Privacy status
-    - YouTube Music URL
 - Syncs playlist tracks with an isolated local history (Parquet).
 
 Requirements
@@ -30,7 +23,7 @@ Google Cloud Setup
 
 Usage
 -----
-Dry run (safe, exports CSV and syncs history):
+Dry run (safe, syncs history):
     python src/youtube_music.py --include-private
 
 Actual deletion:
@@ -41,10 +34,8 @@ Delete playlists created before a specific date:
 """
 
 import argparse
-import csv
 import gc
 import logging
-import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -55,15 +46,19 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import Resource, build
 
-from src.config import ROOT_PATH, use_gcp
+from src.config import ROOT_PATH
 from src.configure_logging import configure_logging
-from src.gcp import upload_file_to_gcs
+from src.utils import (
+    FILE_NAME_YT_HIST,
+    PATH_HIST_LOCAL,
+    append_to_hist_file,
+    deduplicate_hist_file,
+    load_hist_file,
+)
 
 logger = logging.getLogger("youtube_music")
 
 SCOPES = ["https://www.googleapis.com/auth/youtube"]
-PATH_HIST_LOCAL = str(Path(ROOT_PATH) / "data") + "/"
-FILE_NAME_YT_HIST = "hist_youtube_playlists_tracks.parquet.gz"
 
 
 def authenticate() -> Resource:
@@ -159,74 +154,6 @@ def get_playlist_tracks(youtube: Resource, playlist_id: str) -> list[dict[str, A
     return tracks
 
 
-def load_yt_hist_file(
-    file_path: str = PATH_HIST_LOCAL + FILE_NAME_YT_HIST,
-    playlist_id: str | None = None,
-) -> pd.DataFrame:
-    """Load the YouTube history file.
-
-    Args:
-        file_path (str): Path to the history file.
-        playlist_id (str, optional): If provided, only load data for this playlist.
-
-    Returns:
-        pd.DataFrame: Existing history file.
-    """
-    if not os.path.exists(file_path):
-        return pd.DataFrame(
-            columns=[
-                "playlist_id",
-                "playlist_name",
-                "track_id",
-                "datetime_added",
-                "track_title",
-                "channel_title",
-            ]
-        )
-
-    df = pd.read_parquet(file_path)
-    if playlist_id:
-        return df[df["playlist_id"] == playlist_id]
-    return df
-
-
-def save_yt_hist_dataframe(df: pd.DataFrame) -> None:
-    """Save the YouTube history dataframe.
-
-    Args:
-        df (pd.DataFrame): The DataFrame to save.
-    """
-    try:
-        if "datetime_added" in df.columns:
-            df["datetime_added"] = pd.to_datetime(
-                df["datetime_added"], format="ISO8601", utc=True
-            )
-        df.to_parquet(
-            PATH_HIST_LOCAL + FILE_NAME_YT_HIST, compression="gzip", index=False
-        )
-        if use_gcp:
-            upload_file_to_gcs(file_name=FILE_NAME_YT_HIST, local_folder=PATH_HIST_LOCAL)
-        logger.info(f"\t\t[+] Successfully saved YouTube history with {len(df)} records")
-    except Exception as e:
-        logger.error(f"Failed to save YouTube history: {e}")
-
-
-def append_to_yt_hist_file(df_new: pd.DataFrame) -> None:
-    """Append new tracks to the YouTube history file.
-
-    Args:
-        df_new (pd.DataFrame): New tracks to append.
-    """
-    if df_new.empty:
-        return
-
-    df_hist = load_yt_hist_file()
-    df_updated = pd.concat([df_hist, df_new], ignore_index=True)
-    save_yt_hist_dataframe(df_updated)
-    del df_hist, df_updated
-    gc.collect()
-
-
 def sync_youtube_playlist_tracks(youtube: Resource, playlist: dict[str, Any]) -> None:
     """Fetch tracks for a playlist and sync them with the isolated YouTube history.
 
@@ -239,7 +166,8 @@ def sync_youtube_playlist_tracks(youtube: Resource, playlist: dict[str, Any]) ->
 
     logger.info(f"\t[+] Syncing tracks for YouTube playlist: {playlist_name}")
 
-    df_playlist_hist = load_yt_hist_file(playlist_id=playlist_id)
+    yt_hist_path = PATH_HIST_LOCAL + FILE_NAME_YT_HIST
+    df_playlist_hist = load_hist_file(file_path=yt_hist_path, playlist_id=playlist_id)
 
     youtube_tracks = get_playlist_tracks(youtube, playlist_id)
     if not youtube_tracks:
@@ -276,11 +204,16 @@ def sync_youtube_playlist_tracks(youtube: Resource, playlist: dict[str, Any]) ->
         return
 
     df_result = pd.DataFrame(extracted_data)
+
+    # Deduplicate within the current fetch to avoid adding the same track twice
+    # if it appears multiple times in the same YouTube playlist
+    df_result.drop_duplicates(subset=["track_id"], keep="first", inplace=True)
+
     new_tracks = df_result[~df_result["track_id"].isin(df_playlist_hist["track_id"])]
 
     if not new_tracks.empty:
         logger.info(f"\t\t[+] Adding {len(new_tracks)} new tracks to isolated history")
-        append_to_yt_hist_file(new_tracks)
+        append_to_hist_file(new_tracks, file_name=FILE_NAME_YT_HIST)
     else:
         logger.info("\t\t[-] No new tracks to add to history.")
 
@@ -370,38 +303,10 @@ def filter_playlists(df: pd.DataFrame, args: argparse.Namespace) -> pd.DataFrame
     return df.sort_values("created_at")
 
 
-def export_to_csv(df: pd.DataFrame) -> str:
-    """Export the playlist metadata in the DataFrame to a CSV file.
-
-    Args:
-        df (pd.DataFrame): The DataFrame containing playlists to export.
-
-    Returns:
-        str: The filename of the generated CSV file.
-    """
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    csv_file = f"youtube_playlists_export_{timestamp}.csv"
-
-    export_columns = [
-        "playlist_id",
-        "title",
-        "created_at",
-        "privacy",
-        "url",
-    ]
-
-    df[export_columns].to_csv(
-        csv_file,
-        index=False,
-        quoting=csv.QUOTE_ALL,
-    )
-    return csv_file
-
-
 def main() -> None:
     """Execute the main lifecycle of the YouTube Music archiver/deleter.
 
-    Includes configuration, authentication, fetching, filtering, exporting,
+    Includes configuration, authentication, fetching, filtering,
     history syncing, and the optional deletion process.
     """
     configure_logging()
@@ -425,16 +330,11 @@ def main() -> None:
         logger.info("No matched playlists found.")
         return
 
-    csv_file = export_to_csv(df_filtered)
-
-    logger.info("")
-    logger.info(f"Exported CSV: {csv_file}")
-    logger.info(f"Matched playlists: {len(df_filtered)}")
-    logger.info("")
-
     logger.info("Syncing tracks to isolated YouTube history...")
     for _, row in df_filtered.iterrows():
         sync_youtube_playlist_tracks(youtube, row.to_dict())
+
+    deduplicate_hist_file(file_name=FILE_NAME_YT_HIST)
 
     logger.info("")
     logger.info("Playlists matched:")

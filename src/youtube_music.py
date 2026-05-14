@@ -14,8 +14,8 @@ Features
 
 Requirements
 ------------
-- google-auth
-- requests
+- google-api-python-client
+- google-auth-oauthlib
 - pandas
 
 Google Cloud Setup
@@ -23,13 +23,12 @@ Google Cloud Setup
 1. Go to:
    https://console.cloud.google.com/
 
-2. Create a project
+2. Create a project and enable "YouTube Data API v3".
 
-3. Enable:
-   YouTube Data API v3
+3. Create "OAuth 2.0 Client ID" (type: Desktop App).
+   Note: If you use "Web application", you MUST add `http://localhost:65000/` to "Authorized redirect URIs".
 
-4. Ensure you have Application Default Credentials set up:
-   gcloud auth application-default login --scopes="https://www.googleapis.com/auth/youtube"
+4. Download the JSON and save it as `data/client_secret.json`.
 
 Usage
 -----
@@ -51,10 +50,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import google.auth
 import pandas as pd
-from google.auth.transport.requests import AuthorizedSession
-from google.oauth2 import service_account
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import Resource, build
 
 from src.configure_logging import configure_logging
 from src.utils import ROOT_PATH
@@ -64,51 +64,60 @@ logger = logging.getLogger("youtube_music")
 SCOPES = ["https://www.googleapis.com/auth/youtube"]
 
 
-def authenticate() -> AuthorizedSession:
-    """Authenticate with YouTube API using service account.
+def authenticate() -> Resource:
+    """Authenticate with YouTube API using OAuth 2.0.
 
     Returns:
-        AuthorizedSession: Authenticated session object.
+        Resource: YouTube API resource object.
     """
-    sa_path = Path(ROOT_PATH) / "data" / "beatporter-sa.json"
-    creds = service_account.Credentials.from_service_account_file(
-        str(sa_path), scopes=SCOPES
-    )
-    return AuthorizedSession(creds)
+    data_dir = Path(ROOT_PATH) / "data"
+    client_secret_path = data_dir / "client_secret.json"
+    token_path = data_dir / "youtube_token.json"
+
+    creds = None
+    if token_path.exists():
+        creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
+
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            if not client_secret_path.exists():
+                logger.error(f"Please provide {client_secret_path}")
+                raise FileNotFoundError(f"Missing {client_secret_path}")
+
+            flow = InstalledAppFlow.from_client_secrets_file(
+                str(client_secret_path), SCOPES
+            )
+            creds = flow.run_local_server(port=65000)
+
+        with open(token_path, "w") as token:
+            token.write(creds.to_json())
+
+    return build("youtube", "v3", credentials=creds)
 
 
-def get_all_playlists(session: AuthorizedSession) -> list[dict[str, Any]]:
+def get_all_playlists(youtube: Resource) -> list[dict[str, Any]]:
     """Fetch all playlists for the authenticated user.
 
     Args:
-        session (AuthorizedSession): Authenticated session object.
+        youtube (Resource): YouTube API resource object.
 
     Returns:
         list[dict[str, Any]]: List of playlist items.
     """
     playlists: list[dict[str, Any]] = []
-    url = "https://www.googleapis.com/youtube/v3/playlists"
-    params: dict[str, Any] = {
-        "part": "snippet,status",
-        "mine": "true",
-        "maxResults": 50,
-    }
 
-    while True:
-        response = session.get(url, params=params)
-        if response.status_code != 200:
-            logger.error(
-                f"Error fetching playlists: {response.status_code} - {response.text}"
-            )
-            response.raise_for_status()
-        data = response.json()
+    request = youtube.playlists().list(
+        part="snippet,status",
+        mine=True,
+        maxResults=50,
+    )
 
-        playlists.extend(data.get("items", []))
-
-        page_token = data.get("nextPageToken")
-        if not page_token:
-            break
-        params["pageToken"] = page_token
+    while request:
+        response = request.execute()
+        playlists.extend(response.get("items", []))
+        request = youtube.playlists().list_next(request, response)
 
     return playlists
 
@@ -167,23 +176,18 @@ def playlist_to_row(p: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def main() -> None:
-    """Execute the main logic of the script."""
-    configure_logging()
-    args = parse_args()
+def filter_playlists(df: pd.DataFrame, args: argparse.Namespace) -> pd.DataFrame:
+    """Filter playlists based on arguments.
 
-    session = authenticate()
+    Args:
+        df (pd.DataFrame): DataFrame of playlists.
+        args (argparse.Namespace): Command line arguments.
 
-    logger.info("Fetching playlists...")
-    playlists = get_all_playlists(session)
-
-    rows = [playlist_to_row(p) for p in playlists]
-
-    df = pd.DataFrame(rows)
-
+    Returns:
+        pd.DataFrame: Filtered DataFrame.
+    """
     if df.empty:
-        logger.info("No playlists found.")
-        return
+        return df
 
     # Filter private playlists if desired
     if not args.include_private:
@@ -192,15 +196,22 @@ def main() -> None:
     # Filter by creation date
     if args.before:
         cutoff = datetime.strptime(args.before, "%Y-%m-%d").replace(tzinfo=UTC)
-
         df["created_at_dt"] = pd.to_datetime(df["created_at"])
-
         df = df[df["created_at_dt"] < cutoff]
 
-    df = df.sort_values("created_at")
+    return df.sort_values("created_at")
 
+
+def export_to_csv(df: pd.DataFrame) -> str:
+    """Export filtered playlists to a CSV file.
+
+    Args:
+        df (pd.DataFrame): Filtered DataFrame of playlists.
+
+    Returns:
+        str: Name of the exported CSV file.
+    """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
     csv_file = f"youtube_playlists_export_{timestamp}.csv"
 
     export_columns = [
@@ -216,15 +227,38 @@ def main() -> None:
         index=False,
         quoting=csv.QUOTE_ALL,
     )
+    return csv_file
+
+
+def main() -> None:
+    """Execute the main logic of the script."""
+    configure_logging()
+    args = parse_args()
+
+    try:
+        youtube = authenticate()
+    except FileNotFoundError as e:
+        logger.error(e)
+        return
+
+    logger.info("Fetching playlists...")
+    playlists = get_all_playlists(youtube)
+
+    rows = [playlist_to_row(p) for p in playlists]
+    df = pd.DataFrame(rows)
+
+    df = filter_playlists(df, args)
+
+    if df.empty:
+        logger.info("No matched playlists found.")
+        return
+
+    csv_file = export_to_csv(df)
 
     logger.info("")
     logger.info(f"Exported CSV: {csv_file}")
     logger.info(f"Matched playlists: {len(df)}")
     logger.info("")
-
-    if len(df) == 0:
-        logger.info("Nothing to delete.")
-        return
 
     logger.info("Playlists matched:")
     logger.info("")
@@ -248,7 +282,6 @@ def main() -> None:
         return
 
     confirm = input("\nType DELETE to permanently remove these playlists: ")
-
     if confirm != "DELETE":
         logger.info("Cancelled.")
         return
@@ -257,16 +290,11 @@ def main() -> None:
     logger.info("Deleting playlists...")
     logger.info("")
 
-    delete_url = "https://www.googleapis.com/youtube/v3/playlists"
     for _, row in df.iterrows():
         playlist_id = row["playlist_id"]
-
         try:
-            resp = session.delete(delete_url, params={"id": playlist_id})
-            resp.raise_for_status()
-
+            youtube.playlists().delete(id=playlist_id).execute()
             logger.info(f"Deleted: {row['title']}")
-
         except Exception as e:
             logger.error(f"Failed: {row['title']}")
             logger.error(e)

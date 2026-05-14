@@ -333,6 +333,7 @@ def main() -> None:
     logger.info("Syncing tracks to isolated YouTube history...")
     for _, row in df_filtered.iterrows():
         sync_youtube_playlist_tracks(youtube, row.to_dict())
+        logger.info("")
 
     deduplicate_hist_file(file_name=FILE_NAME_YT_HIST)
 

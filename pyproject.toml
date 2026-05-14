@@ -9,7 +9,7 @@ readme = "README.md"
 requires-python = "==3.13.2"
 dependencies = [
     "datetime<6.0,>=5.1",
-    "pandas<3.0.0,>=2.0.3",
+    "pandas>=2.0.3,<3.0.0",
     "requests<3.0.0,>=2.31.0",
     "bs4<1.0.0,>=0.0.1",
     "spotipy<3.0.0,>=2.23.0",
@@ -26,6 +26,8 @@ dependencies = [
     "undetected-chromedriver>=3.5.5",
     "selenium>=4.40.0",
     "setuptools>=82.0.1",
+    "google-api-python-client>=2.196.0",
+    "google-auth-oauthlib>=1.4.0",
 ]
 
 [dependency-groups]

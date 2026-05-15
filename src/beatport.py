@@ -109,18 +109,27 @@ def _get_driver(max_retries: int = 3) -> Any:
             options.add_argument("--disable-domain-reliability")
             options.add_argument("--disable-renderer-backgrounding")
 
-            # Use standard headless=False to better bypass Cloudflare
-            driver = uc.Chrome(options=options, headless=False)
-
-            # Immediately restore focus to the previously active app on Mac
+            # On Mac, proactively start a background task to restore focus
+            # This handles the "pop" that happens during the blocking uc.Chrome() call
             if active_app:
                 try:
-                    subprocess.run(
-                        ["osascript", "-e", f'tell application "{active_app}" to activate'],
-                        capture_output=True,
+                    subprocess.Popen(
+                        [
+                            "osascript",
+                            "-e",
+                            "delay 1",
+                            "-e",
+                            f'tell application "{active_app}" to activate',
+                        ],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
                     )
                 except Exception:
                     pass
+
+            # Use standard headless=False to better bypass Cloudflare
+            # This is a blocking call that can take several seconds
+            driver = uc.Chrome(options=options, headless=False)
 
             try:
                 # Move window far below the screen to avoid disturbing the user
@@ -128,7 +137,7 @@ def _get_driver(max_retries: int = 3) -> Any:
             except Exception:
                 pass
             # Give it more time to settle
-            sleep(5)
+            sleep(2)
             return driver
         except Exception as e:
             logger.warning(

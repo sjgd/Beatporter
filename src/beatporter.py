@@ -11,6 +11,7 @@ from time import sleep
 import pandas as pd
 
 from src.beatport import (
+    BeatportBrowser,
     find_chart,
     get_chart,
     get_label_tracks,
@@ -97,83 +98,59 @@ def _handle_backups(args: list[str], spotify_bkp: dict[str, str]) -> None:
             gc.collect()
 
 
-def _handle_charts(
-    args: list[str],
-    parsed_charts: dict[str, str],
-) -> None:
-    if "charts" in args:
-        for chart, chart_bp_url_code in parsed_charts.items():
-            logger.info(" ")
-            logger.info(f"Getting chart : ***** {chart} : {chart_bp_url_code} *****")
-            try:
-                chart_url = find_chart(chart, chart_bp_url_code)
-                if chart_url:
-                    tracks_dicts = get_chart(chart_url)
-                    logger.debug(chart_bp_url_code + ":" + str(tracks_dicts))
-                    logger.info(f"\t[+] Found {len(tracks_dicts)} tracks for {chart}")
-                    add_new_tracks_to_playlist_chart_label(
-                        chart, tracks_dicts, uri=chart_bp_url_code
-                    )
-                else:
-                    logger.info(f"\t[+] Chart {chart} not found")
-            except Exception as e:
-                logger.error(
-                    "FAILED getting chart: "
-                    f"***** {chart} : {chart_bp_url_code} ***** "
-                    f"with error: {e}"
-                )
-            chart_url = None
-            tracks_dicts = None
-            gc.collect()
+def _handle_job(job: dict) -> None:
+    """Process a single scraping job and update Spotify."""
+    job_type = job["type"]
+    job_data = job["data"]
 
-
-def _handle_genres(args: list[str], genres: dict[str, str]) -> None:
-    if "genres" in args:
-        for genre, genre_bp_url_code in genres.items():
-            # Clear cache BEFORE processing to free memory from previous iteration
-            gc.collect()
-
-            logger.info(" ")
-            logger.info(f" Getting genre : ***** {genre} *****")
-            try:
-                top_100_chart = get_top_100_tracks(genre)
-                logger.debug(genre + ":" + str(top_100_chart))
-                add_new_tracks_to_playlist_genre(genre, top_100_chart)
-            except Exception as e:
-                logger.error(f"FAILED getting genre: ***** {genre} ***** with error: {e}")
-            finally:
-                if "top_100_chart" in locals():
-                    del top_100_chart
-                gc.collect()
-
-
-def _handle_labels(
-    args: list[str],
-    labels: dict[str, str],
-    shuffle_label: bool,
-) -> None:
-    if "labels" in args:
-        for label, label_bp_url_code in labels.items():
-            # TODO avoid looping through all pages if already parsed before ?
-            # TODO Add tracks per EP rather than track by track ?
-            logger.info(" ")
-            logger.info(f"Getting label : ***** {label} : {label_bp_url_code} *****")
-            try:
-                tracks_dict = get_label_tracks(label, label_bp_url_code)
-                logger.info(f"Found {len(tracks_dict)} tracks for {label}")
-                if shuffle_label:
-                    random.shuffle(tracks_dict)
+    if job_type == "chart":
+        chart, chart_bp_url_code = job_data
+        logger.info(" ")
+        logger.info(f"Processing chart : ***** {chart} : {chart_bp_url_code} *****")
+        try:
+            chart_url = find_chart(chart, chart_bp_url_code)
+            if chart_url:
+                tracks_dicts = get_chart(chart_url)
+                logger.info(f"\t[+] Found {len(tracks_dicts)} tracks for {chart}")
                 add_new_tracks_to_playlist_chart_label(
-                    label, tracks_dict, uri=label_bp_url_code
+                    chart, tracks_dicts, uri=chart_bp_url_code
                 )
-            except Exception as e:
-                logger.error(
-                    "FAILED getting label: "
-                    f"***** {label} : {label_bp_url_code} ***** "
-                    f"with error: {e}"
-                )
-            tracks_dict = None
-            gc.collect()
+            else:
+                logger.info(f"\t[+] Chart {chart} not found")
+        except Exception as e:
+            logger.error(
+                "FAILED getting chart: "
+                f"***** {chart} : {chart_bp_url_code} ***** "
+                f"with error: {e}"
+            )
+
+    elif job_type == "genre":
+        genre = job_data
+        logger.info(" ")
+        logger.info(f"Processing genre : ***** {genre} *****")
+        try:
+            top_100_chart = get_top_100_tracks(genre)
+            add_new_tracks_to_playlist_genre(genre, top_100_chart)
+        except Exception as e:
+            logger.error(f"FAILED getting genre: ***** {genre} ***** with error: {e}")
+
+    elif job_type == "label":
+        label, label_bp_url_code, shuffle_label = job_data
+        logger.info(" ")
+        logger.info(f"Processing label : ***** {label} : {label_bp_url_code} *****")
+        try:
+            tracks_dict = get_label_tracks(label, label_bp_url_code)
+            logger.info(f"Found {len(tracks_dict)} tracks for {label}")
+            if shuffle_label:
+                random.shuffle(tracks_dict)
+            add_new_tracks_to_playlist_chart_label(
+                label, tracks_dict, uri=label_bp_url_code
+            )
+        except Exception as e:
+            logger.error(
+                f"FAILED getting label: ***** {label} : {label_bp_url_code} ***** "
+                f"with error: {e}"
+            )
 
 
 def main(
@@ -182,7 +159,7 @@ def main(
     genres: dict[str, str] = genres,
     labels: dict[str, str] = labels,
 ) -> None:
-    """Run Beatporter.
+    """Run Beatporter with optimized sequential pipeline.
 
     Args:
         spotify_bkp: List of Spotify playlist to backup
@@ -226,10 +203,35 @@ def main(
         args = valid_arguments
     logger.info(f"Using arguments: {args} of available {valid_arguments}")
 
+    # 1. Handle backups first (no browser needed)
     _handle_backups(args, spotify_bkp)
-    _handle_charts(args, parsed_charts)
-    _handle_genres(args, genres)
-    _handle_labels(args, labels, shuffle_label)
+
+    # 2. Build Job Queue for scraping tasks
+    job_queue = []
+    if "charts" in args:
+        for chart, code in parsed_charts.items():
+            job_queue.append({"type": "chart", "data": (chart, code)})
+
+    if "genres" in args:
+        for genre in genres.keys():
+            job_queue.append({"type": "genre", "data": genre})
+
+    if "labels" in args:
+        for label, code in labels.items():
+            job_queue.append({"type": "label", "data": (label, code, shuffle_label)})
+
+    # 3. Process jobs sequentially using persistent browser
+    try:
+        if job_queue:
+            logger.info(f"Starting pipeline for {len(job_queue)} scraping jobs...")
+            for job in job_queue:
+                _handle_job(job)
+                # Small sleep between jobs to be nice to Beatport
+                sleep(2)
+                gc.collect()
+    finally:
+        # Close the browser if it was opened
+        BeatportBrowser.quit()
 
     # Output
     sleep(5)

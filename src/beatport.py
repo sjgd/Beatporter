@@ -66,6 +66,36 @@ HEADERS = {
 }
 
 
+class BeatportBrowser:
+    """Manages a persistent browser instance for Beatport scraping."""
+
+    _driver: Any = None
+
+    @classmethod
+    def get_driver(cls) -> Any:
+        """Get or create the persistent driver instance."""
+        if cls._driver is None:
+            cls._driver = _get_driver()
+        else:
+            try:
+                # Check if driver is still alive
+                _ = cls._driver.window_handles
+            except Exception:
+                logger.warning("Persistent driver lost, recreating...")
+                with suppress(Exception):
+                    cls._driver.quit()
+                cls._driver = _get_driver()
+        return cls._driver
+
+    @classmethod
+    def quit(cls) -> None:
+        """Safely quit the persistent driver."""
+        if cls._driver:
+            with suppress(Exception):
+                cls._driver.quit()
+            cls._driver = None
+
+
 def _get_driver(max_retries: int = 3) -> Any:
     """Create a new undetected_chromedriver instance with retries."""
     import undetected_chromedriver as uc
@@ -196,13 +226,12 @@ def get_beatport_page_script_queries(url: str) -> dict:
     last_error = None
 
     for attempt in range(max_load_retries):
-        driver = None
         try:
             logger.debug(
                 f"Scraping attempt {attempt + 1}/{max_load_retries} for {url}..."
             )
-            driver = _get_driver()
-            logger.debug(f"Driver created for {url}. Getting URL...")
+            driver = BeatportBrowser.get_driver()
+            logger.debug(f"Using persistent driver for {url}. Getting URL...")
             driver.get(url)
             logger.debug(f"URL loaded for {url}. Sleeping {SLEEP_LOAD_PAGE}s...")
             sleep(SLEEP_LOAD_PAGE)  # Wait for page to load
@@ -237,10 +266,6 @@ def get_beatport_page_script_queries(url: str) -> dict:
             )
             # Extra sleep on failure
             sleep(5)
-        finally:
-            if driver:
-                with suppress(Exception):
-                    driver.quit()
 
     raise last_error or ValueError(
         f"Failed to scrape {url} after {max_load_retries} attempts"
@@ -302,10 +327,9 @@ def scrape_beatport_charts(
     last_error = None
 
     for attempt in range(max_load_retries):
-        driver = None
         charts: list[str] = []
         try:
-            driver = _get_driver()
+            driver = BeatportBrowser.get_driver()
             logger.info(f"Loading URL: {url}")
             driver.get(url)
             sleep(SLEEP_LOAD_PAGE)  # Wait for page to load
@@ -339,10 +363,6 @@ def scrape_beatport_charts(
                 f"Attempt {attempt + 1}/{max_load_retries} failed for {url}: {e}"
             )
             sleep(5)
-        finally:
-            if driver:
-                with suppress(Exception):
-                    driver.quit()
 
     logger.error(f"Failed to scrape charts from {url}: {last_error}")
     return []

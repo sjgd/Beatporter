@@ -4,6 +4,8 @@ import gc
 import json
 import logging
 import re
+import subprocess
+import sys
 from contextlib import suppress
 from datetime import datetime, timedelta
 from functools import lru_cache
@@ -68,18 +70,63 @@ def _get_driver(max_retries: int = 3) -> Any:
     """Create a new undetected_chromedriver instance with retries."""
     import undetected_chromedriver as uc
 
+    # On Mac, we want to restore focus to the previous app after Chrome "pops"
+    active_app = None
+    if sys.platform == "darwin":
+        try:
+            active_app = (
+                subprocess.check_output(
+                    [
+                        "osascript",
+                        "-e",
+                        'tell application "System Events" to get name of first process whose frontmost is true',
+                    ]
+                )
+                .decode()
+                .strip()
+            )
+        except Exception:
+            pass
+
     for i in range(max_retries):
         try:
             # Create fresh options for each attempt to avoid 'cannot reuse' error
             options = uc.ChromeOptions()
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
+            options.add_argument("--disable-gpu")
             options.add_argument("--window-size=1920,1080")
-            options.add_argument("--window-position=2000,2000")
+            options.add_argument("--window-position=0,5000")
             options.add_argument("--disable-extensions")
             options.add_argument("--disable-popup-blocking")
             options.add_argument("--disable-blink-features=AutomationControlled")
+            
+            # Anti-throttling flags for when screen is locked or window is hidden
+            options.add_argument("--disable-background-timer-throttling")
+            options.add_argument("--disable-backgrounding-occluded-windows")
+            options.add_argument("--disable-breakpad")
+            options.add_argument("--disable-component-update")
+            options.add_argument("--disable-domain-reliability")
+            options.add_argument("--disable-renderer-backgrounding")
 
             # Use standard headless=False to better bypass Cloudflare
             driver = uc.Chrome(options=options, headless=False)
+
+            # Immediately restore focus to the previously active app on Mac
+            if active_app:
+                try:
+                    subprocess.run(
+                        ["osascript", "-e", f'tell application "{active_app}" to activate'],
+                        capture_output=True,
+                    )
+                except Exception:
+                    pass
+
+            try:
+                # Move window far below the screen to avoid disturbing the user
+                driver.set_window_position(0, 5000)
+            except Exception:
+                pass
             # Give it more time to settle
             sleep(5)
             return driver
@@ -117,6 +164,10 @@ def _wait_for_dehydrated_state(driver: Any, url: str) -> str:
         sleep(1)
 
     if not page_source or "dehydratedState" not in page_source:
+        try:
+            logger.warning(f"Failed to find dehydratedState. Page title: {driver.title}")
+        except Exception:
+            pass
         raise ValueError(f"Failed to find dehydratedState in {url}")
     return page_source
 

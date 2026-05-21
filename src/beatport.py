@@ -96,9 +96,31 @@ class BeatportBrowser:
             cls._driver = None
 
 
+def _get_chrome_major_version() -> int | None:
+    """Detect the major version of Google Chrome installed on the system."""
+    try:
+        if sys.platform == "darwin":
+            path = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        elif sys.platform == "win32":
+            path = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+        else:
+            path = "google-chrome"
+
+        output = subprocess.check_output([path, "--version"]).decode()
+        version_match = re.search(r"(\d+)\.", output)
+        if version_match:
+            return int(version_match.group(1))
+    except Exception as e:
+        logger.debug(f"Failed to detect Chrome version: {e}")
+    return None
+
+
 def _get_driver(max_retries: int = 3) -> Any:
     """Create a new undetected_chromedriver instance with retries."""
     import undetected_chromedriver as uc
+
+    # Detect Chrome version to avoid driver mismatch
+    chrome_version = _get_chrome_major_version()
 
     # On Mac, we want to restore focus to the previous app after Chrome "pops"
     active_app = None
@@ -130,7 +152,7 @@ def _get_driver(max_retries: int = 3) -> Any:
             options.add_argument("--disable-extensions")
             options.add_argument("--disable-popup-blocking")
             options.add_argument("--disable-blink-features=AutomationControlled")
-            
+
             # Anti-throttling flags for when screen is locked or window is hidden
             options.add_argument("--disable-background-timer-throttling")
             options.add_argument("--disable-backgrounding-occluded-windows")
@@ -159,7 +181,9 @@ def _get_driver(max_retries: int = 3) -> Any:
 
             # Use standard headless=False to better bypass Cloudflare
             # This is a blocking call that can take several seconds
-            driver = uc.Chrome(options=options, headless=False)
+            driver = uc.Chrome(
+                options=options, headless=False, version_main=chrome_version
+            )
 
             try:
                 # Move window far below the screen to avoid disturbing the user

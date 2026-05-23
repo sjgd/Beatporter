@@ -6,7 +6,7 @@ import logging
 from google.cloud import storage
 from google.oauth2 import service_account
 
-from src.utils import ROOT_PATH
+from src.config import ROOT_PATH
 
 # Set constants
 PROJECT_ID = "beatporter"

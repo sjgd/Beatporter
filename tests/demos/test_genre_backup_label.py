@@ -109,7 +109,7 @@ def test_chart(chart: dict[str, str]) -> None:
             logger.info(f"\t[+] Found {len(tracks_dicts)} tracks for {chart}")
             add_new_tracks_to_playlist_chart_label(
                 title=chart,
-                tracks_dicts=tracks_dicts,
+                tracks_dict=tracks_dicts,
                 use_prefix=True,
                 silent=silent_search,
             )
@@ -120,6 +120,7 @@ def test_chart(chart: dict[str, str]) -> None:
                 f"***** {chart} : {chart_bp_url_code} ***** "
                 f"with error: {e}"
             )
+            pytest.fail(f"Failed to get chart {chart}: {e}")
     else:
         logger.info(f"\t[+] Chart {chart} not found")
 

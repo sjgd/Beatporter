@@ -1,36 +1,45 @@
-FROM python:3.13.2
+# Stage 1: Builder
+FROM python:3.13.2-slim AS builder
 
-# Set environment variables to prevent Python from writing .pyc files and to buffer stdout and stderr
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# Set working directory
+WORKDIR /app
+
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
+
+# Install dependencies
+ENV UV_COMPILE_BYTECODE=1
+RUN mkdir -p /app/tmp
+ENV TMPDIR=/app/tmp
+RUN uv sync --frozen --no-install-project --no-dev --no-cache
+RUN rm -rf /app/tmp
+
+# Stage 2: Runner
+FROM python:3.13.2-slim AS runner
+
+# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PATH="/app/.venv/bin:$PATH"
+ENV PYTHONPATH="/app:/app/src"
 
-# The installer requires curl (and certificates) to download the release archive
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates
+WORKDIR /app
 
-# Download the latest installer
-ADD https://astral.sh/uv/install.sh /uv-installer.sh
+# Copy the virtual environment from the builder
+COPY --from=builder /app/.venv /app/.venv
 
-# Run the installer then remove it
-RUN sh /uv-installer.sh && rm /uv-installer.sh
+# Copy application code and directories
+COPY src /app/src
+COPY logs /app/logs
+COPY data /app/data
 
-# Ensure the uv installed binary is on the `PATH`
-ENV PATH="/root/.local/bin/:$PATH"
-
-COPY src /beatporter/src
-COPY logs /beatporter//logs
-COPY data /beatporter/data
-COPY pyproject.toml uv.lock /beatporter/
-
-WORKDIR /beatporter
-
-# Set the PYTHONPATH to include /src
-ENV PYTHONPATH=$PYTHONPATH:/beatporter:/beatporter/src
-
+# Expose ports
 EXPOSE 80
 EXPOSE 8080
 EXPOSE 65000
 
-# Install dependencies using poetry
-RUN uv sync --frozen
-
-CMD exec uv run --frozen python src/beatporter.py
+# Run the application
+CMD ["python", "src/beatporter.py"]

@@ -1,7 +1,9 @@
 """Module to manage Spotify queries."""
 
+import gc
 import logging
 import re
+from datetime import UTC, datetime
 
 import pandas as pd
 import spotipy
@@ -458,6 +460,7 @@ def add_new_tracks_to_playlist_chart_label(
     tracks_dict: list[BeatportTrack],
     use_prefix: bool = True,
     silent: bool = silent_search,
+    uri: str | None = None,
 ) -> None:
     """Add tracks from Beatport to a Spotify playlist.
 
@@ -466,6 +469,7 @@ def add_new_tracks_to_playlist_chart_label(
         tracks_dict (list): Dictionary of tracks to add.
         use_prefix (bool): Add a prefix to the playlist name as defined in config.
         silent (bool): If True, do not display searching details except errors.
+        uri (str): Optional Beatport URI/code for logging.
     """
     persistent_playlist_name = f"{playlist_prefix}{title}" if use_prefix else title
     logger.info(f'[+] Identifying new tracks for playlist: "{persistent_playlist_name}"')
@@ -476,9 +480,13 @@ def add_new_tracks_to_playlist_chart_label(
     }
 
     if not playlist["id"]:
-        logger.warning(
-            f'\t[!] Playlist "{playlist["name"]}" does not exist, creating it.'
-        )
+        log_msg = f'\t[!] Playlist "{playlist["name"]}" does not exist, creating it.'
+        if uri:
+            log_msg = (
+                f'\t[!] Playlist "{playlist["name"]}" ({uri}) '
+                "does not exist, creating it."
+            )
+        logger.warning(log_msg)
         playlist["id"] = create_playlist(playlist["name"])
 
     df_playlist_hist = sync_playlist_history(playlist, digging_mode)
@@ -509,7 +517,9 @@ def add_new_tracks_to_playlist_chart_label(
                         "playlist_id": playlist["id"],
                         "playlist_name": playlist["name"],
                         "track_id": track_id,
-                        "datetime_added": pd.Timestamp.now(tz="UTC"),
+                        "datetime_added": datetime.now(tz=UTC).strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        ),
                         "artist_name": track.artists[0],
                     }
                 )
@@ -545,6 +555,10 @@ def add_new_tracks_to_playlist_chart_label(
         logger.info(
             f'[+] No new tracks to add to the playlist: "{persistent_playlist_name}"'
         )
+
+    # Clean up all temporary data structures
+    del df_playlist_hist, persistent_track_ids, new_history_tracks
+    gc.collect()
 
     return
 
@@ -614,7 +628,9 @@ def _process_genre_tracks(
                         "playlist_id": playlists[0]["id"],
                         "playlist_name": playlists[0]["name"],
                         "track_id": track_id,
-                        "datetime_added": pd.Timestamp.now(tz="UTC"),
+                        "datetime_added": datetime.now(tz=UTC).strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        ),
                         "artist_name": track.artists[0],
                     }
                 )
@@ -630,7 +646,9 @@ def _process_genre_tracks(
                         "playlist_id": playlists[1]["id"],
                         "playlist_name": playlists[1]["name"],
                         "track_id": track_id,
-                        "datetime_added": pd.Timestamp.now(tz="UTC"),
+                        "datetime_added": datetime.now(tz=UTC).strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        ),
                         "artist_name": track.artists[0],
                     }
                 )
@@ -651,32 +669,53 @@ def _backfill_daily_playlist(
     daily_top_n_playlist_name: str,
     playlists: list[dict],
 ) -> None:
-    """Add more tracks to daily genre playlist if not enough found."""
-    if n_daily_tracks < daily_n_track:
-        extra_daily_top_n_track_ids = []
-        reversed_persistent_ids = df_persistent_hist["track_id"].values[
-            ::-1
-        ]  # Freshest first
+    """Add more tracks to daily genre playlist if not enough found.
 
-        for track_id in reversed_persistent_ids:
-            if n_daily_tracks >= daily_n_track:
-                break
+    Args:
+        n_daily_tracks (int): Number of tracks already in the playlist.
+        df_persistent_hist (pd.DataFrame): Persistent playlist history.
+        df_daily_hist (pd.DataFrame): Daily playlist history.
+        daily_top_n_track_ids (list[str]): List of track IDs already
+         added to daily playlist.
+        daily_top_n_playlist_name (str): Name of the daily playlist.
+        playlists (list[dict]): List of playlist dictionaries.
+    """
+    if n_daily_tracks >= daily_n_track:
+        return
 
-            if (
-                track_id not in df_daily_hist["track_id"].values
-                and track_id not in daily_top_n_track_ids
-                and track_id not in extra_daily_top_n_track_ids
-            ):
-                extra_daily_top_n_track_ids.append(track_id)
-                n_daily_tracks += 1
+    extra_daily_top_n_track_ids: list[str] = []
 
-        if extra_daily_top_n_track_ids:
-            logger.warning(
-                f"[+] Adding {len(extra_daily_top_n_track_ids)} extra new "
-                f'tracks to the playlist: "{daily_top_n_playlist_name}"'
-            )
-            add_tracks_to_playlist(playlists[1]["id"], extra_daily_top_n_track_ids)
-            update_playlist_description_with_date(playlists[1])
+    # Build list of persistent track ids (freshest first).
+    # Prefer local history (`df_persistent_hist`) even if empty; then
+    # complement with current playlist contents from Spotify so we always
+    # have candidates for backfill.
+    reversed_persistent_ids: list[str] = []
+    reversed_persistent_ids = list(df_persistent_hist["track_id"].values[::-1])
+
+    # Existing daily ids set (guard against missing column)
+    daily_existing_ids = set(df_daily_hist["track_id"].values)
+
+    for track_id in reversed_persistent_ids:
+        if n_daily_tracks >= daily_n_track:
+            break
+        if (
+            track_id not in daily_existing_ids
+            and track_id not in daily_top_n_track_ids
+            and track_id not in extra_daily_top_n_track_ids
+        ):
+            extra_daily_top_n_track_ids.append(track_id)
+            n_daily_tracks += 1
+
+    if extra_daily_top_n_track_ids:
+        logger.warning(
+            f"[+] Adding {len(extra_daily_top_n_track_ids)} extra new "
+            f'tracks to the playlist: "{daily_top_n_playlist_name}"'
+        )
+        add_tracks_to_playlist(playlists[1]["id"], extra_daily_top_n_track_ids)
+        update_playlist_description_with_date(playlists[1])
+
+    del extra_daily_top_n_track_ids, reversed_persistent_ids, daily_existing_ids
+    gc.collect()
 
 
 def add_new_tracks_to_playlist_genre(
@@ -722,8 +761,10 @@ def add_new_tracks_to_playlist_genre(
     n_daily_tracks = 0
     if daily_mode:
         spotify_ins = spotify_auth()
-        daily_playlist = spotify_ins.playlist(playlist_id=playlists[1]["id"])
-        n_daily_tracks = len(daily_playlist["tracks"]["items"])
+        daily_playlist = spotify_ins.playlist(
+            playlist_id=playlists[1]["id"], fields="tracks(total)"
+        )
+        n_daily_tracks = daily_playlist["tracks"]["total"]
 
     (
         persistent_track_ids,
@@ -775,6 +816,12 @@ def add_new_tracks_to_playlist_genre(
             daily_top_n_playlist_name,
             playlists,
         )
+
+    # Clean up all temporary data structures
+    del df_persistent_hist, df_daily_hist
+    del persistent_track_ids, daily_top_n_track_ids
+    del new_persistent_history_tracks, new_daily_history_tracks
+    gc.collect()
 
     return
 

@@ -3,15 +3,17 @@
 import gc
 import logging
 import os
+import queue
 import random
 import sys
-import traceback
+import threading
 from datetime import datetime
 from time import sleep
 
 import pandas as pd
 
 from src.beatport import (
+    BeatportBrowser,
     find_chart,
     get_chart,
     get_label_tracks,
@@ -39,7 +41,7 @@ from src.spotify_utils import (
     get_all_playlists,
     update_hist_pl_tracks,
 )
-from src.utils import FILE_NAME_HIST, PATH_HIST_LOCAL, HistoryCache, deduplicate_hist_file
+from src.utils import FILE_NAME_HIST, PATH_HIST_LOCAL, deduplicate_hist_file
 
 logger = logging.getLogger("beatporter")
 
@@ -61,6 +63,11 @@ def refresh_all_playlists_history() -> None:
         if playlist["owner"]["id"] == username:
             logger.info(f"Refreshing history for playlist: {playlist['name']}")
             update_hist_pl_tracks(playlist)
+            gc.collect()
+            logger.info("")
+
+    del all_playlists
+    gc.collect()
 
 
 def _transfer_excel_to_parquet_if_needed() -> None:
@@ -80,99 +87,111 @@ def _handle_backups(args: list[str], spotify_bkp: dict[str, str]) -> None:
         for playlist_name, org_playlist_id in spotify_bkp.items():
             logger.info(" ")
             logger.info(
-                f"-Backing up playlist : ***** {playlist_name} : {org_playlist_id} *****"
+                f"Backing up playlist : ***** {playlist_name} : {org_playlist_id} *****"
             )
             try:
                 back_up_spotify_playlist(playlist_name, org_playlist_id)
             except Exception as e:
-                traceback.print_exc()
-                logger.warning(
+                logger.error(
                     "FAILED backing up playlist: "
                     f"***** {playlist_name} : {org_playlist_id} ***** "
                     f"with error: {e}"
                 )
-            HistoryCache.clear()
             gc.collect()
 
 
-def _handle_charts(
-    args: list[str],
-    parsed_charts: dict[str, str],
-) -> None:
-    if "charts" in args:
-        for chart, chart_bp_url_code in parsed_charts.items():
-            # TODO check if chart are working, otherwise do as genre and label
-            # TODO handle return None, handle chart_bp_url_code has ID already or not
-            logger.info(" ")
-            logger.info(f" Getting chart : ***** {chart} : {chart_bp_url_code} *****")
-            try:
-                chart_url = find_chart(chart, chart_bp_url_code)
-                if chart_url:
-                    tracks_dicts = get_chart(chart_url)
-                    logger.debug(chart_bp_url_code + ":" + str(tracks_dicts))
-                    logger.info(f"\t[+] Found {len(tracks_dicts)} tracks for {chart}")
-                    add_new_tracks_to_playlist_chart_label(chart, tracks_dicts)
-                else:
-                    logger.info(f"\t[+] Chart {chart} not found")
-            except Exception as e:
-                traceback.print_exc()
-                logger.warning(
-                    "FAILED getting chart: "
-                    f"***** {chart} : {chart_bp_url_code} ***** "
-                    f"with error: {e}"
-                )
-            chart_url = None
-            tracks_dicts = None
-            HistoryCache.clear()
-            gc.collect()
+def _scrape_job(job: dict) -> dict | None:
+    """Scrape data for a single job and return a result dict."""
+    job_type = job["type"]
+    job_data = job["data"]
 
+    try:
+        if job_type == "chart":
+            chart, chart_bp_url_code = job_data
+            logger.info(f"[Scraper] Scraping chart: {chart}")
+            chart_url = find_chart(chart, chart_bp_url_code)
+            if chart_url:
+                chart_uri = chart_url.split("/chart/")[-1]
+                logger.info(f"[Scraper] Found chart URI: {chart_uri}")
+                tracks_dicts = get_chart(chart_url)
+                return {
+                    "type": "chart",
+                    "name": chart,
+                    "tracks": tracks_dicts,
+                    "code": chart_bp_url_code,
+                    "uri": chart_uri,
+                }
+            else:
+                logger.warning(f"[Scraper] Chart {chart} not found")
 
-def _handle_genres(args: list[str], genres: dict[str, str]) -> None:
-    if "genres" in args:
-        for genre, genre_bp_url_code in genres.items():
-            logger.info(" ")
-            logger.info(f" Getting genre : ***** {genre} *****")
+        elif job_type == "genre":
+            genre = job_data
+            logger.info(f"[Scraper] Scraping genre: {genre}")
             top_100_chart = get_top_100_tracks(genre)
-            logger.debug(genre + ":" + str(top_100_chart))
-            try:
-                add_new_tracks_to_playlist_genre(genre, top_100_chart)
-            except Exception as e:
-                traceback.print_exc()
-                logger.warning(
-                    f"FAILED getting genre: ***** {genre} ***** with error: {e}"
-                )
-            top_100_chart = None
-            HistoryCache.clear()
-            gc.collect()
+            return {"type": "genre", "name": genre, "tracks": top_100_chart}
+
+        elif job_type == "label":
+            label, label_bp_url_code, shuffle_label = job_data
+            logger.info(f"[Scraper] Scraping label: {label}")
+            tracks_dict = get_label_tracks(label, label_bp_url_code)
+            return {
+                "type": "label",
+                "name": label,
+                "tracks": tracks_dict,
+                "code": label_bp_url_code,
+                "shuffle": shuffle_label,
+            }
+    except Exception as e:
+        logger.error(f"[Scraper] FAILED scraping {job_type}: {job_data} - error: {e}")
+
+    return None
 
 
-def _handle_labels(
-    args: list[str],
-    labels: dict[str, str],
-    shuffle_label: bool,
-) -> None:
-    if "labels" in args:
-        for label, label_bp_url_code in labels.items():
-            # TODO avoid looping through all pages if already parsed before ?
-            # TODO Add tracks per EP rather than track by track ?
+def _sync_result(result: dict) -> None:
+    """Sync a single scraping result to Spotify."""
+    res_type = result["type"]
+    name = result["name"]
+    tracks = result["tracks"]
+
+    try:
+        if res_type == "chart":
             logger.info(" ")
-            logger.info(f"Getting label : ***** {label} : {label_bp_url_code} *****")
-            try:
-                tracks_dict = get_label_tracks(label, label_bp_url_code)
-                logger.info(f"Found {len(tracks_dict)} tracks for {label}")
-                if shuffle_label:
-                    random.shuffle(tracks_dict)
-                add_new_tracks_to_playlist_chart_label(label, tracks_dict)
-            except Exception as e:
-                traceback.print_exc()
-                logger.warning(
-                    "FAILED getting label: "
-                    f"***** {label} : {label_bp_url_code} ***** "
-                    f"with error: {e}"
-                )
-            tracks_dict = None
-            HistoryCache.clear()
-            gc.collect()
+            logger.info(f"Syncing chart : ***** {name} *****")
+            add_new_tracks_to_playlist_chart_label(name, tracks, uri=result.get("uri"))
+
+        elif res_type == "genre":
+            logger.info(" ")
+            logger.info(f"Syncing genre : ***** {name} *****")
+            add_new_tracks_to_playlist_genre(name, tracks)
+
+        elif res_type == "label":
+            logger.info(" ")
+            logger.info(f"Syncing label : ***** {name} *****")
+            if result["shuffle"]:
+                random.shuffle(tracks)
+            add_new_tracks_to_playlist_chart_label(name, tracks, uri=result["code"])
+
+    except Exception as e:
+        logger.error(f"[Sync] FAILED syncing {res_type} {name} to Spotify: {e}")
+    finally:
+        gc.collect()
+
+
+def _scraper_producer(job_queue: list[dict], result_queue: queue.Queue) -> None:
+    """Thread function to process the job queue and put results into the result queue."""
+    logger.info("[Scraper] Thread started.")
+    try:
+        for job in job_queue:
+            result = _scrape_job(job)
+            if result:
+                result_queue.put(result)
+            # Small sleep between jobs to be nice to Beatport
+            sleep(2)
+    finally:
+        # Close browser and send sentinel
+        BeatportBrowser.quit()
+        result_queue.put(None)
+        logger.info("[Scraper] Thread finished.")
 
 
 def main(
@@ -181,7 +200,7 @@ def main(
     genres: dict[str, str] = genres,
     labels: dict[str, str] = labels,
 ) -> None:
-    """Run Beatporter.
+    """Run Beatporter with optimized Scrape-Sync pipeline.
 
     Args:
         spotify_bkp: List of Spotify playlist to backup
@@ -225,17 +244,46 @@ def main(
         args = valid_arguments
     logger.info(f"Using arguments: {args} of available {valid_arguments}")
 
+    # 1. Build Job Queue for scraping tasks
+    job_queue = []
+    if "charts" in args:
+        for chart, code in parsed_charts.items():
+            job_queue.append({"type": "chart", "data": (chart, code)})
+    if "genres" in args:
+        for genre in genres.keys():
+            job_queue.append({"type": "genre", "data": genre})
+    if "labels" in args:
+        for label, code in labels.items():
+            job_queue.append({"type": "label", "data": (label, code, shuffle_label)})
+
+    # 2. Start Scraper Producer Thread
+    result_queue = queue.Queue()
+    scraper_thread = None
+    if job_queue:
+        scraper_thread = threading.Thread(
+            target=_scraper_producer, args=(job_queue, result_queue), name="ScraperThread"
+        )
+        scraper_thread.start()
+
+    # 3. Handle backups in Main Thread while scraping happens in background
     _handle_backups(args, spotify_bkp)
-    _handle_charts(args, parsed_charts)
-    _handle_genres(args, genres)
-    _handle_labels(args, labels, shuffle_label)
+
+    # 4. Process Scraping Results (Consumer) in Main Thread
+    if scraper_thread:
+        logger.info("[Main] Waiting for scraping results...")
+        while True:
+            result = result_queue.get()
+            if result is None:  # Sentinel value
+                break
+            _sync_result(result)
+            result_queue.task_done()
 
     # Output
     sleep(5)
     deduplicate_hist_file()
     if use_gcp:
         upload_file_to_gcs(file_name=FILE_NAME_HIST, local_folder=PATH_HIST_LOCAL)
-    # TODO add back option to save to excel for manual checking
+
     end_time = datetime.now()
     logger.info(f"[!] Done @ {end_time} (Ran for: {end_time - start_time})")
 
@@ -251,10 +299,6 @@ if __name__ == "__main__":
 # Check to include original mix then remove
 # TODO review imports
 # TODO modify read me
-# TODO shuffle playlist option
-# TODO add config to create playlist private per default
-# TODO improve search with parsing names contains brackets, commas or special characters :
-#  (feat. Aliz Smith) and feat. Griz-O and Feat. Denzel Curry, Pell
 # TODO shuffle playlist option
 # TODO add config to create playlist private per default
 # TODO improve search with parsing names contains brackets, commas or special characters :

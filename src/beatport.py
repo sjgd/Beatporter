@@ -169,7 +169,7 @@ def _get_driver(max_retries: int = 3) -> Any:
                         [
                             "osascript",
                             "-e",
-                            "delay 1",
+                            "delay 2",
                             "-e",
                             f'tell application "{active_app}" to activate',
                         ],
@@ -184,6 +184,16 @@ def _get_driver(max_retries: int = 3) -> Any:
             driver = uc.Chrome(
                 options=options, headless=False, version_main=chrome_version
             )
+
+            # Second attempt to restore focus after driver is created, just in case
+            if active_app:
+                try:
+                    subprocess.run(
+                        ["osascript", "-e", f'tell application "{active_app}" to activate'],
+                        capture_output=True,
+                    )
+                except Exception:
+                    pass
 
             try:
                 # Move window far below the screen to avoid disturbing the user

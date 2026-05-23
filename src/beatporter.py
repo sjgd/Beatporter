@@ -111,12 +111,15 @@ def _scrape_job(job: dict) -> dict | None:
             logger.info(f"[Scraper] Scraping chart: {chart}")
             chart_url = find_chart(chart, chart_bp_url_code)
             if chart_url:
+                chart_uri = chart_url.split("/chart/")[-1]
+                logger.info(f"[Scraper] Found chart URI: {chart_uri}")
                 tracks_dicts = get_chart(chart_url)
                 return {
                     "type": "chart",
                     "name": chart,
                     "tracks": tracks_dicts,
                     "code": chart_bp_url_code,
+                    "uri": chart_uri,
                 }
             else:
                 logger.warning(f"[Scraper] Chart {chart} not found")
@@ -154,7 +157,7 @@ def _sync_result(result: dict) -> None:
         if res_type == "chart":
             logger.info(" ")
             logger.info(f"Syncing chart : ***** {name} *****")
-            add_new_tracks_to_playlist_chart_label(name, tracks, uri=result["code"])
+            add_new_tracks_to_playlist_chart_label(name, tracks, uri=result.get("uri"))
 
         elif res_type == "genre":
             logger.info(" ")

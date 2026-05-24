@@ -74,17 +74,26 @@ class BeatportBrowser:
     @classmethod
     def get_driver(cls) -> Any:
         """Get or create the persistent driver instance."""
-        if cls._driver is None:
-            cls._driver = _get_driver()
-        else:
+        is_dead = False
+        if cls._driver is not None:
             try:
-                # Check if driver is still alive
-                _ = cls._driver.window_handles
+                # Rigorous check: must have handles and be able to access them
+                handles = cls._driver.window_handles
+                if not handles:
+                    is_dead = True
+                else:
+                    # Try to access current window to be sure
+                    _ = cls._driver.current_window_handle
             except Exception:
-                logger.warning("Persistent driver lost, recreating...")
+                is_dead = True
+
+        if cls._driver is None or is_dead:
+            if is_dead:
+                logger.warning("Persistent driver session invalid, recreating...")
                 with suppress(Exception):
                     cls._driver.quit()
-                cls._driver = _get_driver()
+            cls._driver = _get_driver()
+
         return cls._driver
 
     @classmethod
@@ -298,6 +307,11 @@ def get_beatport_page_script_queries(url: str) -> dict:
             logger.warning(
                 f"Attempt {attempt + 1}/{max_load_retries} failed for {url}: {e}"
             )
+            # If window is lost, force a driver reset for the next attempt
+            if "no such window" in str(e).lower() or "session" in str(e).lower():
+                logger.info("Resetting driver due to lost window...")
+                BeatportBrowser.quit()
+            
             # Extra sleep on failure
             sleep(5)
 
@@ -396,6 +410,10 @@ def scrape_beatport_charts(
             logger.warning(
                 f"Attempt {attempt + 1}/{max_load_retries} failed for {url}: {e}"
             )
+            # If window is lost, force a driver reset for the next attempt
+            if "no such window" in str(e).lower() or "session" in str(e).lower():
+                logger.info("Resetting driver due to lost window...")
+                BeatportBrowser.quit()
             sleep(5)
 
     logger.error(f"Failed to scrape charts from {url}: {last_error}")

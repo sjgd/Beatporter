@@ -28,7 +28,7 @@ _hist_file_lock = threading.RLock()
 F = TypeVar("F", bound=Callable[..., Any])
 
 
-def thread_safe_hist(func: F) -> F:
+def thread_safe_hist(func: F) -> F:  # noqa: UP047
     """Ensure thread-safe operations on the history file."""
 
     @wraps(func)

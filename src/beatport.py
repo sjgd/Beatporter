@@ -198,7 +198,11 @@ def _get_driver(max_retries: int = 3) -> Any:
             if active_app:
                 try:
                     subprocess.run(
-                        ["osascript", "-e", f'tell application "{active_app}" to activate'],
+                        [
+                            "osascript",
+                            "-e",
+                            f'tell application "{active_app}" to activate',
+                        ],
                         capture_output=True,
                     )
                 except Exception:
@@ -311,7 +315,7 @@ def get_beatport_page_script_queries(url: str) -> dict:
             if "no such window" in str(e).lower() or "session" in str(e).lower():
                 logger.info("Resetting driver due to lost window...")
                 BeatportBrowser.quit()
-            
+
             # Extra sleep on failure
             sleep(5)
 

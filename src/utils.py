@@ -3,7 +3,11 @@
 import gc
 import logging
 import os
+import threading
+from collections.abc import Callable
 from datetime import datetime
+from functools import wraps
+from typing import Any, TypeVar, cast
 
 import pandas as pd
 import psutil
@@ -18,6 +22,21 @@ FILE_NAME_YT_HIST = "hist_youtube_playlists_tracks.parquet.gz"
 curr_date = datetime.today().strftime("%Y-%m-%d")
 
 logger = logging.getLogger("utils")
+
+_hist_file_lock = threading.RLock()
+
+F = TypeVar("F", bound=Callable[..., Any])
+
+
+def thread_safe_hist(func: F) -> F:
+    """Ensure thread-safe operations on the history file."""
+
+    @wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        with _hist_file_lock:
+            return func(*args, **kwargs)
+
+    return cast(F, wrapper)
 
 
 def _load_and_optimize_parquet(file_path: str) -> pd.DataFrame:
@@ -73,6 +92,7 @@ def _handle_missing_history_file(file_path: str, allow_empty: bool) -> pd.DataFr
     )
 
 
+@thread_safe_hist
 def load_hist_file(
     file_path: str | None = None,
     playlist_id: str | None = None,
@@ -135,6 +155,7 @@ def load_hist_file(
     return df_hist_pl_tracks
 
 
+@thread_safe_hist
 def save_hist_dataframe(df_hist: pd.DataFrame, file_name: str = FILE_NAME_HIST) -> None:
     """Save the history dataframe and sync to GCS if enabled.
 
@@ -166,6 +187,7 @@ def save_hist_dataframe(df_hist: pd.DataFrame, file_name: str = FILE_NAME_HIST) 
     print_memory_usage_readable()
 
 
+@thread_safe_hist
 def append_to_hist_file(
     df_new_tracks: pd.DataFrame,
     file_name: str = FILE_NAME_HIST,
@@ -196,6 +218,7 @@ def append_to_hist_file(
         logger.error(f"Failed to append to hist file: {e}", exc_info=True)
 
 
+@thread_safe_hist
 def deduplicate_hist_file(
     file_name: str = FILE_NAME_HIST,
 ) -> None:

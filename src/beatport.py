@@ -217,8 +217,9 @@ def _get_driver(max_retries: int = 3) -> Any:
             sleep(2)
             return driver
         except Exception as e:
+            err_msg = str(e).split("\n")[0] if str(e) else type(e).__name__
             logger.warning(
-                f"Failed to create driver (attempt {i + 1}/{max_retries}): {e}"
+                f"Failed to create driver (attempt {i + 1}/{max_retries}): {err_msg}"
             )
             if i == max_retries - 1:
                 raise
@@ -243,7 +244,8 @@ def _wait_for_dehydrated_state(driver: Any, url: str) -> str:
                     f"Still waiting for dehydratedState on {url} (attempt {i}/60)..."
                 )
         except (NoSuchWindowException, WebDriverException) as e:
-            logger.warning(f"Browser window lost during wait: {e}")
+            err_msg = str(e).split("\n")[0] if str(e) else type(e).__name__
+            logger.warning(f"Browser window lost during wait: {err_msg}")
             raise
         except Exception as e:
             logger.debug(f"Transient error getting page source: {e}")
@@ -308,8 +310,9 @@ def get_beatport_page_script_queries(url: str) -> dict:
 
         except Exception as e:
             last_error = e
+            err_msg = str(e).split("\n")[0] if str(e) else type(e).__name__
             logger.warning(
-                f"Attempt {attempt + 1}/{max_load_retries} failed for {url}: {e}"
+                f"Attempt {attempt + 1}/{max_load_retries} failed for {url}: {err_msg}"
             )
             # If window is lost, force a driver reset for the next attempt
             if "no such window" in str(e).lower() or "session" in str(e).lower():
@@ -337,7 +340,8 @@ def _wait_for_charts(driver: Any, max_wait: int) -> None:
             ):
                 break
         except (NoSuchWindowException, WebDriverException) as e:
-            logger.warning(f"Browser window lost during charts wait: {e}")
+            err_msg = str(e).split("\n")[0] if str(e) else type(e).__name__
+            logger.warning(f"Browser window lost during charts wait: {err_msg}")
             raise
         except Exception as e:
             logger.debug(f"Transient error in scrape_beatport_charts wait: {e}")
@@ -351,10 +355,12 @@ def _extract_links(driver: Any) -> list:
             raise ValueError("Browser window closed unexpectedly before finding elements")
         return driver.find_elements(By.CSS_SELECTOR, 'a[href*="/chart/"]')
     except (NoSuchWindowException, WebDriverException) as e:
-        logger.warning(f"Browser window lost before element find: {e}")
+        err_msg = str(e).split("\n")[0] if str(e) else type(e).__name__
+        logger.warning(f"Browser window lost before element find: {err_msg}")
         raise
     except Exception as e:
-        logger.error(f"Failed to find elements: {e}")
+        err_msg = str(e).split("\n")[0] if str(e) else type(e).__name__
+        logger.error(f"Failed to find elements: {err_msg}")
         return []
 
 
@@ -411,8 +417,9 @@ def scrape_beatport_charts(
 
         except Exception as e:
             last_error = e
+            err_msg = str(e).split("\n")[0] if str(e) else type(e).__name__
             logger.warning(
-                f"Attempt {attempt + 1}/{max_load_retries} failed for {url}: {e}"
+                f"Attempt {attempt + 1}/{max_load_retries} failed for {url}: {err_msg}"
             )
             # If window is lost, force a driver reset for the next attempt
             if "no such window" in str(e).lower() or "session" in str(e).lower():

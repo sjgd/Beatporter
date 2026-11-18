@@ -124,6 +124,46 @@ def _get_chrome_major_version() -> int | None:
     return None
 
 
+def _get_active_mac_app() -> str | None:
+    """Return the name of the currently frontmost macOS process, if available."""
+    if sys.platform != "darwin":
+        return None
+    with suppress(Exception):
+        script = (
+            'tell application "System Events" to get name of first process '
+            "whose frontmost is true"
+        )
+        return subprocess.check_output(["osascript", "-e", script]).decode().strip()
+    return None
+
+
+def _restore_mac_focus(active_app: str | None, delay_seconds: int = 0) -> None:
+    """Restore window focus to the previously active macOS app."""
+    if not active_app:
+        return
+    activate_script = (
+        f'try\n    tell application "{active_app}" to activate\n'
+        "on error\n"
+        '    tell application "System Events" to set frontmost of first process '
+        f'whose name is "{active_app}" to true\n'
+        "end try"
+    )
+    cmd = ["osascript"]
+    if delay_seconds > 0:
+        cmd.extend(["-e", f"delay {delay_seconds}"])
+    cmd.extend(["-e", activate_script])
+
+    with suppress(Exception):
+        if delay_seconds > 0:
+            subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        else:
+            subprocess.run(cmd, capture_output=True)
+
+
 def _get_driver(max_retries: int = 3) -> Any:
     """Create a new undetected_chromedriver instance with retries."""
     import undetected_chromedriver as uc
@@ -131,23 +171,8 @@ def _get_driver(max_retries: int = 3) -> Any:
     # Detect Chrome version to avoid driver mismatch
     chrome_version = _get_chrome_major_version()
 
-    # On Mac, we want to restore focus to the previous app after Chrome "pops"
-    active_app = None
-    if sys.platform == "darwin":
-        try:
-            active_app = (
-                subprocess.check_output(
-                    [
-                        "osascript",
-                        "-e",
-                        'tell application "System Events" to get name of first process whose frontmost is true',
-                    ]
-                )
-                .decode()
-                .strip()
-            )
-        except Exception:
-            pass
+    # On Mac, restore focus to the previous app after Chrome pops up
+    active_app = _get_active_mac_app()
 
     for i in range(max_retries):
         try:
@@ -157,7 +182,6 @@ def _get_driver(max_retries: int = 3) -> Any:
             options.add_argument("--disable-dev-shm-usage")
             options.add_argument("--disable-gpu")
             options.add_argument("--window-size=1920,1080")
-            options.add_argument("--window-position=0,5000")
             options.add_argument("--disable-extensions")
             options.add_argument("--disable-popup-blocking")
             options.add_argument("--disable-blink-features=AutomationControlled")
@@ -170,23 +194,8 @@ def _get_driver(max_retries: int = 3) -> Any:
             options.add_argument("--disable-domain-reliability")
             options.add_argument("--disable-renderer-backgrounding")
 
-            # On Mac, proactively start a background task to restore focus
-            # This handles the "pop" that happens during the blocking uc.Chrome() call
-            if active_app:
-                try:
-                    subprocess.Popen(
-                        [
-                            "osascript",
-                            "-e",
-                            "delay 2",
-                            "-e",
-                            f'tell application "{active_app}" to activate',
-                        ],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                    )
-                except Exception:
-                    pass
+            # Proactively start a background task to restore focus during uc.Chrome()
+            _restore_mac_focus(active_app, delay_seconds=2)
 
             # Use standard headless=False to better bypass Cloudflare
             # This is a blocking call that can take several seconds
@@ -194,25 +203,9 @@ def _get_driver(max_retries: int = 3) -> Any:
                 options=options, headless=False, version_main=chrome_version
             )
 
-            # Second attempt to restore focus after driver is created, just in case
-            if active_app:
-                try:
-                    subprocess.run(
-                        [
-                            "osascript",
-                            "-e",
-                            f'tell application "{active_app}" to activate',
-                        ],
-                        capture_output=True,
-                    )
-                except Exception:
-                    pass
+            # Restore focus again once driver creation finishes
+            _restore_mac_focus(active_app)
 
-            try:
-                # Move window far below the screen to avoid disturbing the user
-                driver.set_window_position(0, 5000)
-            except Exception:
-                pass
             # Give it more time to settle
             sleep(2)
             return driver

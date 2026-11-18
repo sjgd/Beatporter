@@ -49,7 +49,9 @@ def get_gcs_blob(file_name: str, bucket_folder: str = "") -> storage.Blob:
     return blob
 
 
-def download_file_to_gcs(file_name: str, local_folder: str, gcs_folder: str = "") -> None:
+def download_file_to_gcs(
+    file_name: str, local_folder: str, gcs_folder: str = "", timeout: int = 60
+) -> None:
     """Download local file from GCS.
 
     Uses PROJECT_ID and BUCKET_NAME set in the module.
@@ -58,16 +60,19 @@ def download_file_to_gcs(file_name: str, local_folder: str, gcs_folder: str = ""
         file_name: Local filename
         local_folder: Local source folder
         gcs_folder: Destination folder in the bucket
+        timeout: Request timeout in seconds
     """
     blob = get_gcs_blob(file_name=file_name, bucket_folder=gcs_folder)
-    blob.download_to_filename(filename=local_folder + file_name)
+    blob.download_to_filename(filename=local_folder + file_name, timeout=timeout)
 
     logger.info(
         f"Done downloading file {file_name} from blob {BUCKET_NAME + '/' + gcs_folder}"
     )
 
 
-def upload_file_to_gcs(file_name: str, local_folder: str, gcs_folder: str = "") -> None:
+def upload_file_to_gcs(
+    file_name: str, local_folder: str, gcs_folder: str = "", timeout: int = 60
+) -> None:
     """Upload local file to GCS.
 
     Use PROJECT_ID and BUCKET_NAME set in the module.
@@ -76,9 +81,12 @@ def upload_file_to_gcs(file_name: str, local_folder: str, gcs_folder: str = "") 
         file_name: Local filename
         local_folder: Local source folder
         gcs_folder: Destination folder in the bucket
+        timeout: Request timeout in seconds
     """
     blob = get_gcs_blob(file_name=file_name, bucket_folder=gcs_folder)
-    blob.upload_from_filename(filename=local_folder + file_name, if_generation_match=None)
+    blob.upload_from_filename(
+        filename=local_folder + file_name, if_generation_match=None, timeout=timeout
+    )
 
     logger.info(
         f"Done uploading file {file_name} to blob {BUCKET_NAME + '/' + gcs_folder}"

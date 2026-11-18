@@ -250,14 +250,14 @@ def main(
         for chart, code in parsed_charts.items():
             job_queue.append({"type": "chart", "data": (chart, code)})
     if "genres" in args:
-        for genre in genres.keys():
+        for genre in genres:
             job_queue.append({"type": "genre", "data": genre})
     if "labels" in args:
         for label, code in labels.items():
             job_queue.append({"type": "label", "data": (label, code, shuffle_label)})
 
     # 2. Start Scraper Producer Thread
-    result_queue = queue.Queue()
+    result_queue: queue.Queue = queue.Queue()
     scraper_thread = None
     if job_queue:
         scraper_thread = threading.Thread(

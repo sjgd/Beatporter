@@ -3,6 +3,7 @@
 import gc
 import json
 import logging
+import math
 import re
 import subprocess
 import sys
@@ -12,7 +13,6 @@ from functools import lru_cache
 from time import sleep
 from typing import Any
 
-import pandas as pd
 from bs4 import BeautifulSoup
 from pandas import to_datetime
 from selenium.common.exceptions import NoSuchWindowException, WebDriverException
@@ -124,6 +124,46 @@ def _get_chrome_major_version() -> int | None:
     return None
 
 
+def _get_active_mac_app() -> str | None:
+    """Return the name of the currently frontmost macOS process, if available."""
+    if sys.platform != "darwin":
+        return None
+    with suppress(Exception):
+        script = (
+            'tell application "System Events" to get name of first process '
+            "whose frontmost is true"
+        )
+        return subprocess.check_output(["osascript", "-e", script]).decode().strip()
+    return None
+
+
+def _restore_mac_focus(active_app: str | None, delay_seconds: int = 0) -> None:
+    """Restore window focus to the previously active macOS app."""
+    if not active_app:
+        return
+    activate_script = (
+        f'try\n    tell application "{active_app}" to activate\n'
+        "on error\n"
+        '    tell application "System Events" to set frontmost of first process '
+        f'whose name is "{active_app}" to true\n'
+        "end try"
+    )
+    cmd = ["osascript"]
+    if delay_seconds > 0:
+        cmd.extend(["-e", f"delay {delay_seconds}"])
+    cmd.extend(["-e", activate_script])
+
+    with suppress(Exception):
+        if delay_seconds > 0:
+            subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        else:
+            subprocess.run(cmd, capture_output=True)
+
+
 def _get_driver(max_retries: int = 3) -> Any:
     """Create a new undetected_chromedriver instance with retries."""
     import undetected_chromedriver as uc
@@ -131,23 +171,8 @@ def _get_driver(max_retries: int = 3) -> Any:
     # Detect Chrome version to avoid driver mismatch
     chrome_version = _get_chrome_major_version()
 
-    # On Mac, we want to restore focus to the previous app after Chrome "pops"
-    active_app = None
-    if sys.platform == "darwin":
-        try:
-            active_app = (
-                subprocess.check_output(
-                    [
-                        "osascript",
-                        "-e",
-                        'tell application "System Events" to get name of first process whose frontmost is true',
-                    ]
-                )
-                .decode()
-                .strip()
-            )
-        except Exception:
-            pass
+    # On Mac, restore focus to the previous app after Chrome pops up
+    active_app = _get_active_mac_app()
 
     for i in range(max_retries):
         try:
@@ -157,7 +182,6 @@ def _get_driver(max_retries: int = 3) -> Any:
             options.add_argument("--disable-dev-shm-usage")
             options.add_argument("--disable-gpu")
             options.add_argument("--window-size=1920,1080")
-            options.add_argument("--window-position=0,5000")
             options.add_argument("--disable-extensions")
             options.add_argument("--disable-popup-blocking")
             options.add_argument("--disable-blink-features=AutomationControlled")
@@ -170,23 +194,8 @@ def _get_driver(max_retries: int = 3) -> Any:
             options.add_argument("--disable-domain-reliability")
             options.add_argument("--disable-renderer-backgrounding")
 
-            # On Mac, proactively start a background task to restore focus
-            # This handles the "pop" that happens during the blocking uc.Chrome() call
-            if active_app:
-                try:
-                    subprocess.Popen(
-                        [
-                            "osascript",
-                            "-e",
-                            "delay 2",
-                            "-e",
-                            f'tell application "{active_app}" to activate',
-                        ],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                    )
-                except Exception:
-                    pass
+            # Proactively start a background task to restore focus during uc.Chrome()
+            _restore_mac_focus(active_app, delay_seconds=2)
 
             # Use standard headless=False to better bypass Cloudflare
             # This is a blocking call that can take several seconds
@@ -194,27 +203,16 @@ def _get_driver(max_retries: int = 3) -> Any:
                 options=options, headless=False, version_main=chrome_version
             )
 
-            # Second attempt to restore focus after driver is created, just in case
-            if active_app:
-                try:
-                    subprocess.run(
-                        ["osascript", "-e", f'tell application "{active_app}" to activate'],
-                        capture_output=True,
-                    )
-                except Exception:
-                    pass
+            # Restore focus again once driver creation finishes
+            _restore_mac_focus(active_app)
 
-            try:
-                # Move window far below the screen to avoid disturbing the user
-                driver.set_window_position(0, 5000)
-            except Exception:
-                pass
             # Give it more time to settle
             sleep(2)
             return driver
         except Exception as e:
+            err_msg = str(e).split("\n")[0] if str(e) else type(e).__name__
             logger.warning(
-                f"Failed to create driver (attempt {i + 1}/{max_retries}): {e}"
+                f"Failed to create driver (attempt {i + 1}/{max_retries}): {err_msg}"
             )
             if i == max_retries - 1:
                 raise
@@ -239,7 +237,8 @@ def _wait_for_dehydrated_state(driver: Any, url: str) -> str:
                     f"Still waiting for dehydratedState on {url} (attempt {i}/60)..."
                 )
         except (NoSuchWindowException, WebDriverException) as e:
-            logger.warning(f"Browser window lost during wait: {e}")
+            err_msg = str(e).split("\n")[0] if str(e) else type(e).__name__
+            logger.warning(f"Browser window lost during wait: {err_msg}")
             raise
         except Exception as e:
             logger.debug(f"Transient error getting page source: {e}")
@@ -304,14 +303,15 @@ def get_beatport_page_script_queries(url: str) -> dict:
 
         except Exception as e:
             last_error = e
+            err_msg = str(e).split("\n")[0] if str(e) else type(e).__name__
             logger.warning(
-                f"Attempt {attempt + 1}/{max_load_retries} failed for {url}: {e}"
+                f"Attempt {attempt + 1}/{max_load_retries} failed for {url}: {err_msg}"
             )
             # If window is lost, force a driver reset for the next attempt
             if "no such window" in str(e).lower() or "session" in str(e).lower():
                 logger.info("Resetting driver due to lost window...")
                 BeatportBrowser.quit()
-            
+
             # Extra sleep on failure
             sleep(5)
 
@@ -333,7 +333,8 @@ def _wait_for_charts(driver: Any, max_wait: int) -> None:
             ):
                 break
         except (NoSuchWindowException, WebDriverException) as e:
-            logger.warning(f"Browser window lost during charts wait: {e}")
+            err_msg = str(e).split("\n")[0] if str(e) else type(e).__name__
+            logger.warning(f"Browser window lost during charts wait: {err_msg}")
             raise
         except Exception as e:
             logger.debug(f"Transient error in scrape_beatport_charts wait: {e}")
@@ -347,10 +348,12 @@ def _extract_links(driver: Any) -> list:
             raise ValueError("Browser window closed unexpectedly before finding elements")
         return driver.find_elements(By.CSS_SELECTOR, 'a[href*="/chart/"]')
     except (NoSuchWindowException, WebDriverException) as e:
-        logger.warning(f"Browser window lost before element find: {e}")
+        err_msg = str(e).split("\n")[0] if str(e) else type(e).__name__
+        logger.warning(f"Browser window lost before element find: {err_msg}")
         raise
     except Exception as e:
-        logger.error(f"Failed to find elements: {e}")
+        err_msg = str(e).split("\n")[0] if str(e) else type(e).__name__
+        logger.error(f"Failed to find elements: {err_msg}")
         return []
 
 
@@ -407,8 +410,9 @@ def scrape_beatport_charts(
 
         except Exception as e:
             last_error = e
+            err_msg = str(e).split("\n")[0] if str(e) else type(e).__name__
             logger.warning(
-                f"Attempt {attempt + 1}/{max_load_retries} failed for {url}: {e}"
+                f"Attempt {attempt + 1}/{max_load_retries} failed for {url}: {err_msg}"
             )
             # If window is lost, force a driver reset for the next attempt
             if "no such window" in str(e).lower() or "session" in str(e).lower():
@@ -441,6 +445,13 @@ def get_top_100_playables(genre: str) -> list[dict]:
     return raw_tracks_dicts
 
 
+def _format_duration_ms(duration_ms: int) -> str:
+    """Format duration in milliseconds into M:SS string."""
+    total_seconds = max(duration_ms, 0) // 1000
+    minutes, seconds = divmod(total_seconds, 60)
+    return f"{minutes}:{seconds:02d}"
+
+
 def parse_tracks(raw_tracks_dicts: list[dict]) -> list:
     """Parse tracks from Beatport JSON response.
 
@@ -451,33 +462,39 @@ def parse_tracks(raw_tracks_dicts: list[dict]) -> list:
         List of tracks.
 
     """
-    tracks = list()
+    tracks = []
     for track in raw_tracks_dicts:
         try:
+            duration_ms = int(track.get("length_ms") or 0)
+            duration = str(track.get("length") or _format_duration_ms(duration_ms))
+            published_date = (
+                track.get("publish_date") or track.get("new_release_date") or ""
+            )
+            release_obj = track.get("release") or {}
+            label_obj = release_obj.get("label") or {}
+            genre_obj = track.get("genre") or {}
+            key_obj = track.get("key") or {}
+
             tracks.append(
                 BeatportTrack.model_validate(
                     {
-                        # "title": track["title"],
                         "name": track["name"],
-                        "mix": track["mix_name"],
-                        "artists": [artist["name"] for artist in track["artists"]],
-                        "remixers": [remixer["name"] for remixer in track["remixers"]],
-                        "release": track["release"]["name"],
-                        "label": track["release"]["label"]["name"],
-                        "published_date": track["publish_date"],
-                        # "released_date": track["date"]["released"],
-                        "duration": track[
-                            "length"
-                        ],  # TODO was ["duration"]["minutes"] before,
-                        # to check if the same
-                        "duration_ms": track["length_ms"],
-                        "genres": track["genre"][
-                            "name"
-                        ],  # Used to be track["genres"] as list
-                        "bpm": track["bpm"],
-                        "key": track["key"][
-                            "name"
-                        ],  # Was only track["key"] before, but dict
+                        "mix": track.get("mix_name") or "",
+                        "artists": [
+                            artist["name"] for artist in (track.get("artists") or [])
+                        ],
+                        "remixers": [
+                            remixer["name"] for remixer in (track.get("remixers") or [])
+                        ],
+                        "release": release_obj.get("name", ""),
+                        "label": label_obj.get("name", ""),
+                        "published_date": published_date,
+                        "released_date": track.get("new_release_date") or "",
+                        "duration": duration,
+                        "duration_ms": duration_ms,
+                        "genres": genre_obj.get("name", ""),
+                        "bpm": track.get("bpm"),
+                        "key": key_obj.get("name", ""),
                     }
                 )
             )
@@ -655,6 +672,75 @@ def parse_chart_url_datetime(date_str: str) -> str:
         return datetime.today().strftime(date_str)
 
 
+def _extract_label_tracks_data(results_data: Any) -> dict:
+    """Extract the tracks query state data from Beatport dehydrated queries."""
+    for query in results_data:
+        if not isinstance(query, dict):
+            continue
+        query_key = query.get("queryKey")
+        state_data = query.get("state", {}).get("data")
+        if (
+            isinstance(query_key, list)
+            and query_key
+            and query_key[0] == "tracks"
+            and isinstance(state_data, dict)
+        ):
+            return state_data
+
+    if len(results_data) > 1 and isinstance(results_data[1], dict):
+        fallback_data = results_data[1].get("state", {}).get("data")
+        if isinstance(fallback_data, dict):
+            return fallback_data
+
+    raise ValueError("Could not find tracks query data in label page response")
+
+
+def _get_label_max_pages(tracks_data: dict, per_page: int = 50) -> int:
+    """Determine total number of pages from label tracks query data."""
+    page_str = tracks_data.get("page")
+    if isinstance(page_str, str) and "/" in page_str:
+        max_page_str = page_str.split("/")[1]
+        if max_page_str.isdigit():
+            return int(max_page_str)
+
+    count = tracks_data.get("count")
+    if isinstance(count, int):
+        if count <= 0:
+            return 0
+        results = tracks_data.get("results")
+        results_len = len(results) if isinstance(results, list) else 0
+        effective_per_page = results_len if 0 < results_len < count else per_page
+        return math.ceil(count / effective_per_page)
+
+    raise KeyError("Neither 'page' nor 'count' found in label tracks data")
+
+
+def _get_label_last_update(label: str, max_page_number: int) -> datetime:
+    """Load playlist history for a label and return its last update timestamp."""
+    playlist = find_playlist_chart_label(label)
+    if playlist["id"]:
+        update_hist_pl_tracks(playlist)
+        df_loc_hist = load_hist_file(playlist_id=playlist["id"], allow_empty=True)
+        try:
+            if len(df_loc_hist.index) > 0:
+                last_update = max(df_loc_hist.loc[:, "datetime_added"])
+                if isinstance(last_update, str):
+                    last_update = datetime.strptime(last_update, "%Y-%m-%dT%H:%M:%SZ")
+                else:
+                    last_update = last_update.tz_localize(None)
+                logger.info(
+                    f"Label {label} has {max_page_number} pages. "
+                    f"Last playlist update found {last_update}(UTC): "
+                )
+                return last_update
+        finally:
+            del df_loc_hist
+            gc.collect()
+
+    logger.info(f"Label {label} has {max_page_number} pages")
+    return datetime.min
+
+
 def get_label_tracks(
     label: str,
     label_bp_url_code: str,
@@ -674,64 +760,50 @@ def get_label_tracks(
         List of dict of tracks from oldest (first) to newest (last).
 
     """
-    # Get max number of pages for label
-    url = f"https://www.beatport.com/label/{label_bp_url_code}/tracks?per-page=50"
-    results_data = get_beatport_page_script_queries(url)
-    page_numbers_string = results_data[1]["state"]["data"]["page"]
-    max_page_number = page_numbers_string.split("/")[1]
-    assert len(max_page_number) > 0, "No pages found in label page"
+    per_page = 50
+    first_page_url = (
+        f"https://www.beatport.com/label/{label_bp_url_code}/tracks"
+        f"?page=1&per_page={per_page}"
+    )
+    results_data = get_beatport_page_script_queries(first_page_url)
+    tracks_data = _extract_label_tracks_data(results_data)
+    max_page_number = _get_label_max_pages(tracks_data, per_page=per_page)
+    assert max_page_number > 0, "No pages found in label page"
 
-    # Get tracks for label
-    label_tracks = []
-
-    # Load history
-    playlist = find_playlist_chart_label(label)
-    df_loc_hist = pd.DataFrame()
-    if playlist["id"]:
-        update_hist_pl_tracks(playlist)
-        df_loc_hist = load_hist_file(playlist_id=playlist["id"], allow_empty=True)
-        if len(df_loc_hist.index) > 0:
-            last_update = max(df_loc_hist.loc[:, "datetime_added"])
-            if isinstance(last_update, str):
-                last_update = datetime.strptime(last_update, "%Y-%m-%dT%H:%M:%SZ")
-            else:
-                last_update = last_update.tz_localize(None)
-            logger.info(
-                f"Label {label} has {max_page_number} pages. "
-                f"Last playlist update found {last_update}(UTC): "
-            )
-        else:
-            last_update = datetime.min
-            logger.info(f"Label {label} has {max_page_number} pages")
-    else:
-        last_update = datetime.min
-        logger.info(f"Label {label} has {max_page_number} pages")
+    label_tracks: list[BeatportTrack] = []
+    last_update = _get_label_last_update(label, max_page_number)
 
     # Parse label pages
-    for i in range(1, int(max_page_number)):
+    for i in range(1, max_page_number + 1):
         if not silent:
             logger.info(f"\t[+] Getting label {label_bp_url_code}, page {i}")
         url = (
-            "https://www.beatport.com/label"
-            f"/{label_bp_url_code}/tracks?page={i}&per-page=50"
+            f"https://www.beatport.com/label/{label_bp_url_code}/tracks"
+            f"?page={i}&per_page={per_page}"
         )
         results_data = get_beatport_page_script_queries(url)
-        raw_tracks_dicts = results_data[1]["state"]["data"]["results"]
-        assert len(raw_tracks_dicts) > 0, f"No tracks found on the label page: {url}"
-        raw_tracks = parse_tracks(raw_tracks_dicts)
+        page_data = _extract_label_tracks_data(results_data)
+        raw_tracks_dicts = page_data.get("results") or []
+        if i == 1:
+            assert len(raw_tracks_dicts) > 0, f"No tracks found on the label page: {url}"
+        elif not raw_tracks_dicts:
+            break
 
+        raw_tracks = parse_tracks(raw_tracks_dicts)
         label_tracks.extend(raw_tracks)
 
         # Check if release date reached last update
         reached_last_update = sum(
             [
-                to_datetime(track.published_date).tz_localize(None) < last_update
+                bool(track.published_date)
+                and to_datetime(track.published_date, utc=True).tz_localize(None)
+                < last_update
                 for track in raw_tracks
             ]
         )
 
         # Clean up per page
-        del results_data, raw_tracks_dicts, raw_tracks
+        del results_data, page_data, raw_tracks_dicts, raw_tracks
         gc.collect()
 
         if reached_last_update > 0 and not overwrite:
@@ -739,9 +811,6 @@ def get_label_tracks(
             break
 
     label_tracks.reverse()
-
-    # Final cleanup
-    del df_loc_hist
     gc.collect()
 
     return label_tracks
